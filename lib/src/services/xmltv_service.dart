@@ -6,16 +6,33 @@ import '../models/epg_program.dart';
 class XmlTvService {
   XmlTvService({http.Client? client}) : _client = client ?? http.Client();
 
+  static final RegExp _offsetPattern = RegExp(r'([+-])(\\d{2})(\\d{2})');
+
   final http.Client _client;
 
   Future<Map<String, List<EpgProgram>>> load(String url) async {
-    final uri = Uri.parse(url);
-    final response = await _client.get(uri).timeout(const Duration(seconds: 30));
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        !uri.hasAuthority ||
+        !{'http', 'https'}.contains(uri.scheme.toLowerCase())) {
+      throw const FormatException('Enter a valid HTTP or HTTPS EPG URL.');
+    }
+    late http.Response response;
+    try {
+      response = await _client.get(uri).timeout(const Duration(seconds: 30));
+    } catch (_) {
+      throw Exception('Could not load the TV guide.');
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('EPG returned HTTP ${response.statusCode}.');
     }
 
-    final document = XmlDocument.parse(response.body);
+    late XmlDocument document;
+    try {
+      document = XmlDocument.parse(response.body);
+    } on XmlParserException {
+      throw const FormatException('The TV guide returned invalid XML.');
+    }
     final output = <String, List<EpgProgram>>{};
 
     for (final node in document.findAllElements('programme')) {
