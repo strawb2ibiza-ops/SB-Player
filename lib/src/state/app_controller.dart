@@ -118,6 +118,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> restoreSession() async {
+    await _epgCacheService.cleanupLegacyCache();
     await _loadLibrary();
 
     IptvAccount? stored;
