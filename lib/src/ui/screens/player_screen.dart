@@ -32,6 +32,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   static const _videoOnlyMiniSize = Size(520, 300);
   static const _videoOnlyMiniMinimumSize = Size(320, 180);
 
+  late PlaybackItem _item;
   late final Player _player;
   late final VideoController _videoController;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -59,6 +60,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    _item = widget.item;
     _player = Player();
     _videoController = VideoController(_player);
     _subscriptions.add(_player.stream.buffering.listen((value) {
@@ -111,10 +113,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
 
     try {
-      await _player.open(Media(widget.item.streamUrl), play: true);
-      if (!widget.item.isLive &&
-          widget.item.startPosition > const Duration(seconds: 5)) {
-        await _player.seek(widget.item.startPosition);
+      await _player.open(Media(_item.streamUrl), play: true);
+      if (!_item.isLive &&
+          _item.startPosition > const Duration(seconds: 5)) {
+        await _player.seek(_item.startPosition);
       }
     } catch (_) {
       _handlePlaybackFailure();
@@ -133,11 +135,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _handlePlaybackFailure() {
     if (!mounted) return;
     setState(() {
-      _playbackError = widget.item.isLive
+      _playbackError = _item.isLive
           ? 'The live stream was interrupted.'
           : 'Playback stopped unexpectedly.';
     });
-    if (widget.item.isLive) _scheduleReconnect();
+    if (_item.isLive) _scheduleReconnect();
   }
 
   void _scheduleReconnect() {
@@ -298,7 +300,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _seekRelative(int seconds) async {
-    if (widget.item.isLive || _duration.inMilliseconds <= 0) return;
+    if (_item.isLive || _duration.inMilliseconds <= 0) return;
     final target = (_position + Duration(seconds: seconds)).inMilliseconds;
     final clamped = target.clamp(0, _duration.inMilliseconds).toInt();
     await _player.seek(Duration(milliseconds: clamped));
@@ -327,22 +329,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _switchLiveChannel(int delta) async {
-    if (!widget.item.isLive || widget.controller.channels.isEmpty) return;
+    if (!_item.isLive || widget.controller.channels.isEmpty) return;
     final id = _contentId.replaceFirst('live:', '');
     final currentIndex =
         widget.controller.channels.indexWhere((channel) => channel.id == id);
     if (currentIndex < 0) return;
+
     final length = widget.controller.channels.length;
     final nextIndex = (currentIndex + delta + length) % length;
     final next = widget.controller.playbackForChannel(
       widget.controller.channels[nextIndex],
     );
-    if (!mounted) return;
-    await Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => PlayerScreen(controller: widget.controller, item: next),
-      ),
+
+    await widget.controller.recordPlayback(
+      _item,
+      position: _player.state.position,
+      duration: _player.state.duration,
     );
+
+    if (!mounted) return;
+    setState(() {
+      _item = next;
+      _playbackError = null;
+      _buffering = true;
+    });
+    await _retry();
   }
 
   Widget _withKeyboardShortcuts(Widget child) {
@@ -371,22 +382,22 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   String get _contentId {
-    final separator = widget.item.id.lastIndexOf('|');
+    final separator = _item.id.lastIndexOf('|');
     return separator < 0
-        ? widget.item.id
-        : widget.item.id.substring(separator + 1);
+        ? _item.id
+        : _item.id.substring(separator + 1);
   }
 
   String? get _displaySubtitle {
-    if (!widget.item.isLive) return widget.item.subtitle;
+    if (!_item.isLive) return _item.subtitle;
     final id = _contentId.replaceFirst('live:', '');
     for (final channel in widget.controller.channels) {
       if (channel.id == id) {
         return widget.controller.nowProgram(channel)?.title ??
-            widget.item.subtitle;
+            _item.subtitle;
       }
     }
-    return widget.item.subtitle;
+    return _item.subtitle;
   }
 
   @override
@@ -395,7 +406,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final duration = _player.state.duration;
     unawaited(
       widget.controller.recordPlayback(
-        widget.item,
+        _item,
         position: position,
         duration: duration,
       ),
@@ -423,7 +434,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
-        final favorite = widget.controller.isFavorite(widget.item);
+        final favorite = widget.controller.isFavorite(_item);
         return Scaffold(
           backgroundColor: Colors.black,
           appBar: AppBar(
@@ -432,7 +443,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.item.title,
+                  _item.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -446,13 +457,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ],
             ),
             actions: [
-              if (widget.item.isLive)
+              if (_item.isLive)
                 IconButton(
                   tooltip: 'Previous channel (Page Up)',
                   onPressed: () => _switchLiveChannel(-1),
                   icon: const Icon(Icons.skip_previous),
                 ),
-              if (widget.item.isLive)
+              if (_item.isLive)
                 IconButton(
                   tooltip: 'Next channel (Page Down)',
                   onPressed: () => _switchLiveChannel(1),
@@ -480,7 +491,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 tooltip:
                     favorite ? 'Remove from favorites' : 'Add to favorites',
                 onPressed: () =>
-                    widget.controller.toggleFavorite(widget.item),
+                    widget.controller.toggleFavorite(_item),
                 icon: Icon(
                   favorite ? Icons.favorite : Icons.favorite_border,
                 ),
@@ -518,7 +529,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.item.title,
+                          _item.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w800),
@@ -559,7 +570,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               onSwitchLayout: _toggleMiniLayout,
               onRestore: _toggleMiniPlayer,
               detailed: true,
-              isLive: widget.item.isLive,
+              isLive: _item.isLive,
             ),
           ],
         ),
@@ -603,7 +614,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             Expanded(
                               child: DragToMoveArea(
                                 child: Text(
-                                widget.item.title,
+                                _item.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -644,7 +655,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         onSwitchLayout: _toggleMiniLayout,
                         onRestore: _toggleMiniPlayer,
                         detailed: false,
-                        isLive: widget.item.isLive,
+                        isLive: _item.isLive,
                       ),
                     ],
                   ),
