@@ -296,7 +296,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _seekRelative(int seconds) async {
     if (widget.item.isLive || _duration.inMilliseconds <= 0) return;
     final target = (_position + Duration(seconds: seconds)).inMilliseconds;
-    final clamped = target.clamp(0, _duration.inMilliseconds);
+    final clamped = target.clamp(0, _duration.inMilliseconds).toInt();
     await _player.seek(Duration(milliseconds: clamped));
   }
 
