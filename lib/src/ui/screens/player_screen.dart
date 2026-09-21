@@ -604,22 +604,24 @@ class _PlayerScreenState extends State<PlayerScreen> with WindowListener {
           backgroundColor: Colors.black,
           appBar: AppBar(
             backgroundColor: Colors.black,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (_displaySubtitle != null)
+            title: DragToMoveArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    _displaySubtitle!,
+                    _item.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
                   ),
-              ],
+                  if (_displaySubtitle != null)
+                    Text(
+                      _displaySubtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                ],
+              ),
             ),
             actions: [
               if (_item.isLive)
@@ -667,7 +669,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WindowListener {
                   onPressed: _toggleMiniPlayer,
                   icon: const Icon(Icons.picture_in_picture_alt),
                 ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
+              const DesktopWindowControls(compact: true),
+              const SizedBox(width: 4),
             ],
           ),
           body: Center(child: _buildVideo(useBuiltInControls: true)),
@@ -689,24 +693,30 @@ class _PlayerScreenState extends State<PlayerScreen> with WindowListener {
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w800),
+                    child: DragToMoveArea(
+                      child: SizedBox.expand(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            if (_displaySubtitle != null)
+                              Text(
+                                _displaySubtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                          ],
                         ),
-                        if (_displaySubtitle != null)
-                          Text(
-                            _displaySubtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                      ],
+                      ),
                     ),
                   ),
                   IconButton(
