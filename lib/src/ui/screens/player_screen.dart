@@ -605,6 +605,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                                 ),
                               ),
                             ),
+                            ),
                             IconButton(
                               tooltip: 'Show details',
                               onPressed: _toggleMiniLayout,
