@@ -4,9 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 class DesktopWindowControls extends StatelessWidget {
-  const DesktopWindowControls({super.key, this.compact = false});
+  const DesktopWindowControls({
+    super.key,
+    this.compact = false,
+    this.showMaximize = true,
+  });
 
   final bool compact;
+  final bool showMaximize;
 
   @override
   Widget build(BuildContext context) {
@@ -22,18 +27,19 @@ class DesktopWindowControls extends StatelessWidget {
           onPressed: windowManager.minimize,
           icon: Icon(Icons.remove, size: size),
         ),
-        IconButton(
-          tooltip: 'Maximize / restore',
-          visualDensity: VisualDensity.compact,
-          onPressed: () async {
-            if (await windowManager.isMaximized()) {
-              await windowManager.unmaximize();
-            } else {
-              await windowManager.maximize();
-            }
-          },
-          icon: Icon(Icons.crop_square_rounded, size: size - 2),
-        ),
+        if (showMaximize)
+          IconButton(
+            tooltip: 'Maximize / restore',
+            visualDensity: VisualDensity.compact,
+            onPressed: () async {
+              if (await windowManager.isMaximized()) {
+                await windowManager.unmaximize();
+              } else {
+                await windowManager.maximize();
+              }
+            },
+            icon: Icon(Icons.crop_square_rounded, size: size - 2),
+          ),
         IconButton(
           tooltip: 'Close',
           visualDensity: VisualDensity.compact,
