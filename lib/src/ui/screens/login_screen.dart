@@ -81,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      for (final profile in controller.profiles.take(4))
+                      for (final profile in controller.profiles)
                         Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
