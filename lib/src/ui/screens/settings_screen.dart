@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../../services/playback_preferences.dart';
 import '../../state/app_controller.dart';
