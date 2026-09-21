@@ -18,7 +18,12 @@ class M3uClient {
       throw const FormatException('Enter a valid HTTP or HTTPS M3U URL.');
     }
 
-    final response = await _client.get(uri).timeout(const Duration(seconds: 25));
+    late http.Response response;
+    try {
+      response = await _client.get(uri).timeout(const Duration(seconds: 25));
+    } catch (_) {
+      throw Exception('Could not load the M3U playlist.');
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Playlist returned HTTP ${response.statusCode}.');
     }
