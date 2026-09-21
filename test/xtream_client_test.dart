@@ -50,8 +50,8 @@ void main() {
       }),
     );
 
-    expect(
-      () => client.authenticate(
+    await expectLater(
+      client.authenticate(
         serverUrl: 'https://',
         username: 'user',
         password: 'pass',
