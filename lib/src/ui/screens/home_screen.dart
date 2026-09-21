@@ -7,6 +7,7 @@ import '../../models/library_entry.dart';
 import '../../models/playback_item.dart';
 import '../../state/app_controller.dart';
 import '../widgets/channel_tile.dart';
+import '../widgets/epg_timeline.dart';
 import '../widgets/library_tile.dart';
 import '../widgets/poster_card.dart';
 import 'movie_details_screen.dart';
@@ -194,7 +195,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildGuide(AppController controller) {
     final channels = controller.visibleChannels(_search.text);
-    if (channels.isEmpty) return const Center(child: Text('No channels found.'));
+    if (channels.isEmpty) {
+      return const Center(child: Text('No channels found.'));
+    }
     if (controller.epg.isEmpty && !controller.epgLoading) {
       return Center(
         child: Column(
@@ -214,83 +217,37 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    return ListView.separated(
-      itemCount: channels.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final channel = channels[index];
-        final programmes = controller.programmesForChannel(channel);
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 180,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: channel.logoUrl == null
-                        ? const Icon(Icons.live_tv_outlined)
-                        : SizedBox(
-                            width: 42,
-                            height: 42,
-                            child: Image.network(
-                              channel.logoUrl!,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, _, _) => const Icon(Icons.live_tv_outlined),
-                            ),
-                          ),
-                    title: Text(channel.name, maxLines: 2, overflow: TextOverflow.ellipsis),
-                    onTap: () => _play(controller.playbackForChannel(channel)),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: programmes.isEmpty
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 14),
-                          child: Text('No programme information'),
-                        )
-                      : Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final programme in programmes)
-                              Container(
-                                width: 210,
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: programme.isLiveAt(DateTime.now())
-                                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
-                                      : Colors.white.withValues(alpha: 0.04),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '${_time(programme.start)}–${_time(programme.stop)}',
-                                      style: Theme.of(context).textTheme.bodySmall,
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      programme.title,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontWeight: FontWeight.w700),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                ),
-              ],
+    if (controller.epgLoading && controller.epg.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Text(
+              'Now + 4 hours',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed:
+                  controller.epgLoading ? null : () => controller.loadEpg(force: true),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Refresh guide'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Expanded(
+          child: EpgTimeline(
+            controller: controller,
+            channels: channels,
+            onPlayChannel: (channel) =>
+                _play(controller.playbackForChannel(channel)),
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 
