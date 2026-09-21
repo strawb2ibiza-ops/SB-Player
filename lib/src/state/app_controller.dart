@@ -838,12 +838,6 @@ class AppController extends ChangeNotifier {
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
-  void _setM3uChannels(List<IptvChannel> loaded) {
-    channels = loaded;
-    liveCategories = _categoriesFromChannels(loaded);
-    liveCategoryId = '__all__';
-  }
-
   void _resetCatalogs() {
     liveCategories = const [];
     channels = const [];
