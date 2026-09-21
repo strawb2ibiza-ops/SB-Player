@@ -10,6 +10,7 @@ import '../models/library_entry.dart';
 import '../models/playback_item.dart';
 import '../models/series_item.dart';
 import '../models/vod_item.dart';
+import '../services/epg_cache_service.dart';
 import '../services/library_store.dart';
 import '../services/m3u_client.dart';
 import '../services/secure_account_store.dart';
@@ -24,13 +25,16 @@ class AppController extends ChangeNotifier {
     XtreamClient? xtreamClient,
     M3uClient? m3uClient,
     XmlTvService? xmlTvService,
-  })  : _xtreamClient = xtreamClient ?? XtreamClient(),
+    EpgCacheService epgCacheService = const EpgCacheService(),
+  })  : _epgCacheService = epgCacheService,
+        _xtreamClient = xtreamClient ?? XtreamClient(),
         _m3uClient = m3uClient ?? M3uClient(),
         _xmlTvService = xmlTvService ?? XmlTvService();
 
   final AppConfig config;
   final SecureAccountStore accountStore;
   final LibraryStore libraryStore;
+  final EpgCacheService _epgCacheService;
   final XtreamClient _xtreamClient;
   final M3uClient _m3uClient;
   final XmlTvService _xmlTvService;
@@ -349,15 +353,26 @@ class AppController extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  Future<void> loadEpg() async {
-    if (_epgLoaded || epgLoading) return;
+  Future<void> loadEpg({bool force = false}) async {
+    if ((_epgLoaded && !force) || epgLoading) return;
     final url = account?.epgUrl;
     if (url == null || url.isEmpty) return;
     epgLoading = true;
     notifyListeners();
     try {
-      epg = await _xmlTvService.load(url);
+      if (!force) {
+        final cached = await _epgCacheService.load(url);
+        if (cached != null) {
+          epg = cached;
+          _epgLoaded = true;
+          return;
+        }
+      }
+
+      final fresh = await _xmlTvService.load(url);
+      epg = fresh;
       _epgLoaded = true;
+      await _epgCacheService.save(url, fresh);
     } catch (_) {
       // EPG is optional. Playback and catalog browsing must remain usable.
     } finally {
