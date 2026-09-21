@@ -8,6 +8,7 @@ import '../../models/iptv_channel.dart';
 import '../../models/library_entry.dart';
 import '../../models/playback_item.dart';
 import '../../state/app_controller.dart';
+import '../widgets/account_manager_dialog.dart';
 import '../widgets/channel_tile.dart';
 import '../widgets/epg_timeline.dart';
 import '../widgets/library_tile.dart';
@@ -161,6 +162,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _showAccounts() {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AccountManagerDialog(controller: widget.controller),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -180,7 +188,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
-              if (value == 'logout') unawaited(controller.logout());
+              if (value == 'accounts') {
+                unawaited(_showAccounts());
+              } else if (value == 'logout') {
+                unawaited(controller.logout());
+              }
             },
             itemBuilder: (context) => [
               PopupMenuItem(
@@ -190,6 +202,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     : 'Expires ${_date(controller.account!.expiresAt!)}'),
               ),
               const PopupMenuDivider(),
+              if (!controller.config.isLocked)
+                const PopupMenuItem(
+                  value: 'accounts',
+                  child: Text('Manage accounts'),
+                ),
               const PopupMenuItem(value: 'logout', child: Text('Log out')),
             ],
           ),
@@ -617,7 +634,11 @@ class _Sidebar extends StatelessWidget {
                   const Text('SB', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
                   const Spacer(),
                   Text(
-                    controller.config.isLocked ? 'SB Edition' : 'Open Edition',
+                    controller.config.isLocked
+                        ? 'SB Edition'
+                        : controller.activeProfile?.name ?? 'Open Edition',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
