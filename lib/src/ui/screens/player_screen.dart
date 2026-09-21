@@ -50,6 +50,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Duration _duration = Duration.zero;
   String? _playbackError;
   Size? _previousWindowSize;
+  Offset? _previousWindowPosition;
   Tracks _tracks = const Tracks();
   Track _selectedTracks = const Track();
   MiniPlayerLayout _miniLayout = MiniPlayerLayout.detailed;
@@ -156,6 +157,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     if (!_miniMode) {
       _previousWindowSize = await windowManager.getSize();
+      _previousWindowPosition = await windowManager.getPosition();
       await windowManager.setAlwaysOnTop(true);
       await _applyMiniChrome();
       await _applyMiniWindowSize();
@@ -234,6 +236,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await windowManager.setMinimumSize(_normalMinimumSize);
     if (_previousWindowSize != null) {
       await windowManager.setSize(_previousWindowSize!, animate: true);
+    }
+    if (_previousWindowPosition != null) {
+      await windowManager.setPosition(_previousWindowPosition!, animate: true);
     }
   }
 
@@ -324,7 +329,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Future<void> _switchLiveChannel(int delta) async {
     if (!widget.item.isLive || widget.controller.channels.isEmpty) return;
-    final id = widget.item.id.replaceFirst('live:', '');
+    final id = _contentId.replaceFirst('live:', '');
     final currentIndex =
         widget.controller.channels.indexWhere((channel) => channel.id == id);
     if (currentIndex < 0) return;
@@ -366,9 +371,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
+  String get _contentId {
+    final separator = widget.item.id.lastIndexOf('|');
+    return separator < 0
+        ? widget.item.id
+        : widget.item.id.substring(separator + 1);
+  }
+
   String? get _displaySubtitle {
     if (!widget.item.isLive) return widget.item.subtitle;
-    final id = widget.item.id.replaceFirst('live:', '');
+    final id = _contentId.replaceFirst('live:', '');
     for (final channel in widget.controller.channels) {
       if (channel.id == id) {
         return widget.controller.nowProgram(channel)?.title ??
