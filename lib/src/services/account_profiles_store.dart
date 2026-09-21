@@ -52,8 +52,12 @@ class AccountProfilesStore {
     );
   }
 
-  Future<String?> readActiveProfileId() {
-    return _storage.read(key: _activeProfileKey);
+  Future<String?> readActiveProfileId() async {
+    try {
+      return await _storage.read(key: _activeProfileKey);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> setActiveProfileId(String? id) {
