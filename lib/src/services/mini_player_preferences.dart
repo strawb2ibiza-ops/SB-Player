@@ -41,22 +41,30 @@ class MiniPlayerPreferences {
   FlutterSecureStorage get _storage => const FlutterSecureStorage();
 
   Future<MiniPlayerLayout> readLayout() async {
-    final value = await _storage.read(key: _layoutKey);
-    return MiniPlayerLayout.values.firstWhere(
-      (layout) => layout.name == value,
-      orElse: () => MiniPlayerLayout.detailed,
-    );
+    try {
+      final value = await _storage.read(key: _layoutKey);
+      return MiniPlayerLayout.values.firstWhere(
+        (layout) => layout.name == value,
+        orElse: () => MiniPlayerLayout.detailed,
+      );
+    } catch (_) {
+      return MiniPlayerLayout.detailed;
+    }
   }
 
-  Future<void> saveLayout(MiniPlayerLayout layout) {
-    return _storage.write(key: _layoutKey, value: layout.name);
+  Future<void> saveLayout(MiniPlayerLayout layout) async {
+    try {
+      await _storage.write(key: _layoutKey, value: layout.name);
+    } catch (_) {
+      // Preferences are best-effort.
+    }
   }
 
   Future<MiniPlayerGeometry?> readGeometry(MiniPlayerLayout layout) async {
-    final value =
-        await _storage.read(key: '$_geometryPrefix${layout.name}');
-    if (value == null || value.isEmpty) return null;
     try {
+      final value =
+          await _storage.read(key: '$_geometryPrefix${layout.name}');
+      if (value == null || value.isEmpty) return null;
       return MiniPlayerGeometry.fromJson(
         Map<String, dynamic>.from(jsonDecode(value) as Map),
       );
@@ -69,12 +77,16 @@ class MiniPlayerPreferences {
     MiniPlayerLayout layout, {
     required Size size,
     required Offset position,
-  }) {
-    return _storage.write(
-      key: '$_geometryPrefix${layout.name}',
-      value: jsonEncode(
-        MiniPlayerGeometry(size: size, position: position).toJson(),
-      ),
-    );
+  }) async {
+    try {
+      await _storage.write(
+        key: '$_geometryPrefix${layout.name}',
+        value: jsonEncode(
+          MiniPlayerGeometry(size: size, position: position).toJson(),
+        ),
+      );
+    } catch (_) {
+      // Preferences are best-effort.
+    }
   }
 }
