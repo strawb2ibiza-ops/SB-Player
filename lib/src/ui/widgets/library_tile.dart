@@ -39,7 +39,7 @@ class LibraryTile extends StatelessWidget {
                     : Image.network(
                         entry.artworkUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(_iconFor(entry.kind)),
+                        errorBuilder: (_, _, _) => Icon(_iconFor(entry.kind)),
                       ),
               ),
               const SizedBox(width: 12),
