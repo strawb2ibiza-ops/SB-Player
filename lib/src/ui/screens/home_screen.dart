@@ -388,13 +388,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final hero = continueItems.isNotEmpty
         ? continueItems.first
         : (recentItems.isNotEmpty ? recentItems.first : null);
-    final liveChannels = controller.channels.take(6).toList(growable: false);
+    final liveChannels = controller.channels.where((channel) {
+      return controller.nowProgram(channel) != null;
+    }).take(6).toList(growable: false);
+    final newMovies = controller.recentlyAddedMovies;
+    final newSeries = controller.recentlyAddedSeries;
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 18),
       children: [
         SizedBox(
-          height: 290,
+          height: 330,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: Stack(
@@ -404,6 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Image.network(
                     hero!.artworkUrl!,
                     fit: BoxFit.cover,
+                    alignment: Alignment.centerRight,
                     errorBuilder: (_, _, _) =>
                         const BrandBackdrop(child: SizedBox.expand()),
                   )
@@ -416,10 +421,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       end: Alignment.centerRight,
                       colors: [
                         Color(0xF2040509),
-                        Color(0xB8040509),
-                        Color(0x38040509),
+                        Color(0xA8040509),
+                        Color(0x10040509),
                       ],
-                      stops: [0, .58, 1],
+                      stops: [0, .46, 1],
                     ),
                   ),
                 ),
@@ -491,17 +496,70 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         if (continueItems.isNotEmpty) ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: 26),
           _HomeShelf(
-            title: 'Continue Watching',
-            entries: continueItems.take(8).toList(growable: false),
+            title: 'Pick Up Where You Left Off',
+            entries: continueItems.take(10).toList(growable: false),
             onTap: (entry) => _play(entry.toPlaybackItem()),
           ),
         ],
+        if (newMovies.isNotEmpty) ...[
+          const SizedBox(height: 26),
+          _PosterShelf(
+            title: 'Recently Added Movies',
+            count: newMovies.length,
+            builder: (index) {
+              final movie = newMovies[index];
+              final item = controller.playbackForMovie(movie);
+              return PosterCard(
+                title: movie.name,
+                imageUrl: movie.posterUrl,
+                rating: movie.rating,
+                favorite: controller.isFavorite(item),
+                onFavorite: () => controller.toggleFavorite(item),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => MovieDetailsScreen(
+                        controller: controller,
+                        movie: movie,
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+        if (newSeries.isNotEmpty) ...[
+          const SizedBox(height: 26),
+          _PosterShelf(
+            title: 'Recently Added Series',
+            count: newSeries.length,
+            builder: (index) {
+              final series = newSeries[index];
+              return PosterCard(
+                title: series.name,
+                imageUrl: series.coverUrl,
+                rating: series.rating,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SeriesDetailsScreen(
+                        controller: controller,
+                        series: series,
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ],
         if (liveChannels.isNotEmpty) ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: 26),
           Text(
-            'On now',
+            'On Now',
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 12),
@@ -514,14 +572,14 @@ class _HomeScreenState extends State<HomeScreen> {
               itemBuilder: (context, index) {
                 final channel = liveChannels[index];
                 final item = controller.playbackForChannel(channel);
-                final now = controller.nowProgram(channel);
+                final now = controller.nowProgram(channel)!;
                 final next = controller.nextProgram(channel);
                 return SizedBox(
                   width: 390,
                   child: ChannelTile(
                     channel: channel,
-                    channelNumber: index + 1,
-                    nowText: now?.title,
+                    channelNumber: controller.channels.indexOf(channel) + 1,
+                    nowText: now.title,
                     nextText: next?.title,
                     isFavorite: controller.isFavorite(item),
                     onFavorite: () => controller.toggleFavorite(item),
@@ -533,7 +591,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
         if (recentItems.isNotEmpty) ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: 26),
           _HomeShelf(
             title: 'Recently Watched',
             entries: recentItems.take(8).toList(growable: false),
@@ -1170,6 +1228,41 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
+
+class _PosterShelf extends StatelessWidget {
+  const _PosterShelf({
+    required this.title,
+    required this.count,
+    required this.builder,
+  });
+
+  final String title;
+  final int count;
+  final Widget Function(int index) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 330,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: count,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            itemBuilder: (context, index) => SizedBox(
+              width: 205,
+              child: builder(index),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class _HomeShelf extends StatelessWidget {
   const _HomeShelf({
