@@ -33,6 +33,5 @@ Future<void> main() async {
     accountStore: const SecureAccountStore(),
   );
 
-  await controller.restoreSession();
   runApp(SbPlayerApp(controller: controller));
 }
