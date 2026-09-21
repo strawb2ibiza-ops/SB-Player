@@ -9,6 +9,9 @@ class M3uPlaylist {
 class M3uParser {
   const M3uParser();
 
+  static final RegExp _attributePattern =
+      RegExp(r'([A-Za-z0-9_-]+)="([^"]*)"');
+
   M3uPlaylist parse(String body) {
     final lines = body
         .replaceAll('\r\n', '\n')
@@ -18,18 +21,24 @@ class M3uParser {
         .where((line) => line.isNotEmpty)
         .toList();
 
-    if (lines.isEmpty || !lines.first.startsWith('#EXTM3U')) {
+    final header = lines.firstWhere(
+      (line) => line.trim().isNotEmpty,
+      orElse: () => '',
+    ).trim();
+    if (!header.startsWith('#EXTM3U')) {
       throw const FormatException('Not a valid extended M3U playlist.');
     }
 
-    final epgUrl = _extractHeaderAttribute(lines.first, 'url-tvg') ??
-        _extractHeaderAttribute(lines.first, 'x-tvg-url');
+    final epgUrl = _extractHeaderAttribute(header, 'url-tvg') ??
+        _extractHeaderAttribute(header, 'x-tvg-url');
 
     final channels = <IptvChannel>[];
     String? pendingInfo;
     var generatedId = 0;
 
-    for (final line in lines.skip(1)) {
+    for (final rawLine in lines) {
+      final line = rawLine.trim();
+      if (line.isEmpty || line == header) continue;
       if (line.startsWith('#EXTINF:')) {
         pendingInfo = line;
         continue;
