@@ -317,7 +317,8 @@ class AppController extends ChangeNotifier {
   }
 
   List<VodItem> get recentlyAddedMovies {
-    final values = [...movies];
+    final values =
+        movies.where((item) => item.addedAt != null).toList(growable: true);
     values.sort((a, b) {
       final left = a.addedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       final right = b.addedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -327,7 +328,8 @@ class AppController extends ChangeNotifier {
   }
 
   List<SeriesItem> get recentlyAddedSeries {
-    final values = [...series];
+    final values =
+        series.where((item) => item.addedAt != null).toList(growable: true);
     values.sort((a, b) {
       final left = a.addedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       final right = b.addedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
