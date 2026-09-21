@@ -2,7 +2,7 @@ name: Flutter checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, v0.5-branding-installer]
   pull_request:
 
 concurrency:
