@@ -11,7 +11,7 @@ typedef EpgProgrammeSelected = void Function(
   EpgProgram programme,
 );
 
-class EpgTimeline extends StatelessWidget {
+class EpgTimeline extends StatefulWidget {
   const EpgTimeline({
     super.key,
     required this.controller,
@@ -27,20 +27,33 @@ class EpgTimeline extends StatelessWidget {
   final ValueChanged<IptvChannel> onPlayChannel;
   final EpgProgrammeSelected onProgrammeSelected;
 
+  @override
+  State<EpgTimeline> createState() => _EpgTimelineState();
+}
+
+class _EpgTimelineState extends State<EpgTimeline> {
   static const double _channelWidth = 190;
   static const double _pixelsPerMinute = 3.6;
   static const double _rowHeight = 72;
   static const Duration _windowLength = Duration(hours: 4);
 
+  final ScrollController _horizontalController = ScrollController();
+
+  @override
+  void dispose() {
+    _horizontalController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final rounded = DateTime(
-      anchor.year,
-      anchor.month,
-      anchor.day,
-      anchor.hour,
-      anchor.minute < 30 ? 0 : 30,
+      widget.anchor.year,
+      widget.anchor.month,
+      widget.anchor.day,
+      widget.anchor.hour,
+      widget.anchor.minute < 30 ? 0 : 30,
     );
     final start = rounded;
     final end = start.add(_windowLength);
@@ -50,8 +63,10 @@ class EpgTimeline extends StatelessWidget {
         now.difference(start).inSeconds / 60 * _pixelsPerMinute;
 
     return Scrollbar(
+      controller: _horizontalController,
       thumbVisibility: true,
       child: SingleChildScrollView(
+        controller: _horizontalController,
         scrollDirection: Axis.horizontal,
         child: SizedBox(
           width: totalWidth,
@@ -66,11 +81,11 @@ class EpgTimeline extends StatelessWidget {
               const Divider(height: 1),
               Expanded(
                 child: ListView.builder(
-                  itemCount: channels.length,
+                  itemCount: widget.channels.length,
                   itemExtent: _rowHeight,
                   itemBuilder: (context, index) {
-                    final channel = channels[index];
-                    final programmes = controller.programmesForWindow(
+                    final channel = widget.channels[index];
+                    final programmes = widget.controller.programmesForWindow(
                       channel,
                       start: start,
                       end: end,
@@ -84,9 +99,9 @@ class EpgTimeline extends StatelessWidget {
                       channelWidth: _channelWidth,
                       pixelsPerMinute: _pixelsPerMinute,
                       nowOffset: nowOffset,
-                      onTap: () => onPlayChannel(channel),
+                      onTap: () => widget.onPlayChannel(channel),
                       onProgrammeTap: (programme) =>
-                          onProgrammeSelected(channel, programme),
+                          widget.onProgrammeSelected(channel, programme),
                     );
                   },
                 ),
