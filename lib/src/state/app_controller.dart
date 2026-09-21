@@ -82,6 +82,8 @@ class AppController extends ChangeNotifier {
   bool _moviesLoaded = false;
   bool _seriesLoaded = false;
   bool _epgLoaded = false;
+  String? _cachedSbScopeIdentity;
+  String? _cachedSbScope;
   String? error;
 
   bool get signedIn => account != null;
@@ -790,8 +792,14 @@ class AppController extends ChangeNotifier {
       if (current == null) return 'sb:pending';
       final identity =
           '${current.serverUrl ?? config.providerBaseUrl}|${current.username ?? ''}';
+      if (_cachedSbScopeIdentity == identity && _cachedSbScope != null) {
+        return _cachedSbScope!;
+      }
+
       final digest = sha256.convert(utf8.encode(identity)).toString();
-      return 'sb:${digest.substring(0, 16)}';
+      _cachedSbScopeIdentity = identity;
+      _cachedSbScope = 'sb:${digest.substring(0, 16)}';
+      return _cachedSbScope!;
     }
 
     final id = activeProfileId;
