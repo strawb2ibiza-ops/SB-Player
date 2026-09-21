@@ -82,6 +82,8 @@ class AppController extends ChangeNotifier {
   bool _moviesLoaded = false;
   bool _seriesLoaded = false;
   bool _epgLoaded = false;
+  int _catalogGeneration = 0;
+  int _epgGeneration = 0;
   String? _cachedSbScopeIdentity;
   String? _cachedSbScope;
   String? error;
@@ -492,12 +494,15 @@ class AppController extends ChangeNotifier {
     if ((_epgLoaded && !force) || epgLoading) return;
     final url = account?.epgUrl;
     if (url == null || url.isEmpty) return;
+
+    final generation = _epgGeneration;
     epgLoading = true;
     notifyListeners();
     try {
       if (!force) {
         final cached = await _epgCacheService.load(url);
         if (cached != null) {
+          if (generation != _epgGeneration || account?.epgUrl != url) return;
           epg = cached;
           _epgLoaded = true;
           return;
@@ -505,14 +510,17 @@ class AppController extends ChangeNotifier {
       }
 
       final fresh = await _xmlTvService.load(url);
+      await _epgCacheService.save(url, fresh);
+      if (generation != _epgGeneration || account?.epgUrl != url) return;
       epg = fresh;
       _epgLoaded = true;
-      await _epgCacheService.save(url, fresh);
     } catch (_) {
       // EPG is optional. Playback and catalog browsing must remain usable.
     } finally {
-      epgLoading = false;
-      notifyListeners();
+      if (generation == _epgGeneration) {
+        epgLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -731,6 +739,7 @@ class AppController extends ChangeNotifier {
   Future<void> _loadMovies() async {
     final current = account;
     if (current == null || current.type != AccountType.xtream) return;
+    final generation = _catalogGeneration;
     contentLoading = true;
     error = null;
     notifyListeners();
@@ -745,21 +754,27 @@ class AppController extends ChangeNotifier {
           loadedMovies = value;
         }),
       ]);
+      if (generation != _catalogGeneration || account != current) return;
       movieCategories = categories;
       movies = loadedMovies;
       _moviesLoaded = true;
       movieCategoryId = '__all__';
     } catch (exception) {
-      error = exception.toString().replaceFirst('Exception: ', '');
+      if (generation == _catalogGeneration) {
+        error = exception.toString().replaceFirst('Exception: ', '');
+      }
     } finally {
-      contentLoading = false;
-      notifyListeners();
+      if (generation == _catalogGeneration) {
+        contentLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> _loadSeries() async {
     final current = account;
     if (current == null || current.type != AccountType.xtream) return;
+    final generation = _catalogGeneration;
     contentLoading = true;
     error = null;
     notifyListeners();
@@ -774,15 +789,20 @@ class AppController extends ChangeNotifier {
           loadedSeries = value;
         }),
       ]);
+      if (generation != _catalogGeneration || account != current) return;
       seriesCategories = categories;
       series = loadedSeries;
       _seriesLoaded = true;
       seriesCategoryId = '__all__';
     } catch (exception) {
-      error = exception.toString().replaceFirst('Exception: ', '');
+      if (generation == _catalogGeneration) {
+        error = exception.toString().replaceFirst('Exception: ', '');
+      }
     } finally {
-      contentLoading = false;
-      notifyListeners();
+      if (generation == _catalogGeneration) {
+        contentLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -914,6 +934,8 @@ class AppController extends ChangeNotifier {
   }
 
   void _resetCatalogs() {
+    _catalogGeneration += 1;
+    _epgGeneration += 1;
     liveCategories = const [];
     channels = const [];
     movieCategories = const [];
