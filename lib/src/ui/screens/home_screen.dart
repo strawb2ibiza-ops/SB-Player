@@ -1022,9 +1022,9 @@ class _Sidebar extends StatelessWidget {
         children: [
           Padding(
             padding: EdgeInsets.fromLTRB(
-              collapsed ? 14 : 16,
+              collapsed ? 6 : 16,
               16,
-              collapsed ? 14 : 12,
+              collapsed ? 6 : 12,
               10,
             ),
             child: Row(
@@ -1038,23 +1038,31 @@ class _Sidebar extends StatelessWidget {
                     ),
                   ),
                 if (collapsed)
-                  const Expanded(
-                    child: Center(
+                  const SizedBox(
+                    width: 34,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
                       child: SbLogo(
                         symbolSize: 26,
                         showWordmark: false,
                       ),
                     ),
                   ),
+                const Spacer(),
                 IconButton(
                   tooltip: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
                   visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 30,
+                    height: 30,
+                  ),
+                  padding: EdgeInsets.zero,
                   onPressed: onToggle,
                   icon: Icon(
                     collapsed
                         ? Icons.keyboard_double_arrow_right_rounded
                         : Icons.keyboard_double_arrow_left_rounded,
-                    size: 19,
+                    size: 18,
                   ),
                 ),
               ],
