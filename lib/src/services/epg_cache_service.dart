@@ -10,6 +10,7 @@ class EpgCacheService {
   const EpgCacheService();
 
   static const _filePrefix = 'epg_cache_v1_';
+  static const _legacyFileName = 'epg_cache_v1.json';
 
   Future<Map<String, List<EpgProgram>>?> load(
     String sourceUrl, {
@@ -121,9 +122,20 @@ class EpgCacheService {
       sha256.convert(utf8.encode(sourceUrl)).toString();
 
   Future<File> _cacheFileForKey(String sourceKey) async {
-    final directory = await getApplicationSupportDirectory();
+    final directory = await _cacheDirectory();
     return File(
       '${directory.path}${Platform.pathSeparator}$_filePrefix$sourceKey.json',
     );
+  }
+
+  Future<Directory> _cacheDirectory() async {
+    final directory = await getApplicationSupportDirectory();
+    final legacy = File(
+      '${directory.path}${Platform.pathSeparator}$_legacyFileName',
+    );
+    if (await legacy.exists()) {
+      await legacy.delete();
+    }
+    return directory;
   }
 }
