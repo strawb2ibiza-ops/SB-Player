@@ -1,1 +1,10 @@
-enum ContentSection { live, guide, movies, series, favorites, recent }
+enum ContentSection {
+  home,
+  live,
+  guide,
+  movies,
+  series,
+  continueWatching,
+  favorites,
+  recent,
+}
