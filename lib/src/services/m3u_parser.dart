@@ -51,7 +51,7 @@ class M3uParser {
       generatedId += 1;
       channels.add(
         IptvChannel(
-          id: epgId?.isNotEmpty == true ? epgId! : 'm3u-$generatedId',
+          id: 'm3u-$generatedId',
           name: name.isEmpty ? 'Channel $generatedId' : name,
           streamUrl: line,
           categoryId: group.isEmpty ? 'Other' : group,
