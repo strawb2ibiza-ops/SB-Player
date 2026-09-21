@@ -880,6 +880,72 @@ class _PlayerScreenState extends State<PlayerScreen> with WindowListener {
               ),
             ),
           ),
+        if (_showIntroSkip)
+          Positioned(
+            right: 28,
+            bottom: 96,
+            child: FilledButton.icon(
+              onPressed: () {
+                _introAutoSkipped = true;
+                unawaited(_player.seek(_introSkipTarget));
+              },
+              icon: const Icon(Icons.fast_forward_rounded),
+              label: const Text('Skip Intro'),
+            ),
+          ),
+        if (_showCreditsSkip)
+          Positioned(
+            right: 28,
+            bottom: 96,
+            child: FilledButton.icon(
+              onPressed: () {
+                _creditsAutoHandled = true;
+                if (_hasNextEpisode) {
+                  unawaited(_playNextEpisode());
+                } else {
+                  unawaited(
+                    _player.seek(
+                      _duration - const Duration(seconds: 1),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.skip_next_rounded),
+              label: Text(
+                _hasNextEpisode ? 'Skip Credits' : 'End credits',
+              ),
+            ),
+          ),
+        if (_nextEpisodeCountdown != null)
+          Positioned(
+            right: 28,
+            bottom: 96,
+            child: Container(
+              width: 320,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xEE0D121B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.skip_next_rounded),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Next episode in $_nextEpisodeCountdown…',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _cancelNextEpisode,
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
+            ),
+          ),
         if (_playbackError != null)
           Container(
             constraints: const BoxConstraints(maxWidth: 520),
