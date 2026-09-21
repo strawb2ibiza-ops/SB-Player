@@ -690,10 +690,18 @@ class AppController extends ChangeNotifier {
     List<IptvChannel> loadedChannels;
 
     if (value.type == AccountType.xtream) {
-      final categoriesFuture = _xtreamClient.fetchLiveCategories(value);
-      final channelsFuture = _xtreamClient.fetchLiveChannels(value);
-      loadedCategories = await categoriesFuture;
-      loadedChannels = await channelsFuture;
+      late List<IptvCategory> categories;
+      late List<IptvChannel> liveChannels;
+      await Future.wait<void>([
+        _xtreamClient.fetchLiveCategories(value).then((value) {
+          categories = value;
+        }),
+        _xtreamClient.fetchLiveChannels(value).then((value) {
+          liveChannels = value;
+        }),
+      ]);
+      loadedCategories = categories;
+      loadedChannels = liveChannels;
     } else {
       final playlist = await _m3uClient.load(value.playlistUrl!);
       loadedChannels = playlist.channels;
@@ -724,10 +732,18 @@ class AppController extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final categoriesFuture = _xtreamClient.fetchVodCategories(current);
-      final moviesFuture = _xtreamClient.fetchVodStreams(current);
-      movieCategories = await categoriesFuture;
-      movies = await moviesFuture;
+      late List<IptvCategory> categories;
+      late List<VodItem> loadedMovies;
+      await Future.wait<void>([
+        _xtreamClient.fetchVodCategories(current).then((value) {
+          categories = value;
+        }),
+        _xtreamClient.fetchVodStreams(current).then((value) {
+          loadedMovies = value;
+        }),
+      ]);
+      movieCategories = categories;
+      movies = loadedMovies;
       _moviesLoaded = true;
       movieCategoryId = '__all__';
     } catch (exception) {
@@ -745,10 +761,18 @@ class AppController extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final categoriesFuture = _xtreamClient.fetchSeriesCategories(current);
-      final seriesFuture = _xtreamClient.fetchSeries(current);
-      seriesCategories = await categoriesFuture;
-      series = await seriesFuture;
+      late List<IptvCategory> categories;
+      late List<SeriesItem> loadedSeries;
+      await Future.wait<void>([
+        _xtreamClient.fetchSeriesCategories(current).then((value) {
+          categories = value;
+        }),
+        _xtreamClient.fetchSeries(current).then((value) {
+          loadedSeries = value;
+        }),
+      ]);
+      seriesCategories = categories;
+      series = loadedSeries;
       _seriesLoaded = true;
       seriesCategoryId = '__all__';
     } catch (exception) {
