@@ -94,4 +94,38 @@ void main() {
     );
     client.dispose();
   });
+  test('retries HTTPS port 80 as HTTP during authentication', () async {
+    var requests = 0;
+    final client = XtreamClient(
+      client: MockClient((request) async {
+        requests += 1;
+        if (request.url.scheme == 'https') {
+          throw const http.ClientException('TLS failed');
+        }
+        expect(request.url.scheme, 'http');
+        expect(request.url.port, 80);
+        return http.Response(
+          jsonEncode({
+            'user_info': {
+              'auth': 1,
+              'status': 'Active',
+              'exp_date': null,
+            },
+          }),
+          200,
+        );
+      }),
+    );
+
+    final account = await client.authenticate(
+      serverUrl: 'https://example.test:80',
+      username: 'user',
+      password: 'pass',
+    );
+
+    expect(requests, 2);
+    expect(account.serverUrl, 'http://example.test:80');
+    client.dispose();
+  });
+
 }
