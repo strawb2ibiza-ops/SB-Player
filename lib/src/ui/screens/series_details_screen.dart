@@ -109,7 +109,7 @@ class _SeriesHeader extends StatelessWidget {
               : Image.network(
                   series.coverUrl!,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.movie_filter_outlined, size: 50),
+                  errorBuilder: (_, _, _) => const Icon(Icons.movie_filter_outlined, size: 50),
                 ),
         ),
         const SizedBox(width: 20),
