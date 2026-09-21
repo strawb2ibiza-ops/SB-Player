@@ -20,8 +20,13 @@ Future<void> main() async {
       minimumSize: Size(900, 600),
       center: true,
       title: 'SB Player',
+      titleBarStyle: TitleBarStyle.hidden,
     );
     await windowManager.waitUntilReadyToShow(options, () async {
+      await windowManager.setTitleBarStyle(
+        TitleBarStyle.hidden,
+        windowButtonVisibility: false,
+      );
       await windowManager.show();
       await windowManager.focus();
     });

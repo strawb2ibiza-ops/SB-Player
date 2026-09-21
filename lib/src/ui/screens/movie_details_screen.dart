@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../../models/vod_item.dart';
 import '../../state/app_controller.dart';
 import '../branding/sb_brand.dart';
 import 'player_screen.dart';
+import '../widgets/desktop_window_controls.dart';
 
 class MovieDetailsScreen extends StatelessWidget {
   const MovieDetailsScreen({
@@ -37,7 +39,16 @@ class MovieDetailsScreen extends StatelessWidget {
           extendBodyBehindAppBar: true,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
-            title: Text(movie.name),
+            title: DragToMoveArea(
+              child: SizedBox(
+                height: 42,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(movie.name),
+                ),
+              ),
+            ),
+            actions: const [DesktopWindowControls()],
           ),
           body: Stack(
             fit: StackFit.expand,

@@ -20,7 +20,7 @@ try {
   & $Iscc "$root\installer\SBPlayer.iss"
   Write-Host ""
   Write-Host "Installer created at:"
-  Write-Host "$root\dist\SB-Player-Setup-v0.5.0.exe"
+  Write-Host "$root\dist\SB-Player-Setup-v0.6.0.exe"
 } finally {
   Pop-Location
 }

@@ -19,6 +19,7 @@ import '../services/account_profiles_store.dart';
 import '../services/epg_cache_service.dart';
 import '../services/library_store.dart';
 import '../services/m3u_client.dart';
+import '../services/playback_preferences.dart';
 import '../services/secure_account_store.dart';
 import '../services/xmltv_service.dart';
 import '../services/xtream_client.dart';
@@ -29,6 +30,7 @@ class AppController extends ChangeNotifier {
     required this.accountStore,
     this.libraryStore = const LibraryStore(),
     this.profileStore = const AccountProfilesStore(),
+    this.preferencesStore = const PlaybackPreferencesStore(),
     XtreamClient? xtreamClient,
     M3uClient? m3uClient,
     XmlTvService? xmlTvService,
@@ -42,6 +44,7 @@ class AppController extends ChangeNotifier {
   final SecureAccountStore accountStore;
   final LibraryStore libraryStore;
   final AccountProfilesStore profileStore;
+  final PlaybackPreferencesStore preferencesStore;
   final EpgCacheService _epgCacheService;
   final XtreamClient _xtreamClient;
   final M3uClient _m3uClient;
@@ -70,11 +73,12 @@ class AppController extends ChangeNotifier {
   List<LibraryEntry> favorites = const [];
   List<LibraryEntry> recent = const [];
   Map<String, List<EpgProgram>> epg = const {};
+  PlaybackPreferences preferences = const PlaybackPreferences();
 
   ContentSection section = ContentSection.home;
-  String liveCategoryId = '__all__';
-  String movieCategoryId = '__all__';
-  String seriesCategoryId = '__all__';
+  String liveCategoryId = '__browse__';
+  String movieCategoryId = '__browse__';
+  String seriesCategoryId = '__browse__';
 
   bool loading = false;
   bool contentLoading = false;
@@ -94,8 +98,9 @@ class AppController extends ChangeNotifier {
   List<IptvCategory> get activeCategories {
     switch (section) {
       case ContentSection.live:
-      case ContentSection.guide:
         return liveCategories;
+      case ContentSection.guide:
+        return const [];
       case ContentSection.movies:
         return movieCategories;
       case ContentSection.series:
@@ -111,8 +116,9 @@ class AppController extends ChangeNotifier {
   String get activeCategoryId {
     switch (section) {
       case ContentSection.live:
-      case ContentSection.guide:
         return liveCategoryId;
+      case ContentSection.guide:
+        return '__all__';
       case ContentSection.movies:
         return movieCategoryId;
       case ContentSection.series:
@@ -126,6 +132,8 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> restoreSession() async {
+    await preferencesStore.migrate();
+    preferences = await preferencesStore.load();
     await _epgCacheService.cleanupLegacyCache();
     await _loadLibrary();
 
@@ -223,23 +231,45 @@ class AppController extends ChangeNotifier {
         (value == ContentSection.movies || value == ContentSection.series)) {
       return;
     }
+
+    if (value == ContentSection.live) liveCategoryId = '__browse__';
+    if (value == ContentSection.movies) movieCategoryId = '__browse__';
+    if (value == ContentSection.series) seriesCategoryId = '__browse__';
+
     section = value;
     error = null;
     notifyListeners();
 
-    if (value == ContentSection.movies && !_moviesLoaded) {
+    if (value == ContentSection.home) {
+      await prepareHome();
+    } else if (value == ContentSection.movies && !_moviesLoaded) {
       await _loadMovies();
     } else if (value == ContentSection.series && !_seriesLoaded) {
       await _loadSeries();
     }
   }
 
+  Future<void> prepareHome() async {
+    if (!supportsOnDemand) return;
+    await Future.wait<void>([
+      if (!_moviesLoaded) _loadMovies(),
+      if (!_seriesLoaded) _loadSeries(),
+    ]);
+  }
+
+  Future<void> updatePreferences(PlaybackPreferences value) async {
+    preferences = value;
+    notifyListeners();
+    await preferencesStore.save(value);
+  }
+
   void selectCategory(String categoryId) {
     switch (section) {
       case ContentSection.live:
-      case ContentSection.guide:
         liveCategoryId = categoryId;
         break;
+      case ContentSection.guide:
+        return;
       case ContentSection.movies:
         movieCategoryId = categoryId;
         break;
@@ -255,10 +285,15 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<IptvChannel> visibleChannels(String search) {
+  List<IptvChannel> visibleChannels(
+    String search, {
+    bool ignoreCategory = false,
+  }) {
     final query = search.trim().toLowerCase();
     return channels.where((channel) {
-      final categoryMatches = liveCategoryId == '__all__' || channel.categoryId == liveCategoryId;
+      final categoryMatches = ignoreCategory ||
+          liveCategoryId == '__all__' ||
+          channel.categoryId == liveCategoryId;
       final searchMatches = query.isEmpty || channel.name.toLowerCase().contains(query);
       return categoryMatches && searchMatches;
     }).toList(growable: false);
@@ -267,7 +302,8 @@ class AppController extends ChangeNotifier {
   List<VodItem> visibleMovies(String search) {
     final query = search.trim().toLowerCase();
     return movies.where((item) {
-      final categoryMatches = movieCategoryId == '__all__' || item.categoryId == movieCategoryId;
+      final categoryMatches = movieCategoryId == '__all__' ||
+          item.categoryId == movieCategoryId;
       final searchMatches = query.isEmpty || item.name.toLowerCase().contains(query);
       return categoryMatches && searchMatches;
     }).toList(growable: false);
@@ -276,10 +312,47 @@ class AppController extends ChangeNotifier {
   List<SeriesItem> visibleSeries(String search) {
     final query = search.trim().toLowerCase();
     return series.where((item) {
-      final categoryMatches = seriesCategoryId == '__all__' || item.categoryId == seriesCategoryId;
+      final categoryMatches = seriesCategoryId == '__all__' ||
+          item.categoryId == seriesCategoryId;
       final searchMatches = query.isEmpty || item.name.toLowerCase().contains(query);
       return categoryMatches && searchMatches;
     }).toList(growable: false);
+  }
+
+  List<VodItem> get recentlyAddedMovies {
+    final values =
+        movies.where((item) => item.addedAt != null).toList(growable: true);
+    values.sort((a, b) {
+      final left = a.addedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final right = b.addedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return right.compareTo(left);
+    });
+    return values;
+  }
+
+  List<SeriesItem> get recentlyAddedSeries {
+    final values =
+        series.where((item) => item.addedAt != null).toList(growable: true);
+    values.sort((a, b) {
+      final left = a.addedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final right = b.addedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return right.compareTo(left);
+    });
+    return values;
+  }
+
+  List<VodItem> get newReleaseMovies {
+    final values = movies.where((item) => item.releaseDate != null).toList();
+    values.sort((a, b) =>
+        (b.releaseDate ?? '').compareTo(a.releaseDate ?? ''));
+    return values;
+  }
+
+  List<SeriesItem> get newReleaseSeries {
+    final values = series.where((item) => item.releaseDate != null).toList();
+    values.sort((a, b) =>
+        (b.releaseDate ?? '').compareTo(a.releaseDate ?? ''));
+    return values;
   }
 
   List<LibraryEntry> get continueWatching {
@@ -746,7 +819,7 @@ class AppController extends ChangeNotifier {
     account = resolvedAccount;
     liveCategories = loadedCategories;
     channels = loadedChannels;
-    liveCategoryId = '__all__';
+    liveCategoryId = '__browse__';
     section = ContentSection.home;
   }
 
@@ -772,7 +845,7 @@ class AppController extends ChangeNotifier {
       movieCategories = categories;
       movies = loadedMovies;
       _moviesLoaded = true;
-      movieCategoryId = '__all__';
+      movieCategoryId = '__browse__';
     } catch (exception) {
       if (generation == _catalogGeneration) {
         error = exception.toString().replaceFirst('Exception: ', '');
@@ -807,7 +880,7 @@ class AppController extends ChangeNotifier {
       seriesCategories = categories;
       series = loadedSeries;
       _seriesLoaded = true;
-      seriesCategoryId = '__all__';
+      seriesCategoryId = '__browse__';
     } catch (exception) {
       if (generation == _catalogGeneration) {
         error = exception.toString().replaceFirst('Exception: ', '');
@@ -957,9 +1030,9 @@ class AppController extends ChangeNotifier {
     seriesCategories = const [];
     series = const [];
     epg = const {};
-    liveCategoryId = '__all__';
-    movieCategoryId = '__all__';
-    seriesCategoryId = '__all__';
+    liveCategoryId = '__browse__';
+    movieCategoryId = '__browse__';
+    seriesCategoryId = '__browse__';
     _moviesLoaded = false;
     _seriesLoaded = false;
     _epgLoaded = false;

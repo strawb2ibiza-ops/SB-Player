@@ -7,6 +7,7 @@ class SeriesItem {
     this.plot,
     this.rating,
     this.releaseDate,
+    this.addedAt,
   });
 
   final String id;
@@ -16,6 +17,7 @@ class SeriesItem {
   final String? plot;
   final double? rating;
   final String? releaseDate;
+  final DateTime? addedAt;
 }
 
 class SeriesEpisode {

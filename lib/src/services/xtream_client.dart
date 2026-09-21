@@ -48,16 +48,39 @@ class XtreamClient {
     required String password,
     String label = 'IPTV',
   }) async {
-    final server = normalizeBase(serverUrl);
-    final uri = Uri.parse('$server/player_api.php').replace(
-      queryParameters: {'username': username, 'password': password},
-    );
+    var server = normalizeBase(serverUrl);
+
+    Future<http.Response> request(String base) {
+      final uri = Uri.parse('$base/player_api.php').replace(
+        queryParameters: {'username': username, 'password': password},
+      );
+      return _client.get(uri).timeout(const Duration(seconds: 15));
+    }
 
     late http.Response response;
     try {
-      response = await _client.get(uri).timeout(const Duration(seconds: 15));
+      response = await request(server);
     } catch (_) {
-      throw XtreamException('Could not connect to the IPTV provider.');
+      final parsed = Uri.tryParse(server);
+      final canRetryHttp = parsed != null &&
+          parsed.scheme.toLowerCase() == 'https' &&
+          parsed.hasPort &&
+          parsed.port == 80;
+      if (!canRetryHttp) {
+        throw XtreamException(
+          'Could not connect. Check the provider URL and whether it uses HTTP or HTTPS.',
+        );
+      }
+
+      final fallback = parsed.replace(scheme: 'http').toString();
+      try {
+        response = await request(fallback);
+        server = fallback;
+      } catch (_) {
+        throw XtreamException(
+          'Could not connect. This port normally uses HTTP; check the provider URL and credentials.',
+        );
+      }
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw XtreamException('Provider returned HTTP ${response.statusCode}.');
@@ -177,6 +200,7 @@ class XtreamClient {
         rating: _rating(item['rating_5based'] ?? item['rating']),
         releaseDate: _nullableString(item['releasedate'] ?? item['release_date']),
         duration: _nullableString(item['duration']),
+        addedAt: _unixDate(item['added'] ?? item['last_modified']),
         streamUrl: _httpSource(direct) ?? fallback,
       );
     }).where((item) => item.id.isNotEmpty).toList(growable: false);
@@ -195,6 +219,7 @@ class XtreamClient {
         plot: _nullableString(item['plot']),
         rating: _rating(item['rating_5based'] ?? item['rating']),
         releaseDate: _nullableString(item['releaseDate'] ?? item['release_date']),
+        addedAt: _unixDate(item['last_modified'] ?? item['added']),
       );
     }).where((item) => item.id.isNotEmpty).toList(growable: false);
   }
@@ -331,6 +356,12 @@ class XtreamClient {
     return RegExp(r'^[a-z0-9]{1,8}$').hasMatch(extension)
         ? extension
         : fallback;
+  }
+
+  DateTime? _unixDate(dynamic value) {
+    final seconds = int.tryParse('${value ?? ''}');
+    if (seconds == null || seconds <= 0) return null;
+    return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
   }
 
   double? _rating(dynamic value) {

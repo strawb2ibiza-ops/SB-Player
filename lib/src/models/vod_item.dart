@@ -10,6 +10,7 @@ class VodItem {
     this.rating,
     this.releaseDate,
     this.duration,
+    this.addedAt,
   });
 
   final String id;
@@ -22,4 +23,5 @@ class VodItem {
   final double? rating;
   final String? releaseDate;
   final String? duration;
+  final DateTime? addedAt;
 }

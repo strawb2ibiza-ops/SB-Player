@@ -8,6 +8,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../models/playback_item.dart';
+import '../widgets/desktop_window_controls.dart';
 import '../../services/mini_player_preferences.dart';
 import '../../state/app_controller.dart';
 
@@ -16,16 +17,20 @@ class PlayerScreen extends StatefulWidget {
     super.key,
     required this.controller,
     required this.item,
+    this.playlist = const [],
+    this.playlistIndex = -1,
   });
 
   final AppController controller;
   final PlaybackItem item;
+  final List<PlaybackItem> playlist;
+  final int playlistIndex;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> {
+class _PlayerScreenState extends State<PlayerScreen> with WindowListener {
   static const _normalMinimumSize = Size(900, 600);
   static const _detailedMiniSize = Size(620, 420);
   static const _detailedMiniMinimumSize = Size(460, 310);
@@ -47,6 +52,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
   double _lastNonZeroVolume = 100;
   int _reconnectAttempts = 0;
   Timer? _reconnectTimer;
+  Timer? _geometrySaveTimer;
+  Timer? _nextEpisodeTimer;
+  int? _nextEpisodeCountdown;
+  int _playlistIndex = -1;
+  bool _introAutoSkipped = false;
+  bool _creditsAutoHandled = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   String? _playbackError;
@@ -61,7 +72,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void initState() {
     super.initState();
     _item = widget.item;
+    _playlistIndex = widget.playlistIndex;
     _player = Player();
+    if (Platform.isWindows) windowManager.addListener(this);
     _videoController = VideoController(_player);
     _subscriptions.add(_player.stream.buffering.listen((value) {
       if (mounted) setState(() => _buffering = value);
@@ -86,6 +99,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }));
     _subscriptions.add(_player.stream.position.listen((value) {
       if (mounted) setState(() => _position = value);
+      _handleSmartSkips(value);
     }));
     _subscriptions.add(_player.stream.duration.listen((value) {
       if (mounted) setState(() => _duration = value);
@@ -93,6 +107,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _subscriptions.add(_player.stream.volume.listen((value) {
       if (value > 0) _lastNonZeroVolume = value;
       if (mounted) setState(() => _volume = value);
+    }));
+    _subscriptions.add(_player.stream.completed.listen((value) {
+      if (value) _handlePlaybackCompleted();
     }));
 
     unawaited(_loadMiniPreference());
@@ -102,6 +119,145 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _loadMiniPreference() async {
     final layout = await _miniPreferences.readLayout();
     if (mounted) setState(() => _miniLayout = layout);
+  }
+
+  bool get _hasNextEpisode =>
+      _playlistIndex >= 0 &&
+      _playlistIndex + 1 < widget.playlist.length;
+
+  Duration get _introSkipTarget {
+    if (_duration.inSeconds <= 0) return const Duration(seconds: 75);
+    final detected = (_duration.inSeconds * 0.055).round().clamp(45, 90).toInt();
+    return Duration(seconds: detected);
+  }
+
+  bool get _showIntroSkip {
+    if (_item.kind != PlaybackKind.episode ||
+        !widget.controller.preferences.showSkipIntro ||
+        _duration.inSeconds < 600) {
+      return false;
+    }
+    return _position >= const Duration(seconds: 8) &&
+        _position < _introSkipTarget;
+  }
+
+  bool get _showCreditsSkip {
+    if (_item.kind != PlaybackKind.episode ||
+        !widget.controller.preferences.showSkipCredits ||
+        _duration.inSeconds < 600) {
+      return false;
+    }
+    final remaining = _duration - _position;
+    final threshold = Duration(
+      seconds: (_duration.inSeconds * 0.045).round().clamp(65, 150).toInt(),
+    );
+    return remaining > Duration.zero && remaining <= threshold;
+  }
+
+  void _handleSmartSkips(Duration position) {
+    if (_item.kind != PlaybackKind.episode || _duration.inSeconds < 600) {
+      return;
+    }
+
+    final prefs = widget.controller.preferences;
+    if (prefs.showSkipIntro &&
+        prefs.autoSkipIntro &&
+        !_introAutoSkipped &&
+        position >= const Duration(seconds: 8) &&
+        position < _introSkipTarget) {
+      _introAutoSkipped = true;
+      unawaited(_player.seek(_introSkipTarget));
+    }
+
+    if (prefs.showSkipCredits &&
+        prefs.autoSkipCredits &&
+        !_creditsAutoHandled &&
+        _showCreditsSkip) {
+      _creditsAutoHandled = true;
+      if (_hasNextEpisode) {
+        unawaited(_playNextEpisode());
+      } else {
+        unawaited(_player.seek(_duration - const Duration(seconds: 1)));
+      }
+    }
+  }
+
+  void _handlePlaybackCompleted() {
+    if (_item.kind != PlaybackKind.episode ||
+        !widget.controller.preferences.autoplayNextEpisode ||
+        !_hasNextEpisode ||
+        _nextEpisodeTimer?.isActive == true) {
+      return;
+    }
+
+    var seconds = 5;
+    if (mounted) setState(() => _nextEpisodeCountdown = seconds);
+    _nextEpisodeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      seconds -= 1;
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (seconds <= 0) {
+        timer.cancel();
+        setState(() => _nextEpisodeCountdown = null);
+        unawaited(_playNextEpisode());
+      } else {
+        setState(() => _nextEpisodeCountdown = seconds);
+      }
+    });
+  }
+
+  Future<void> _playNextEpisode() async {
+    if (!_hasNextEpisode) return;
+
+    await widget.controller.recordPlayback(
+      _item,
+      position: _player.state.duration,
+      duration: _player.state.duration,
+    );
+
+    _playlistIndex += 1;
+    final next = widget.playlist[_playlistIndex];
+    _nextEpisodeTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _item = next;
+        _position = Duration.zero;
+        _duration = Duration.zero;
+        _nextEpisodeCountdown = null;
+        _introAutoSkipped = false;
+        _creditsAutoHandled = false;
+        _playbackError = null;
+        _buffering = true;
+      });
+    }
+    await _player.stop();
+    await _open();
+  }
+
+  void _cancelNextEpisode() {
+    _nextEpisodeTimer?.cancel();
+    if (mounted) setState(() => _nextEpisodeCountdown = null);
+  }
+
+  @override
+  void onWindowMove() {
+    _scheduleMiniGeometrySave();
+  }
+
+  @override
+  void onWindowResize() {
+    _scheduleMiniGeometrySave();
+  }
+
+  void _scheduleMiniGeometrySave() {
+    if (!_miniMode || !Platform.isWindows) return;
+    _geometrySaveTimer?.cancel();
+    _geometrySaveTimer = Timer(
+      const Duration(milliseconds: 300),
+      () => unawaited(_saveMiniGeometry()),
+    );
   }
 
   Future<void> _open({Duration? resumeAt}) async {
@@ -216,10 +372,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Future<void> _applyMiniChrome() async {
     if (!Platform.isWindows) return;
     await windowManager.setTitleBarStyle(
-      _miniLayout == MiniPlayerLayout.videoOnly
-          ? TitleBarStyle.hidden
-          : TitleBarStyle.normal,
-      windowButtonVisibility: _miniLayout != MiniPlayerLayout.videoOnly,
+      TitleBarStyle.hidden,
+      windowButtonVisibility: false,
     );
   }
 
@@ -238,7 +392,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!Platform.isWindows || !_miniMode) return;
     await _saveMiniGeometry();
     await windowManager.setAlwaysOnTop(false);
-    await windowManager.setTitleBarStyle(TitleBarStyle.normal);
+    await windowManager.setTitleBarStyle(
+      TitleBarStyle.hidden,
+      windowButtonVisibility: false,
+    );
     await windowManager.setMinimumSize(_normalMinimumSize);
     if (_previousWindowSize != null) {
       await windowManager.setSize(_previousWindowSize!, animate: true);
@@ -417,6 +574,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ),
     );
     _reconnectTimer?.cancel();
+    _geometrySaveTimer?.cancel();
+    _nextEpisodeTimer?.cancel();
+    if (Platform.isWindows) windowManager.removeListener(this);
     unawaited(_restoreWindow());
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
@@ -444,22 +604,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
           backgroundColor: Colors.black,
           appBar: AppBar(
             backgroundColor: Colors.black,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (_displaySubtitle != null)
+            title: DragToMoveArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Text(
-                    _displaySubtitle!,
+                    _item.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
                   ),
-              ],
+                  if (_displaySubtitle != null)
+                    Text(
+                      _displaySubtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                ],
+              ),
             ),
             actions: [
               if (_item.isLive)
@@ -507,7 +669,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   onPressed: _toggleMiniPlayer,
                   icon: const Icon(Icons.picture_in_picture_alt),
                 ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 4),
+              const DesktopWindowControls(compact: true),
+              const SizedBox(width: 4),
             ],
           ),
           body: Center(child: _buildVideo(useBuiltInControls: true)),
@@ -529,24 +693,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w800),
+                    child: DragToMoveArea(
+                      child: SizedBox.expand(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            if (_displaySubtitle != null)
+                              Text(
+                                _displaySubtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                          ],
                         ),
-                        if (_displaySubtitle != null)
-                          Text(
-                            _displaySubtitle!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                      ],
+                      ),
                     ),
                   ),
                   IconButton(
@@ -558,6 +728,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     tooltip: 'Restore full player',
                     onPressed: _toggleMiniPlayer,
                     icon: const Icon(Icons.open_in_full),
+                  ),
+                  const DesktopWindowControls(
+                    compact: true,
+                    showMaximize: false,
                   ),
                 ],
               ),
@@ -644,6 +818,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               onPressed: _toggleMiniPlayer,
                               icon: const Icon(Icons.open_in_full),
                             ),
+                            const DesktopWindowControls(
+                              compact: true,
+                              showMaximize: false,
+                            ),
                           ],
                         ),
                       ),
@@ -707,6 +885,72 @@ class _PlayerScreenState extends State<PlayerScreen> {
               child: Padding(
                 padding: EdgeInsets.all(18),
                 child: CircularProgressIndicator(),
+              ),
+            ),
+          ),
+        if (_showIntroSkip)
+          Positioned(
+            right: 28,
+            bottom: 96,
+            child: FilledButton.icon(
+              onPressed: () {
+                _introAutoSkipped = true;
+                unawaited(_player.seek(_introSkipTarget));
+              },
+              icon: const Icon(Icons.fast_forward_rounded),
+              label: const Text('Skip Intro'),
+            ),
+          ),
+        if (_showCreditsSkip)
+          Positioned(
+            right: 28,
+            bottom: 96,
+            child: FilledButton.icon(
+              onPressed: () {
+                _creditsAutoHandled = true;
+                if (_hasNextEpisode) {
+                  unawaited(_playNextEpisode());
+                } else {
+                  unawaited(
+                    _player.seek(
+                      _duration - const Duration(seconds: 1),
+                    ),
+                  );
+                }
+              },
+              icon: const Icon(Icons.skip_next_rounded),
+              label: Text(
+                _hasNextEpisode ? 'Skip Credits' : 'End credits',
+              ),
+            ),
+          ),
+        if (_nextEpisodeCountdown != null)
+          Positioned(
+            right: 28,
+            bottom: 96,
+            child: Container(
+              width: 320,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xEE0D121B),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.skip_next_rounded),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Next episode in $_nextEpisodeCountdown…',
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _cancelNextEpisode,
+                    child: const Text('Cancel'),
+                  ),
+                ],
               ),
             ),
           ),
