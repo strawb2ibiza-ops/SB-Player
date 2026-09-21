@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/series_item.dart';
+import '../../models/playback_item.dart';
 import '../../state/app_controller.dart';
 import 'player_screen.dart';
 
@@ -69,6 +70,11 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 
           final details = snapshot.data!;
           final seasons = details.seasons.keys.toList()..sort();
+          final episodeQueue = <PlaybackItem>[
+            for (final season in seasons)
+              for (final episode in details.seasons[season]!)
+                controller.playbackForEpisode(series, episode),
+          ];
           if (seasons.isEmpty) {
             return const Center(child: Text('No episodes were returned by the provider.'));
           }
@@ -100,11 +106,18 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                           subtitle: episode.duration == null ? null : Text(episode.duration!),
                           trailing: const Icon(Icons.play_circle_outline),
                           onTap: () {
+                            final item =
+                                controller.playbackForEpisode(series, episode);
+                            final queueIndex = episodeQueue.indexWhere(
+                              (value) => value.id == item.id,
+                            );
                             Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => PlayerScreen(
                                   controller: controller,
-                                  item: controller.playbackForEpisode(series, episode),
+                                  item: item,
+                                  playlist: episodeQueue,
+                                  playlistIndex: queueIndex,
                                 ),
                               ),
                             );
