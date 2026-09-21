@@ -25,7 +25,7 @@ jobs:
 
   windows-build:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -34,12 +34,28 @@ jobs:
           cache: true
       - run: flutter config --enable-windows-desktop
       - run: flutter create --project-name sb_player --platforms=windows .
+      - name: Generate SB Player Windows icon
+        shell: pwsh
+        run: ./scripts/generate_windows_brand_icon.ps1
       - run: flutter pub get
       - run: flutter build windows --release
-      - name: Upload Windows release
+      - name: Upload portable Windows release
         uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Windows-Open-v0.4
+          name: SB-Player-Windows-Open-v0.5
           path: build/windows/x64/runner/Release/**
+          if-no-files-found: error
+          retention-days: 14
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: Build Windows installer
+        shell: pwsh
+        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "installer\SBPlayer.iss"'
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: SB-Player-Setup-v0.5.0
+          path: dist/SB-Player-Setup-v0.5.0.exe
           if-no-files-found: error
           retention-days: 14
