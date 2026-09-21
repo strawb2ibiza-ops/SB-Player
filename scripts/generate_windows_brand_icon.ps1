@@ -24,7 +24,6 @@ $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
   [System.Drawing.Color]::FromArgb(122,77,255),
   35
 )
-$graphics.FillRoundedRectangle = $null
 $graphics.FillEllipse($brush, $gradientRect)
 
 $inner = New-Object System.Drawing.Rectangle 35, 35, 186, 186
