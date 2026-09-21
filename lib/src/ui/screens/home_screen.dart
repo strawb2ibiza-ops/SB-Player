@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../models/content_section.dart';
 import '../../models/epg_program.dart';
 import '../../models/iptv_channel.dart';
+import '../../models/iptv_category.dart';
 import '../../models/library_entry.dart';
 import '../../models/playback_item.dart';
 import '../../models/series_item.dart';
