@@ -1,4 +1,4 @@
-# SB Player v0.3
+# SB Player v0.4 development
 
 Windows-first Flutter IPTV player with two distributions from one codebase:
 
@@ -27,6 +27,7 @@ Use only with IPTV services and content you are authorized to access or distribu
 - XMLTV EPG support
 - Now/Next programme information
 - TV Guide view
+- Six-hour persistent EPG cache with manual force refresh
 
 ### Movies and series
 
