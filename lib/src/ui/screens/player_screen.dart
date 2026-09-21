@@ -729,6 +729,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WindowListener {
                     onPressed: _toggleMiniPlayer,
                     icon: const Icon(Icons.open_in_full),
                   ),
+                  const DesktopWindowControls(
+                    compact: true,
+                    showMaximize: false,
+                  ),
                 ],
               ),
             ),
@@ -813,6 +817,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WindowListener {
                               tooltip: 'Restore full player',
                               onPressed: _toggleMiniPlayer,
                               icon: const Icon(Icons.open_in_full),
+                            ),
+                            const DesktopWindowControls(
+                              compact: true,
+                              showMaximize: false,
                             ),
                           ],
                         ),
