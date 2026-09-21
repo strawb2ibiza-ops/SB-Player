@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../../models/series_item.dart';
 import '../../models/playback_item.dart';
