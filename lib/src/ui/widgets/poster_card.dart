@@ -39,7 +39,7 @@ class PosterCard extends StatelessWidget {
                         : Image.network(
                             imageUrl!,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.movie_outlined, size: 46),
+                            errorBuilder: (_, _, _) => const Icon(Icons.movie_outlined, size: 46),
                           ),
                   ),
                   if (onFavorite != null)
