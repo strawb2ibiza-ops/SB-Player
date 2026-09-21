@@ -353,6 +353,23 @@ class AppController extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  List<EpgProgram> programmesForWindow(
+    IptvChannel channel, {
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final id = channel.epgId;
+    if (id == null) return const [];
+    final programmes = epg[id];
+    if (programmes == null) return const [];
+    return programmes
+        .where(
+          (programme) =>
+              programme.stop.isAfter(start) && programme.start.isBefore(end),
+        )
+        .toList(growable: false);
+  }
+
   Future<void> loadEpg({bool force = false}) async {
     if ((_epgLoaded && !force) || epgLoading) return;
     final url = account?.epgUrl;
