@@ -325,7 +325,8 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  bool isFavorite(PlaybackItem item) =>  bool isFavorite(PlaybackItem item) => favorites.any((entry) => entry.id == item.id);
+  bool isFavorite(PlaybackItem item) =>
+      favorites.any((entry) => entry.id == item.id);
 
   Future<void> toggleFavorite(PlaybackItem item) async {
     final existing = favorites.indexWhere((entry) => entry.id == item.id);
@@ -383,7 +384,7 @@ class AppController extends ChangeNotifier {
     await libraryStore.saveRecent(recent);
   }
 
-  EpgProgram? nowProgram(IptvChannel channel, {DateTime? at}) {  EpgProgram? nowProgram(IptvChannel channel, {DateTime? at}) {
+  EpgProgram? nowProgram(IptvChannel channel, {DateTime? at}) {
     final id = channel.epgId;
     if (id == null) return null;
     final programmes = epg[id];
@@ -458,7 +459,7 @@ class AppController extends ChangeNotifier {
     return output;
   }
 
-  Future<void> loadEpg({bool force = false}) async {  Future<void> loadEpg({bool force = false}) async {
+  Future<void> loadEpg({bool force = false}) async {
     if ((_epgLoaded && !force) || epgLoading) return;
     final url = account?.epgUrl;
     if (url == null || url.isEmpty) return;
