@@ -37,7 +37,8 @@ $textBrush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::White
 $format = New-Object System.Drawing.StringFormat
 $format.Alignment = [System.Drawing.StringAlignment]::Center
 $format.LineAlignment = [System.Drawing.StringAlignment]::Center
-$graphics.DrawString("SB", $font, $textBrush, $rect, $format)
+$textRect = New-Object System.Drawing.RectangleF 0, 0, $size, $size
+$graphics.DrawString("SB", $font, $textBrush, $textRect, $format)
 
 $icon = [System.Drawing.Icon]::FromHandle($bitmap.GetHicon())
 $stream = [System.IO.File]::Create($outFile)
