@@ -216,7 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return ListView.separated(
       itemCount: channels.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, index) {
         final channel = channels[index];
         final programmes = controller.programmesForChannel(channel);
@@ -238,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             child: Image.network(
                               channel.logoUrl!,
                               fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) => const Icon(Icons.live_tv_outlined),
+                              errorBuilder: (_, _, _) => const Icon(Icons.live_tv_outlined),
                             ),
                           ),
                     title: Text(channel.name, maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -379,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (entries.isEmpty) return Center(child: Text(empty));
     return ListView.separated(
       itemCount: entries.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final entry = entries[index];
         final item = entry.toPlaybackItem();
