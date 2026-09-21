@@ -16,12 +16,13 @@ class EpgCacheService {
     Duration maxAge = const Duration(hours: 6),
   }) async {
     try {
-      final file = await _cacheFile(sourceUrl);
+      final sourceKey = _sourceKey(sourceUrl);
+      final file = await _cacheFileForKey(sourceKey);
       if (!await file.exists()) return null;
       final decoded = jsonDecode(await file.readAsString());
       if (decoded is! Map) return null;
       final data = Map<String, dynamic>.from(decoded);
-      if (data['sourceUrl'] != sourceUrl) return null;
+      if (data['sourceKey'] != sourceKey) return null;
 
       final cachedAt = DateTime.tryParse('${data['cachedAt'] ?? ''}');
       if (cachedAt == null || DateTime.now().difference(cachedAt) > maxAge) {
@@ -79,11 +80,12 @@ class EpgCacheService {
         if (programmes.isNotEmpty) compact[entry.key] = programmes;
       }
 
-      final file = await _cacheFile(sourceUrl);
+      final sourceKey = _sourceKey(sourceUrl);
+      final file = await _cacheFileForKey(sourceKey);
       await file.parent.create(recursive: true);
       await file.writeAsString(
         jsonEncode({
-          'sourceUrl': sourceUrl,
+          'sourceKey': sourceKey,
           'cachedAt': now.toIso8601String(),
           'channels': compact,
         }),
@@ -97,7 +99,7 @@ class EpgCacheService {
   Future<void> clear([String? sourceUrl]) async {
     try {
       if (sourceUrl != null) {
-        final file = await _cacheFile(sourceUrl);
+        final file = await _cacheFileForKey(_sourceKey(sourceUrl));
         if (await file.exists()) await file.delete();
         return;
       }
@@ -115,11 +117,13 @@ class EpgCacheService {
     }
   }
 
-  Future<File> _cacheFile(String sourceUrl) async {
+  String _sourceKey(String sourceUrl) =>
+      sha256.convert(utf8.encode(sourceUrl)).toString();
+
+  Future<File> _cacheFileForKey(String sourceKey) async {
     final directory = await getApplicationSupportDirectory();
-    final digest = sha256.convert(utf8.encode(sourceUrl)).toString();
     return File(
-      '${directory.path}${Platform.pathSeparator}$_filePrefix$digest.json',
+      '${directory.path}${Platform.pathSeparator}$_filePrefix$sourceKey.json',
     );
   }
 }
