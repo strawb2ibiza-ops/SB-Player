@@ -200,6 +200,7 @@ class XtreamClient {
         rating: _rating(item['rating_5based'] ?? item['rating']),
         releaseDate: _nullableString(item['releasedate'] ?? item['release_date']),
         duration: _nullableString(item['duration']),
+        addedAt: _unixDate(item['added'] ?? item['last_modified']),
         streamUrl: _httpSource(direct) ?? fallback,
       );
     }).where((item) => item.id.isNotEmpty).toList(growable: false);
@@ -218,6 +219,7 @@ class XtreamClient {
         plot: _nullableString(item['plot']),
         rating: _rating(item['rating_5based'] ?? item['rating']),
         releaseDate: _nullableString(item['releaseDate'] ?? item['release_date']),
+        addedAt: _unixDate(item['last_modified'] ?? item['added']),
       );
     }).where((item) => item.id.isNotEmpty).toList(growable: false);
   }
@@ -354,6 +356,12 @@ class XtreamClient {
     return RegExp(r'^[a-z0-9]{1,8}$').hasMatch(extension)
         ? extension
         : fallback;
+  }
+
+  DateTime? _unixDate(dynamic value) {
+    final seconds = int.tryParse('${value ?? ''}');
+    if (seconds == null || seconds <= 0) return null;
+    return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
   }
 
   double? _rating(dynamic value) {
