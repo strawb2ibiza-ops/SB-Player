@@ -70,6 +70,53 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 28),
+                    if (!locked && controller.profiles.isNotEmpty) ...[
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Saved accounts',
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      for (final profile in controller.profiles.take(4))
+                        Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            dense: true,
+                            leading: const Icon(Icons.account_circle_outlined),
+                            title: Text(
+                              profile.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              profile.subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: controller.loading
+                                ? null
+                                : () => controller.switchProfile(profile.id),
+                          ),
+                        ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          children: [
+                            Expanded(child: Divider()),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 10),
+                              child: Text('ADD OR SIGN IN TO ANOTHER'),
+                            ),
+                            Expanded(child: Divider()),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (!locked) ...[
                       SegmentedButton<bool>(
                         segments: const [
