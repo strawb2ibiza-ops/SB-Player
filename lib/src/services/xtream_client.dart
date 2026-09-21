@@ -25,7 +25,8 @@ class XtreamClient {
     if (result.isEmpty) {
       throw XtreamException('Enter the IPTV server URL.');
     }
-    if (!result.startsWith('http://') && !result.startsWith('https://')) {
+    final lower = result.toLowerCase();
+    if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
       result = 'https://$result';
     }
     while (result.endsWith('/')) {
