@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
+import '../debug/debug_catalog.dart';
 import '../models/content_section.dart';
 import '../models/epg_program.dart';
 import '../models/iptv_account.dart';
@@ -88,6 +89,8 @@ class AppController extends ChangeNotifier {
   String? _cachedSbScope;
   String? error;
 
+  bool debugMode = false;
+
   bool get signedIn => account != null;
   bool get supportsOnDemand => account?.type == AccountType.xtream;
 
@@ -163,6 +166,32 @@ class AppController extends ChangeNotifier {
         await profileStore.setActiveProfileId(null);
       }
       await accountStore.clear();
+    } finally {
+      loading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> signInDebug() async {
+    loading = true;
+    error = null;
+    notifyListeners();
+    try {
+      _resetCatalogs();
+      debugMode = true;
+      account = DebugCatalog.account;
+      activeProfileId = null;
+      liveCategories = DebugCatalog.liveCategories;
+      channels = DebugCatalog.channels;
+      movieCategories = DebugCatalog.movieCategories;
+      movies = DebugCatalog.movies;
+      seriesCategories = DebugCatalog.seriesCategories;
+      series = DebugCatalog.series;
+      epg = DebugCatalog.epg(DateTime.now());
+      _moviesLoaded = true;
+      _seriesLoaded = true;
+      _epgLoaded = true;
+      section = ContentSection.home;
     } finally {
       loading = false;
       notifyListeners();
@@ -343,6 +372,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<SeriesDetails> fetchSeriesDetails(SeriesItem item) async {
+    if (debugMode) return DebugCatalog.seriesDetails(item);
     final current = account;
     if (current == null || current.type != AccountType.xtream) {
       throw Exception('Series are only available for Xtream accounts.');
@@ -546,6 +576,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> loadEpg({bool force = false}) async {
+    if (debugMode) return;
     if ((_epgLoaded && !force) || epgLoading) return;
     final url = account?.epgUrl;
     if (url == null || url.isEmpty) return;
@@ -664,6 +695,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> beginAddAccount() async {
     if (config.isLocked) return;
+    debugMode = false;
     account = null;
     activeProfileId = null;
     _resetCatalogs();
@@ -675,6 +707,7 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    debugMode = false;
     account = null;
     activeProfileId = null;
     _resetCatalogs();
