@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'brand.dart';
+import 'branding/sb_brand.dart';
 
 class AppTheme {
   static ThemeData dark() {
@@ -8,13 +8,13 @@ class AppTheme {
       seedColor: SbBrand.electricBlue,
       brightness: Brightness.dark,
       surface: SbBrand.panel,
-      error: SbBrand.live,
+      error: SbBrand.liveError,
     ).copyWith(
       primary: SbBrand.electricBlue,
       secondary: SbBrand.purple,
       surface: SbBrand.panel,
-      onSurface: SbBrand.text,
-      onSurfaceVariant: SbBrand.muted,
+      onSurface: SbBrand.textPrimary,
+      onSurfaceVariant: SbBrand.textMuted,
     );
 
     return ThemeData(
@@ -22,46 +22,42 @@ class AppTheme {
       brightness: Brightness.dark,
       scaffoldBackgroundColor: SbBrand.black,
       colorScheme: scheme,
-      fontFamily: 'Arial',
       textTheme: const TextTheme(
         headlineLarge: TextStyle(
           fontWeight: FontWeight.w900,
           letterSpacing: -1.6,
-          color: SbBrand.text,
+          color: SbBrand.textPrimary,
         ),
         headlineMedium: TextStyle(
           fontWeight: FontWeight.w900,
           letterSpacing: -1.2,
-          color: SbBrand.text,
+          color: SbBrand.textPrimary,
         ),
         headlineSmall: TextStyle(
           fontWeight: FontWeight.w800,
           letterSpacing: -.7,
-          color: SbBrand.text,
+          color: SbBrand.textPrimary,
         ),
         titleLarge: TextStyle(
           fontWeight: FontWeight.w800,
           letterSpacing: -.6,
-          color: SbBrand.text,
+          color: SbBrand.textPrimary,
         ),
         titleMedium: TextStyle(
           fontWeight: FontWeight.w700,
-          color: SbBrand.text,
+          color: SbBrand.textPrimary,
         ),
         bodyLarge: TextStyle(
-          color: SbBrand.text,
+          color: SbBrand.textPrimary,
           height: 1.42,
-          fontWeight: FontWeight.w400,
         ),
         bodyMedium: TextStyle(
-          color: SbBrand.text,
+          color: SbBrand.textPrimary,
           height: 1.38,
-          fontWeight: FontWeight.w400,
         ),
         bodySmall: TextStyle(
-          color: SbBrand.muted,
+          color: SbBrand.textMuted,
           height: 1.3,
-          fontWeight: FontWeight.w400,
         ),
       ),
       cardTheme: CardThemeData(
@@ -70,7 +66,7 @@ class AppTheme {
         clipBehavior: Clip.antiAlias,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(11),
           side: BorderSide(
             color: Colors.white.withValues(alpha: .08),
           ),
@@ -79,11 +75,12 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: SbBrand.elevated,
-        hintStyle: const TextStyle(color: SbBrand.muted),
-        labelStyle: const TextStyle(color: SbBrand.muted),
-        prefixIconColor: SbBrand.muted,
-        suffixIconColor: SbBrand.muted,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        hintStyle: const TextStyle(color: SbBrand.textMuted),
+        labelStyle: const TextStyle(color: SbBrand.textMuted),
+        prefixIconColor: SbBrand.textMuted,
+        suffixIconColor: SbBrand.textMuted,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(11),
           borderSide: BorderSide(
@@ -117,7 +114,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: SbBrand.text,
+          foregroundColor: SbBrand.textPrimary,
           side: BorderSide(color: Colors.white.withValues(alpha: .14)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
@@ -131,20 +128,14 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(9),
         ),
-        labelStyle: const TextStyle(color: SbBrand.text),
+        labelStyle: const TextStyle(color: SbBrand.textPrimary),
       ),
       dividerColor: Colors.white.withValues(alpha: .08),
       appBarTheme: const AppBarTheme(
         backgroundColor: SbBrand.black,
-        foregroundColor: SbBrand.text,
+        foregroundColor: SbBrand.textPrimary,
         elevation: 0,
         scrolledUnderElevation: 0,
-      ),
-      navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: SbBrand.elevated,
-        indicatorColor: SbBrand.panelBlue,
-        selectedIconTheme: const IconThemeData(color: SbBrand.electricBlue),
-        unselectedIconTheme: const IconThemeData(color: SbBrand.muted),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: SbBrand.electricBlue,
@@ -155,7 +146,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: Colors.white.withValues(alpha: .1)),
         ),
-        textStyle: const TextStyle(color: SbBrand.text),
+        textStyle: const TextStyle(color: SbBrand.textPrimary),
       ),
     );
   }
