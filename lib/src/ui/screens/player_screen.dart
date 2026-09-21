@@ -127,7 +127,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WindowListener {
 
   Duration get _introSkipTarget {
     if (_duration.inSeconds <= 0) return const Duration(seconds: 75);
-    final detected = (_duration.inSeconds * 0.055).round().clamp(45, 90);
+    final detected = (_duration.inSeconds * 0.055).round().clamp(45, 90).toInt();
     return Duration(seconds: detected);
   }
 
@@ -149,7 +149,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WindowListener {
     }
     final remaining = _duration - _position;
     final threshold = Duration(
-      seconds: (_duration.inSeconds * 0.045).round().clamp(65, 150),
+      seconds: (_duration.inSeconds * 0.045).round().clamp(65, 150).toInt(),
     );
     return remaining > Duration.zero && remaining <= threshold;
   }
