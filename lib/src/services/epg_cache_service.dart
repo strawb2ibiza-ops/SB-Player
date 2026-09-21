@@ -62,7 +62,7 @@ class EpgCacheService {
     try {
       final now = DateTime.now();
       final oldest = now.subtract(const Duration(hours: 6));
-      final newest = now.add(const Duration(days: 2));
+      final newest = now.add(const Duration(days: 7));
       final compact = <String, List<Map<String, dynamic>>>{};
 
       for (final entry in channels.entries) {
