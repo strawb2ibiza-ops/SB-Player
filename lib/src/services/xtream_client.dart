@@ -119,7 +119,7 @@ class XtreamClient {
     return data.whereType<Map>().map((item) {
       final streamId = '${item['stream_id'] ?? ''}';
       final direct = '${item['direct_source'] ?? ''}'.trim();
-      final fallback = '$server/live/$username/$password/$streamId.ts';
+      final fallback = '$server/live/${_segment(username)}/${_segment(password)}/${_segment(streamId)}.ts';
 
       return IptvChannel(
         id: streamId,
@@ -142,9 +142,9 @@ class XtreamClient {
 
     return data.whereType<Map>().map((item) {
       final streamId = '${item['stream_id'] ?? ''}';
-      final extension = _nullableString(item['container_extension']) ?? 'mp4';
+      final extension = _safeExtension(item['container_extension'], 'mp4');
       final direct = '${item['direct_source'] ?? ''}'.trim();
-      final fallback = '$server/movie/$username/$password/$streamId.$extension';
+      final fallback = '$server/movie/${_segment(username)}/${_segment(password)}/${_segment(streamId)}.$extension';
 
       return VodItem(
         id: streamId,
@@ -231,7 +231,7 @@ class XtreamClient {
     final id = '${raw['id'] ?? raw['stream_id'] ?? ''}';
     if (id.isEmpty) return null;
 
-    final extension = _nullableString(raw['container_extension']) ?? 'mp4';
+    final extension = _safeExtension(raw['container_extension'], 'mp4');
     final season = int.tryParse('${raw['season'] ?? fallbackSeason}') ?? fallbackSeason;
     final episodeNumber = int.tryParse('${raw['episode_num'] ?? raw['episode'] ?? 0}') ?? 0;
     final info = raw['info'] is Map ? raw['info'] as Map : const <dynamic, dynamic>{};
@@ -239,7 +239,7 @@ class XtreamClient {
     final username = account.username!;
     final password = account.password!;
     final direct = '${raw['direct_source'] ?? ''}'.trim();
-    final fallback = '$server/series/$username/$password/$id.$extension';
+    final fallback = '$server/series/${_segment(username)}/${_segment(password)}/${_segment(id)}.$extension';
 
     return SeriesEpisode(
       id: id,
@@ -280,6 +280,16 @@ class XtreamClient {
       throw XtreamException('Provider returned HTTP ${response.statusCode}.');
     }
     return jsonDecode(response.body);
+  }
+
+  String _segment(String value) => Uri.encodeComponent(value);
+
+  String _safeExtension(dynamic value, String fallback) {
+    final extension = _nullableString(value)?.toLowerCase();
+    if (extension == null) return fallback;
+    return RegExp(r'^[a-z0-9]{1,8}$').hasMatch(extension)
+        ? extension
+        : fallback;
   }
 
   double? _rating(dynamic value) {
