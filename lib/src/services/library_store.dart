@@ -22,16 +22,20 @@ class LibraryStore {
       _save(_recentKey, entries);
 
   Future<void> _save(String key, List<LibraryEntry> entries) async {
-    final encoded = jsonEncode(
-      entries.map((entry) => entry.toJson()).toList(growable: false),
-    );
-    await _storage.write(key: key, value: encoded);
+    try {
+      final encoded = jsonEncode(
+        entries.map((entry) => entry.toJson()).toList(growable: false),
+      );
+      await _storage.write(key: key, value: encoded);
+    } catch (_) {
+      // Library persistence is best-effort and must not interrupt playback.
+    }
   }
 
   Future<List<LibraryEntry>> _load(String key) async {
-    final value = await _storage.read(key: key);
-    if (value == null || value.isEmpty) return const [];
     try {
+      final value = await _storage.read(key: key);
+      if (value == null || value.isEmpty) return const [];
       final decoded = jsonDecode(value);
       if (decoded is! List) {
         await _storage.delete(key: key);
@@ -43,7 +47,11 @@ class LibraryStore {
           .where((entry) => entry.id.isNotEmpty && entry.streamUrl.isNotEmpty)
           .toList(growable: false);
     } catch (_) {
-      await _storage.delete(key: key);
+      try {
+        await _storage.delete(key: key);
+      } catch (_) {
+        // Ignore storage cleanup failures.
+      }
       return const [];
     }
   }
