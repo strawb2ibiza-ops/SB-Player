@@ -41,11 +41,17 @@ class _ChannelTileState extends State<ChannelTile> {
         duration: const Duration(milliseconds: 160),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(11),
+          border: Border.all(
+            color: _hovered
+                ? SbBrand.electricBlue.withValues(alpha: 0.34)
+                : Colors.transparent,
+          ),
           boxShadow: [
             if (_hovered)
               BoxShadow(
-                color: SbBrand.electricBlue.withValues(alpha: 0.24),
-                blurRadius: 22,
+                color: Colors.black.withValues(alpha: 0.28),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
               ),
           ],
         ),
@@ -79,8 +85,7 @@ class _ChannelTileState extends State<ChannelTile> {
                       color: SbBrand.panelBlue,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color:
-                            SbBrand.electricBlue.withValues(alpha: 0.16),
+                        color: Colors.white.withValues(alpha: 0.10),
                       ),
                     ),
                     clipBehavior: Clip.antiAlias,
