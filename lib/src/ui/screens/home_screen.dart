@@ -581,6 +581,14 @@ class _HomeScreenState extends State<HomeScreen> {
             movies: controller.newReleaseMovies.take(10).toList(growable: false),
           ),
         ],
+        if (controller.newReleaseSeries.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _SeriesShelf(
+            title: 'New Series Releases',
+            controller: controller,
+            series: controller.newReleaseSeries.take(10).toList(growable: false),
+          ),
+        ],
         if (recentItems.isNotEmpty) ...[
           const SizedBox(height: 24),
           _HomeShelf(
