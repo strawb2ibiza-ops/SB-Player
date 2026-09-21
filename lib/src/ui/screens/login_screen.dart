@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_config.dart';
 import '../../state/app_controller.dart';
-import '../brand.dart';
+import '../branding/sb_brand.dart';
+import '../widgets/brand_backdrop.dart';
+import '../widgets/sb_logo.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.controller});
@@ -48,8 +50,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final locked = controller.config.mode == DistributionMode.sbLocked;
 
     return Scaffold(
-      body: SbGalaxyBackground(
-        intensity: .86,
+      body: BrandBackdrop(
+        dense: true,
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -76,8 +78,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const Center(
-                        child: SbBrandMark(
-                          height: 72,
+                        child: SbLogo(
+                          symbolSize: 82,
                           showWordmark: true,
                           showTagline: true,
                         ),
@@ -95,7 +97,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             : 'Connect with Xtream Codes or an M3U playlist.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: SbBrand.muted,
+                              color: SbBrand.textMuted,
                             ),
                       ),
                       const SizedBox(height: 26),
@@ -111,8 +113,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         for (final profile in controller.profiles)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 8),
-                            child: SbGlowBorder(
-                              radius: 11,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: SbBrand.panel,
+                                borderRadius: BorderRadius.circular(11),
+                                border: Border.all(
+                                  color:
+                                      Colors.white.withValues(alpha: .09),
+                                ),
+                              ),
                               child: ListTile(
                                 dense: true,
                                 leading: const CircleAvatar(
@@ -148,7 +157,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: Text(
                                   'ADD ANOTHER',
                                   style: TextStyle(
-                                    color: SbBrand.muted,
+                                    color: SbBrand.textMuted,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: 1.1,
@@ -238,15 +247,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: SbBrand.live.withValues(alpha: .10),
+                            color: SbBrand.liveError.withValues(alpha: .10),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: SbBrand.live.withValues(alpha: .34),
+                              color:
+                                  SbBrand.liveError.withValues(alpha: .34),
                             ),
                           ),
                           child: Text(
                             controller.error!,
-                            style: const TextStyle(color: SbBrand.live),
+                            style: const TextStyle(
+                              color: SbBrand.liveError,
+                            ),
                           ),
                         ),
                       ],
