@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/vod_item.dart';
 import '../../state/app_controller.dart';
+import '../branding/sb_brand.dart';
 import 'player_screen.dart';
 
 class MovieDetailsScreen extends StatelessWidget {
@@ -33,51 +34,93 @@ class MovieDetailsScreen extends StatelessWidget {
         final resume = item.startPosition > const Duration(seconds: 10);
 
         return Scaffold(
-          appBar: AppBar(title: Text(movie.name)),
-          body: LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 760;
-              final poster = _Poster(url: movie.posterUrl);
-              final details = _Details(
-                movie: movie,
-                resumePosition: item.startPosition,
-                favorite: favorite,
-                onFavorite: () => controller.toggleFavorite(item),
-                onPlay: () => _play(context),
-              );
-
-              return SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1100),
-                    child: wide
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              SizedBox(width: 300, child: poster),
-                              const SizedBox(width: 28),
-                              Expanded(child: details),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Center(child: SizedBox(width: 260, child: poster)),
-                              const SizedBox(height: 24),
-                              details,
-                            ],
-                          ),
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            title: Text(movie.name),
+          ),
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (movie.posterUrl != null)
+                Opacity(
+                  opacity: 0.22,
+                  child: Image.network(
+                    movie.posterUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => const SizedBox.shrink(),
                   ),
                 ),
-              );
-            },
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xB8040509),
+                      Color(0xF2040509),
+                      SbBrand.black,
+                    ],
+                    stops: [0, 0.58, 1],
+                  ),
+                ),
+              ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 760;
+                  final poster = _Poster(url: movie.posterUrl);
+                  final details = _Details(
+                    movie: movie,
+                    resumePosition: item.startPosition,
+                    favorite: favorite,
+                    onFavorite: () => controller.toggleFavorite(item),
+                    onPlay: () => _play(context),
+                  );
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(30, 118, 30, 36),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1180),
+                        child: wide
+                            ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(width: 300, child: poster),
+                                  const SizedBox(width: 36),
+                                  Expanded(child: details),
+                                ],
+                              )
+                            : Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: [
+                                  Center(
+                                    child: SizedBox(
+                                      width: 260,
+                                      child: poster,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 28),
+                                  details,
+                                ],
+                              ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
           floatingActionButton: resume
               ? FloatingActionButton.extended(
+                  backgroundColor: SbBrand.electricBlue,
+                  foregroundColor: Colors.white,
                   onPressed: () => _play(context),
-                  icon: const Icon(Icons.play_arrow),
-                  label: Text('Resume at ${_formatDuration(item.startPosition)}'),
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: Text(
+                    'Resume ${_formatDuration(item.startPosition)}',
+                  ),
                 )
               : null,
         );
