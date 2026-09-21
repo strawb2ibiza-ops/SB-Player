@@ -75,8 +75,7 @@ class M3uParser {
 
   Map<String, String> _parseAttributes(String line) {
     final result = <String, String>{};
-    final expression = RegExp(r'([A-Za-z0-9_-]+)="([^"]*)"');
-    for (final match in expression.allMatches(line)) {
+    for (final match in _attributePattern.allMatches(line)) {
       result[match.group(1)!.toLowerCase()] = match.group(2)!;
     }
     return result;
