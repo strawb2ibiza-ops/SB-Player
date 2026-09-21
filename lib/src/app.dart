@@ -4,25 +4,55 @@ import 'state/app_controller.dart';
 import 'ui/app_theme.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/login_screen.dart';
+import 'ui/screens/splash_screen.dart';
 
-class SbPlayerApp extends StatelessWidget {
+class SbPlayerApp extends StatefulWidget {
   const SbPlayerApp({super.key, required this.controller});
 
   final AppController controller;
 
   @override
+  State<SbPlayerApp> createState() => _SbPlayerAppState();
+}
+
+class _SbPlayerAppState extends State<SbPlayerApp> {
+  late final Future<void> _startup;
+
+  @override
+  void initState() {
+    super.initState();
+    _startup = _restoreWithMinimumSplash();
+  }
+
+  Future<void> _restoreWithMinimumSplash() async {
+    await Future.wait<void>([
+      widget.controller.restoreSession(),
+      Future<void>.delayed(const Duration(milliseconds: 900)),
+    ]);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: controller.config.appName,
+      title: widget.controller.config.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
-      home: AnimatedBuilder(
-        animation: controller,
-        builder: (context, _) {
-          if (controller.signedIn) {
-            return HomeScreen(controller: controller);
+      home: FutureBuilder<void>(
+        future: _startup,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const SplashScreen();
           }
-          return LoginScreen(controller: controller);
+
+          return AnimatedBuilder(
+            animation: widget.controller,
+            builder: (context, _) {
+              if (widget.controller.signedIn) {
+                return HomeScreen(controller: widget.controller);
+              }
+              return LoginScreen(controller: widget.controller);
+            },
+          );
         },
       ),
     );

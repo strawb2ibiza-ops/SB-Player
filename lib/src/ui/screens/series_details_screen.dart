@@ -4,7 +4,7 @@ import '../../models/series_item.dart';
 import '../../state/app_controller.dart';
 import 'player_screen.dart';
 
-class SeriesDetailsScreen extends StatelessWidget {
+class SeriesDetailsScreen extends StatefulWidget {
   const SeriesDetailsScreen({
     super.key,
     required this.controller,
@@ -15,11 +15,32 @@ class SeriesDetailsScreen extends StatelessWidget {
   final SeriesItem series;
 
   @override
+  State<SeriesDetailsScreen> createState() => _SeriesDetailsScreenState();
+}
+
+class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
+  late Future<SeriesDetails> _details;
+
+  @override
+  void initState() {
+    super.initState();
+    _details = widget.controller.fetchSeriesDetails(widget.series);
+  }
+
+  void _retry() {
+    setState(() {
+      _details = widget.controller.fetchSeriesDetails(widget.series);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final series = widget.series;
+    final controller = widget.controller;
     return Scaffold(
       appBar: AppBar(title: Text(series.name)),
       body: FutureBuilder<SeriesDetails>(
-        future: controller.fetchSeriesDetails(series),
+        future: _details,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
@@ -28,7 +49,20 @@ class SeriesDetailsScreen extends StatelessWidget {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text('Could not load this series: ${snapshot.error}'),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline, size: 42),
+                    const SizedBox(height: 12),
+                    const Text('Could not load this series.'),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: _retry,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
+                ),
               ),
             );
           }
@@ -109,7 +143,7 @@ class _SeriesHeader extends StatelessWidget {
               : Image.network(
                   series.coverUrl!,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.movie_filter_outlined, size: 50),
+                  errorBuilder: (_, _, _) => const Icon(Icons.movie_filter_outlined, size: 50),
                 ),
         ),
         const SizedBox(width: 20),

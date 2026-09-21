@@ -22,11 +22,22 @@ class XtreamClient {
 
   String normalizeBase(String value) {
     var result = value.trim();
-    if (!result.startsWith('http://') && !result.startsWith('https://')) {
+    if (result.isEmpty) {
+      throw XtreamException('Enter the IPTV server URL.');
+    }
+    final lower = result.toLowerCase();
+    if (!lower.startsWith('http://') && !lower.startsWith('https://')) {
       result = 'https://$result';
     }
     while (result.endsWith('/')) {
       result = result.substring(0, result.length - 1);
+    }
+
+    final uri = Uri.tryParse(result);
+    if (uri == null ||
+        !uri.hasAuthority ||
+        !{'http', 'https'}.contains(uri.scheme.toLowerCase())) {
+      throw XtreamException('Enter a valid HTTP or HTTPS IPTV server URL.');
     }
     return result;
   }
@@ -42,12 +53,22 @@ class XtreamClient {
       queryParameters: {'username': username, 'password': password},
     );
 
-    final response = await _client.get(uri).timeout(const Duration(seconds: 15));
+    late http.Response response;
+    try {
+      response = await _client.get(uri).timeout(const Duration(seconds: 15));
+    } catch (_) {
+      throw XtreamException('Could not connect to the IPTV provider.');
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw XtreamException('Provider returned HTTP ${response.statusCode}.');
     }
 
-    final decoded = jsonDecode(response.body);
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw XtreamException('Provider returned invalid account data.');
+    }
     if (decoded is! Map<String, dynamic>) {
       throw XtreamException('Provider returned an unexpected response.');
     }
@@ -119,7 +140,7 @@ class XtreamClient {
     return data.whereType<Map>().map((item) {
       final streamId = '${item['stream_id'] ?? ''}';
       final direct = '${item['direct_source'] ?? ''}'.trim();
-      final fallback = '$server/live/$username/$password/$streamId.ts';
+      final fallback = '$server/live/${_segment(username)}/${_segment(password)}/${_segment(streamId)}.ts';
 
       return IptvChannel(
         id: streamId,
@@ -127,7 +148,7 @@ class XtreamClient {
         categoryId: '${item['category_id'] ?? ''}',
         logoUrl: _nullableString(item['stream_icon']),
         epgId: _nullableString(item['epg_channel_id']),
-        streamUrl: direct.startsWith('http') ? direct : fallback,
+        streamUrl: _httpSource(direct) ?? fallback,
       );
     }).where((channel) => channel.id.isNotEmpty).toList(growable: false);
   }
@@ -142,9 +163,9 @@ class XtreamClient {
 
     return data.whereType<Map>().map((item) {
       final streamId = '${item['stream_id'] ?? ''}';
-      final extension = _nullableString(item['container_extension']) ?? 'mp4';
+      final extension = _safeExtension(item['container_extension'], 'mp4');
       final direct = '${item['direct_source'] ?? ''}'.trim();
-      final fallback = '$server/movie/$username/$password/$streamId.$extension';
+      final fallback = '$server/movie/${_segment(username)}/${_segment(password)}/${_segment(streamId)}.$extension';
 
       return VodItem(
         id: streamId,
@@ -156,7 +177,7 @@ class XtreamClient {
         rating: _rating(item['rating_5based'] ?? item['rating']),
         releaseDate: _nullableString(item['releasedate'] ?? item['release_date']),
         duration: _nullableString(item['duration']),
-        streamUrl: direct.startsWith('http') ? direct : fallback,
+        streamUrl: _httpSource(direct) ?? fallback,
       );
     }).where((item) => item.id.isNotEmpty).toList(growable: false);
   }
@@ -231,7 +252,7 @@ class XtreamClient {
     final id = '${raw['id'] ?? raw['stream_id'] ?? ''}';
     if (id.isEmpty) return null;
 
-    final extension = _nullableString(raw['container_extension']) ?? 'mp4';
+    final extension = _safeExtension(raw['container_extension'], 'mp4');
     final season = int.tryParse('${raw['season'] ?? fallbackSeason}') ?? fallbackSeason;
     final episodeNumber = int.tryParse('${raw['episode_num'] ?? raw['episode'] ?? 0}') ?? 0;
     final info = raw['info'] is Map ? raw['info'] as Map : const <dynamic, dynamic>{};
@@ -239,14 +260,14 @@ class XtreamClient {
     final username = account.username!;
     final password = account.password!;
     final direct = '${raw['direct_source'] ?? ''}'.trim();
-    final fallback = '$server/series/$username/$password/$id.$extension';
+    final fallback = '$server/series/${_segment(username)}/${_segment(password)}/${_segment(id)}.$extension';
 
     return SeriesEpisode(
       id: id,
       title: '${raw['title'] ?? raw['name'] ?? 'Episode $episodeNumber'}',
       season: season,
       episodeNumber: episodeNumber,
-      streamUrl: direct.startsWith('http') ? direct : fallback,
+      streamUrl: _httpSource(direct) ?? fallback,
       extension: extension,
       plot: _nullableString(info['plot'] ?? raw['plot']),
       duration: _nullableString(info['duration'] ?? raw['duration']),
@@ -275,11 +296,41 @@ class XtreamClient {
       },
     );
 
-    final response = await _client.get(uri).timeout(const Duration(seconds: 25));
+    late http.Response response;
+    try {
+      response = await _client.get(uri).timeout(const Duration(seconds: 25));
+    } catch (_) {
+      throw XtreamException('Could not load data from the IPTV provider.');
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw XtreamException('Provider returned HTTP ${response.statusCode}.');
     }
-    return jsonDecode(response.body);
+    try {
+      return jsonDecode(response.body);
+    } catch (_) {
+      throw XtreamException('Provider returned invalid data.');
+    }
+  }
+
+  String? _httpSource(String value) {
+    if (value.isEmpty) return null;
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        !uri.hasAuthority ||
+        !{'http', 'https'}.contains(uri.scheme.toLowerCase())) {
+      return null;
+    }
+    return value;
+  }
+
+  String _segment(String value) => Uri.encodeComponent(value);
+
+  String _safeExtension(dynamic value, String fallback) {
+    final extension = _nullableString(value)?.toLowerCase();
+    if (extension == null) return fallback;
+    return RegExp(r'^[a-z0-9]{1,8}$').hasMatch(extension)
+        ? extension
+        : fallback;
   }
 
   double? _rating(dynamic value) {

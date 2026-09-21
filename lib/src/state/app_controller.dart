@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
@@ -5,11 +9,14 @@ import '../models/content_section.dart';
 import '../models/epg_program.dart';
 import '../models/iptv_account.dart';
 import '../models/iptv_category.dart';
+import '../models/iptv_profile.dart';
 import '../models/iptv_channel.dart';
 import '../models/library_entry.dart';
 import '../models/playback_item.dart';
 import '../models/series_item.dart';
 import '../models/vod_item.dart';
+import '../services/account_profiles_store.dart';
+import '../services/epg_cache_service.dart';
 import '../services/library_store.dart';
 import '../services/m3u_client.dart';
 import '../services/secure_account_store.dart';
@@ -21,21 +28,37 @@ class AppController extends ChangeNotifier {
     required this.config,
     required this.accountStore,
     this.libraryStore = const LibraryStore(),
+    this.profileStore = const AccountProfilesStore(),
     XtreamClient? xtreamClient,
     M3uClient? m3uClient,
     XmlTvService? xmlTvService,
-  })  : _xtreamClient = xtreamClient ?? XtreamClient(),
+    EpgCacheService epgCacheService = const EpgCacheService(),
+  })  : _epgCacheService = epgCacheService,
+        _xtreamClient = xtreamClient ?? XtreamClient(),
         _m3uClient = m3uClient ?? M3uClient(),
         _xmlTvService = xmlTvService ?? XmlTvService();
 
   final AppConfig config;
   final SecureAccountStore accountStore;
   final LibraryStore libraryStore;
+  final AccountProfilesStore profileStore;
+  final EpgCacheService _epgCacheService;
   final XtreamClient _xtreamClient;
   final M3uClient _m3uClient;
   final XmlTvService _xmlTvService;
 
   IptvAccount? account;
+  List<IptvProfile> profiles = const [];
+  String? activeProfileId;
+
+  IptvProfile? get activeProfile {
+    final id = activeProfileId;
+    if (id == null) return null;
+    for (final profile in profiles) {
+      if (profile.id == id) return profile;
+    }
+    return null;
+  }
 
   List<IptvCategory> liveCategories = const [];
   List<IptvChannel> channels = const [];
@@ -59,6 +82,10 @@ class AppController extends ChangeNotifier {
   bool _moviesLoaded = false;
   bool _seriesLoaded = false;
   bool _epgLoaded = false;
+  int _catalogGeneration = 0;
+  int _epgGeneration = 0;
+  String? _cachedSbScopeIdentity;
+  String? _cachedSbScope;
   String? error;
 
   bool get signedIn => account != null;
@@ -95,16 +122,42 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> restoreSession() async {
+    await _epgCacheService.cleanupLegacyCache();
     await _loadLibrary();
-    final stored = await accountStore.read();
-    if (stored == null) return;
-    account = stored;
+
+    IptvAccount? stored;
+    if (!config.isLocked) {
+      profiles = await profileStore.loadProfiles();
+      activeProfileId = await profileStore.readActiveProfileId();
+      stored = activeProfile?.account;
+    }
+
+    stored ??= await accountStore.read();
+    if (stored == null) {
+      notifyListeners();
+      return;
+    }
+
     loading = true;
     notifyListeners();
     try {
+      if (!config.isLocked && activeProfile == null) {
+        await _saveOpenProfile(stored);
+      }
+
       await _loadAccount(stored);
+      await accountStore.save(account!);
+
+      if (!config.isLocked) {
+        await _updateActiveProfileAccount(account!);
+      }
+      await _migrateLegacyLibraryToCurrentScope();
     } catch (_) {
       account = null;
+      activeProfileId = null;
+      if (!config.isLocked) {
+        await profileStore.setActiveProfileId(null);
+      }
       await accountStore.clear();
     } finally {
       loading = false;
@@ -122,15 +175,21 @@ class AppController extends ChangeNotifier {
       if (config.isLocked && server.contains('replace-me.invalid')) {
         throw Exception('SB provider endpoint has not been configured in this build.');
       }
+
       final authenticated = await _xtreamClient.authenticate(
         serverUrl: server,
         username: username.trim(),
         password: password,
         label: config.isLocked ? 'SB' : 'Xtream',
       );
-      account = authenticated;
-      await accountStore.save(authenticated);
+
       await _loadAccount(authenticated);
+      await accountStore.save(account!);
+
+      if (!config.isLocked) {
+        await _saveOpenProfile(account!);
+      }
+      await _migrateLegacyLibraryToCurrentScope();
     });
   }
 
@@ -140,18 +199,18 @@ class AppController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+
     return _guard(() async {
-      final playlist = await _m3uClient.load(playlistUrl);
       final next = IptvAccount(
         type: AccountType.m3u,
         label: 'M3U',
         playlistUrl: playlistUrl.trim(),
-        epgUrl: playlist.epgUrl,
       );
-      account = next;
-      await accountStore.save(next);
-      _resetCatalogs();
-      _setM3uChannels(playlist.channels);
+
+      await _loadAccount(next);
+      await accountStore.save(account!);
+      await _saveOpenProfile(account!);
+      await _migrateLegacyLibraryToCurrentScope();
     });
   }
 
@@ -218,12 +277,14 @@ class AppController extends ChangeNotifier {
   }
 
   List<LibraryEntry> visibleLibrary(List<LibraryEntry> entries, String search) {
+    final prefix = '$_libraryScope|';
     final query = search.trim().toLowerCase();
-    if (query.isEmpty) return entries;
-    return entries
-        .where((entry) => entry.title.toLowerCase().contains(query) ||
-            (entry.subtitle?.toLowerCase().contains(query) ?? false))
-        .toList(growable: false);
+    return entries.where((entry) {
+      if (!entry.id.startsWith(prefix)) return false;
+      if (query.isEmpty) return true;
+      return entry.title.toLowerCase().contains(query) ||
+          (entry.subtitle?.toLowerCase().contains(query) ?? false);
+    }).toList(growable: false);
   }
 
   Future<SeriesDetails> fetchSeriesDetails(SeriesItem item) async {
@@ -235,7 +296,7 @@ class AppController extends ChangeNotifier {
   }
 
   PlaybackItem playbackForChannel(IptvChannel channel) => PlaybackItem(
-        id: 'live:${channel.id}',
+        id: _scopedContentId('live', channel.id),
         title: channel.name,
         streamUrl: channel.streamUrl,
         kind: PlaybackKind.live,
@@ -243,28 +304,38 @@ class AppController extends ChangeNotifier {
         subtitle: nowProgram(channel)?.title,
       );
 
-  PlaybackItem playbackForMovie(VodItem movie) => PlaybackItem(
-        id: 'movie:${movie.id}',
-        title: movie.name,
-        streamUrl: movie.streamUrl,
-        kind: PlaybackKind.movie,
-        artworkUrl: movie.posterUrl,
-        subtitle: movie.releaseDate,
-        startPosition: _savedPosition('movie:${movie.id}'),
-      );
+  PlaybackItem playbackForMovie(VodItem movie) {
+    final id = _scopedContentId('movie', movie.id);
+    return PlaybackItem(
+      id: id,
+      title: movie.name,
+      streamUrl: movie.streamUrl,
+      kind: PlaybackKind.movie,
+      artworkUrl: movie.posterUrl,
+      subtitle: movie.releaseDate,
+      startPosition: _savedPosition(id),
+    );
+  }
 
-  PlaybackItem playbackForEpisode(SeriesItem seriesItem, SeriesEpisode episode) =>
-      PlaybackItem(
-        id: 'episode:${episode.id}',
-        title: episode.title,
-        streamUrl: episode.streamUrl,
-        kind: PlaybackKind.episode,
-        artworkUrl: episode.imageUrl ?? seriesItem.coverUrl,
-        subtitle: '${seriesItem.name} • S${episode.season} E${episode.episodeNumber}',
-        startPosition: _savedPosition('episode:${episode.id}'),
-      );
+  PlaybackItem playbackForEpisode(
+    SeriesItem seriesItem,
+    SeriesEpisode episode,
+  ) {
+    final id = _scopedContentId('episode', episode.id);
+    return PlaybackItem(
+      id: id,
+      title: episode.title,
+      streamUrl: episode.streamUrl,
+      kind: PlaybackKind.episode,
+      artworkUrl: episode.imageUrl ?? seriesItem.coverUrl,
+      subtitle:
+          '${seriesItem.name} • S${episode.season} E${episode.episodeNumber}',
+      startPosition: _savedPosition(id),
+    );
+  }
 
-  bool isFavorite(PlaybackItem item) => favorites.any((entry) => entry.id == item.id);
+  bool isFavorite(PlaybackItem item) =>
+      favorites.any((entry) => entry.id == item.id);
 
   Future<void> toggleFavorite(PlaybackItem item) async {
     final existing = favorites.indexWhere((entry) => entry.id == item.id);
@@ -285,7 +356,9 @@ class AppController extends ChangeNotifier {
     Duration duration = Duration.zero,
   }) async {
     var savedPosition = position;
-    if (!item.isLive && duration.inSeconds > 0 && position.inSeconds / duration.inSeconds > 0.95) {
+    if (!item.isLive &&
+        duration.inSeconds > 0 &&
+        position.inSeconds / duration.inSeconds > 0.95) {
       savedPosition = Duration.zero;
     }
 
@@ -295,7 +368,18 @@ class AppController extends ChangeNotifier {
       duration: duration,
     );
 
-    recent = [entry, ...recent.where((value) => value.id != item.id)].take(50).toList();
+    final prefix = '$_libraryScope|';
+    final currentScope = [
+      entry,
+      ...recent.where(
+        (value) => value.id.startsWith(prefix) && value.id != item.id,
+      ),
+    ].take(50);
+
+    recent = [
+      ...currentScope,
+      ...recent.where((value) => !value.id.startsWith(prefix)),
+    ];
 
     final favoriteIndex = favorites.indexWhere((value) => value.id == item.id);
     if (favoriteIndex >= 0) {
@@ -313,24 +397,34 @@ class AppController extends ChangeNotifier {
     final id = channel.epgId;
     if (id == null) return null;
     final programmes = epg[id];
-    if (programmes == null) return null;
+    if (programmes == null || programmes.isEmpty) return null;
+
     final time = at ?? DateTime.now();
-    for (final programme in programmes) {
-      if (programme.isLiveAt(time)) return programme;
-    }
-    return null;
+    final nextIndex = _lowerBoundProgrammeStart(
+      programmes,
+      time,
+      strictlyAfter: true,
+    );
+    final currentIndex = nextIndex - 1;
+    if (currentIndex < 0) return null;
+
+    final current = programmes[currentIndex];
+    return current.isLiveAt(time) ? current : null;
   }
 
   EpgProgram? nextProgram(IptvChannel channel, {DateTime? at}) {
     final id = channel.epgId;
     if (id == null) return null;
     final programmes = epg[id];
-    if (programmes == null) return null;
+    if (programmes == null || programmes.isEmpty) return null;
+
     final time = at ?? DateTime.now();
-    for (final programme in programmes) {
-      if (programme.start.isAfter(time)) return programme;
-    }
-    return null;
+    final index = _lowerBoundProgrammeStart(
+      programmes,
+      time,
+      strictlyAfter: true,
+    );
+    return index < programmes.length ? programmes[index] : null;
   }
 
   List<EpgProgram> programmesForChannel(
@@ -339,43 +433,201 @@ class AppController extends ChangeNotifier {
     int limit = 6,
   }) {
     final id = channel.epgId;
-    if (id == null) return const [];
+    if (id == null || limit <= 0) return const [];
     final programmes = epg[id];
-    if (programmes == null) return const [];
+    if (programmes == null || programmes.isEmpty) return const [];
+
     final time = from ?? DateTime.now();
-    return programmes
-        .where((programme) => programme.stop.isAfter(time))
-        .take(limit)
-        .toList(growable: false);
+    var index = _lowerBoundProgrammeStart(programmes, time);
+    if (index > 0 && programmes[index - 1].stop.isAfter(time)) {
+      index -= 1;
+    }
+    return programmes.skip(index).take(limit).toList(growable: false);
   }
 
-  Future<void> loadEpg() async {
-    if (_epgLoaded || epgLoading) return;
+  List<EpgProgram> programmesForWindow(
+    IptvChannel channel, {
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final id = channel.epgId;
+    if (id == null || !end.isAfter(start)) return const [];
+    final programmes = epg[id];
+    if (programmes == null || programmes.isEmpty) return const [];
+
+    var index = _lowerBoundProgrammeStart(programmes, start);
+    while (index > 0 && programmes[index - 1].stop.isAfter(start)) {
+      index -= 1;
+    }
+
+    final output = <EpgProgram>[];
+    for (; index < programmes.length; index++) {
+      final programme = programmes[index];
+      if (!programme.start.isBefore(end)) break;
+      if (programme.stop.isAfter(start)) output.add(programme);
+    }
+    return output;
+  }
+
+  int _lowerBoundProgrammeStart(
+    List<EpgProgram> programmes,
+    DateTime time, {
+    bool strictlyAfter = false,
+  }) {
+    var low = 0;
+    var high = programmes.length;
+    while (low < high) {
+      final mid = (low + high) >> 1;
+      final start = programmes[mid].start;
+      final belongsBefore =
+          strictlyAfter ? !start.isAfter(time) : start.isBefore(time);
+      if (belongsBefore) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low;
+  }
+
+  Future<void> loadEpg({bool force = false}) async {
+    if ((_epgLoaded && !force) || epgLoading) return;
     final url = account?.epgUrl;
     if (url == null || url.isEmpty) return;
+
+    final generation = _epgGeneration;
     epgLoading = true;
     notifyListeners();
     try {
-      epg = await _xmlTvService.load(url);
+      if (!force) {
+        final cached = await _epgCacheService.load(url);
+        if (cached != null) {
+          if (generation != _epgGeneration || account?.epgUrl != url) return;
+          epg = cached;
+          _epgLoaded = true;
+          return;
+        }
+      }
+
+      final fresh = await _xmlTvService.load(url);
+      await _epgCacheService.save(url, fresh);
+      if (generation != _epgGeneration || account?.epgUrl != url) return;
+      epg = fresh;
       _epgLoaded = true;
     } catch (_) {
       // EPG is optional. Playback and catalog browsing must remain usable.
     } finally {
-      epgLoading = false;
-      notifyListeners();
+      if (generation == _epgGeneration) {
+        epgLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> refresh() async {
-    if (account == null) return;
-    await _guard(() => _loadAccount(account!));
+    final current = account;
+    if (current == null) return;
+
+    final refreshed = await _guard(() async {
+      await _loadAccount(current);
+      await accountStore.save(account!);
+      if (!config.isLocked) {
+        await _updateActiveProfileAccount(account!);
+      }
+    });
+
+    if (refreshed) unawaited(loadEpg());
+  }
+
+  Future<bool> switchProfile(String profileId) async {
+    if (config.isLocked || profileId == activeProfileId) return false;
+
+    IptvProfile? selected;
+    for (final profile in profiles) {
+      if (profile.id == profileId) {
+        selected = profile;
+        break;
+      }
+    }
+    if (selected == null) return false;
+    final profile = selected;
+
+    final switched = await _guard(() async {
+      await _loadAccount(profile.account);
+      activeProfileId = profile.id;
+      await profileStore.setActiveProfileId(profile.id);
+      await accountStore.save(account!);
+      await _updateActiveProfileAccount(account!);
+      await _migrateLegacyLibraryToCurrentScope();
+    });
+
+    if (switched) unawaited(loadEpg());
+    return switched;
+  }
+
+  Future<void> renameProfile(String profileId, String name) async {
+    if (config.isLocked) return;
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    profiles = [
+      for (final profile in profiles)
+        if (profile.id == profileId)
+          profile.copyWith(name: trimmed, updatedAt: DateTime.now())
+        else
+          profile,
+    ];
+    await profileStore.saveProfiles(profiles);
+    notifyListeners();
+  }
+
+  Future<void> removeProfile(String profileId) async {
+    if (config.isLocked) return;
+
+    final exists = profiles.any((profile) => profile.id == profileId);
+    if (!exists) return;
+
+    final removingActive = activeProfileId == profileId;
+    if (removingActive && profiles.length > 1) {
+      final replacement =
+          profiles.firstWhere((profile) => profile.id != profileId);
+      final switched = await switchProfile(replacement.id);
+      if (!switched) return;
+    }
+
+    profiles = profiles
+        .where((profile) => profile.id != profileId)
+        .toList(growable: false);
+    await profileStore.saveProfiles(profiles);
+    await _removeLibraryScope('profile:$profileId');
+
+    if (removingActive && profiles.isEmpty) {
+      await beginAddAccount();
+    } else {
+      notifyListeners();
+    }
+  }
+
+  Future<void> beginAddAccount() async {
+    if (config.isLocked) return;
+    account = null;
+    activeProfileId = null;
+    _resetCatalogs();
+    section = ContentSection.live;
+    error = null;
+    await profileStore.setActiveProfileId(null);
+    await accountStore.clear();
+    notifyListeners();
   }
 
   Future<void> logout() async {
     account = null;
+    activeProfileId = null;
     _resetCatalogs();
     section = ContentSection.live;
     error = null;
+    if (!config.isLocked) {
+      await profileStore.setActiveProfileId(null);
+    }
     await accountStore.clear();
     notifyListeners();
   }
@@ -385,78 +637,197 @@ class AppController extends ChangeNotifier {
     recent = await libraryStore.loadRecent();
   }
 
+  Future<void> _saveOpenProfile(IptvAccount value) async {
+    if (config.isLocked) return;
+
+    IptvProfile? existing;
+    for (final profile in profiles) {
+      if (_sameProfileAccount(profile.account, value)) {
+        existing = profile;
+        break;
+      }
+    }
+
+    final now = DateTime.now();
+    final next = IptvProfile(
+      id: existing?.id ?? now.microsecondsSinceEpoch.toString(),
+      name: existing?.name ?? _defaultProfileName(value),
+      account: value,
+      updatedAt: now,
+    );
+
+    profiles = [
+      next,
+      ...profiles.where((profile) => profile.id != next.id),
+    ];
+    activeProfileId = next.id;
+    await profileStore.saveProfiles(profiles);
+    await profileStore.setActiveProfileId(next.id);
+  }
+
+  Future<void> _updateActiveProfileAccount(IptvAccount value) async {
+    final id = activeProfileId;
+    if (id == null) return;
+    profiles = [
+      for (final profile in profiles)
+        if (profile.id == id)
+          profile.copyWith(account: value, updatedAt: DateTime.now())
+        else
+          profile,
+    ];
+    await profileStore.saveProfiles(profiles);
+  }
+
+  bool _sameProfileAccount(IptvAccount left, IptvAccount right) {
+    if (left.type != right.type) return false;
+    if (left.type == AccountType.xtream) {
+      return left.serverUrl == right.serverUrl &&
+          left.username == right.username;
+    }
+    return left.playlistUrl == right.playlistUrl;
+  }
+
+  String _defaultProfileName(IptvAccount value) {
+    final source =
+        value.type == AccountType.xtream ? value.serverUrl : value.playlistUrl;
+    final host = Uri.tryParse(source ?? '')?.host;
+    if (host?.isNotEmpty == true) return host!;
+    return value.type == AccountType.xtream ? 'Xtream account' : 'M3U playlist';
+  }
+
   Future<void> _loadAccount(IptvAccount value) async {
-    _resetCatalogs();
+    IptvAccount resolvedAccount = value;
+    List<IptvCategory> loadedCategories;
+    List<IptvChannel> loadedChannels;
+
     if (value.type == AccountType.xtream) {
-      final results = await Future.wait([
-        _xtreamClient.fetchLiveCategories(value),
-        _xtreamClient.fetchLiveChannels(value),
+      late List<IptvCategory> categories;
+      late List<IptvChannel> liveChannels;
+      await Future.wait<void>([
+        _xtreamClient.fetchLiveCategories(value).then((value) {
+          categories = value;
+        }),
+        _xtreamClient.fetchLiveChannels(value).then((value) {
+          liveChannels = value;
+        }),
       ]);
-      liveCategories = results[0] as List<IptvCategory>;
-      channels = results[1] as List<IptvChannel>;
+      loadedCategories = categories;
+      loadedChannels = liveChannels;
     } else {
       final playlist = await _m3uClient.load(value.playlistUrl!);
-      _setM3uChannels(playlist.channels);
+      loadedChannels = playlist.channels;
+      loadedCategories = _categoriesFromChannels(loadedChannels);
+
       if (playlist.epgUrl != null && playlist.epgUrl != value.epgUrl) {
-        account = IptvAccount(
+        resolvedAccount = IptvAccount(
           type: value.type,
           label: value.label,
           playlistUrl: value.playlistUrl,
           epgUrl: playlist.epgUrl,
         );
-        await accountStore.save(account!);
       }
     }
+
+    _resetCatalogs();
+    account = resolvedAccount;
+    liveCategories = loadedCategories;
+    channels = loadedChannels;
     liveCategoryId = '__all__';
     section = ContentSection.live;
-    notifyListeners();
   }
 
   Future<void> _loadMovies() async {
     final current = account;
     if (current == null || current.type != AccountType.xtream) return;
+    final generation = _catalogGeneration;
     contentLoading = true;
     error = null;
     notifyListeners();
     try {
-      final results = await Future.wait([
-        _xtreamClient.fetchVodCategories(current),
-        _xtreamClient.fetchVodStreams(current),
+      late List<IptvCategory> categories;
+      late List<VodItem> loadedMovies;
+      await Future.wait<void>([
+        _xtreamClient.fetchVodCategories(current).then((value) {
+          categories = value;
+        }),
+        _xtreamClient.fetchVodStreams(current).then((value) {
+          loadedMovies = value;
+        }),
       ]);
-      movieCategories = results[0] as List<IptvCategory>;
-      movies = results[1] as List<VodItem>;
+      if (generation != _catalogGeneration || account != current) return;
+      movieCategories = categories;
+      movies = loadedMovies;
       _moviesLoaded = true;
       movieCategoryId = '__all__';
     } catch (exception) {
-      error = exception.toString().replaceFirst('Exception: ', '');
+      if (generation == _catalogGeneration) {
+        error = exception.toString().replaceFirst('Exception: ', '');
+      }
     } finally {
-      contentLoading = false;
-      notifyListeners();
+      if (generation == _catalogGeneration) {
+        contentLoading = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> _loadSeries() async {
     final current = account;
     if (current == null || current.type != AccountType.xtream) return;
+    final generation = _catalogGeneration;
     contentLoading = true;
     error = null;
     notifyListeners();
     try {
-      final results = await Future.wait([
-        _xtreamClient.fetchSeriesCategories(current),
-        _xtreamClient.fetchSeries(current),
+      late List<IptvCategory> categories;
+      late List<SeriesItem> loadedSeries;
+      await Future.wait<void>([
+        _xtreamClient.fetchSeriesCategories(current).then((value) {
+          categories = value;
+        }),
+        _xtreamClient.fetchSeries(current).then((value) {
+          loadedSeries = value;
+        }),
       ]);
-      seriesCategories = results[0] as List<IptvCategory>;
-      series = results[1] as List<SeriesItem>;
+      if (generation != _catalogGeneration || account != current) return;
+      seriesCategories = categories;
+      series = loadedSeries;
       _seriesLoaded = true;
       seriesCategoryId = '__all__';
     } catch (exception) {
-      error = exception.toString().replaceFirst('Exception: ', '');
+      if (generation == _catalogGeneration) {
+        error = exception.toString().replaceFirst('Exception: ', '');
+      }
     } finally {
-      contentLoading = false;
-      notifyListeners();
+      if (generation == _catalogGeneration) {
+        contentLoading = false;
+        notifyListeners();
+      }
     }
   }
+
+  String get _libraryScope {
+    if (config.isLocked) {
+      final current = account;
+      if (current == null) return 'sb:pending';
+      final identity =
+          '${current.serverUrl ?? config.providerBaseUrl}|${current.username ?? ''}';
+      if (_cachedSbScopeIdentity == identity && _cachedSbScope != null) {
+        return _cachedSbScope!;
+      }
+
+      final digest = sha256.convert(utf8.encode(identity)).toString();
+      _cachedSbScopeIdentity = identity;
+      _cachedSbScope = 'sb:${digest.substring(0, 16)}';
+      return _cachedSbScope!;
+    }
+
+    final id = activeProfileId;
+    return id == null ? 'profile:pending' : 'profile:$id';
+  }
+
+  String _scopedContentId(String kind, String id) =>
+      '$_libraryScope|$kind:$id';
 
   Duration _savedPosition(String id) {
     for (final item in recent) {
@@ -483,20 +854,88 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  void _setM3uChannels(List<IptvChannel> loaded) {
-    channels = loaded;
+  LibraryEntry _rekeyLibraryEntry(LibraryEntry entry, String id) {
+    return LibraryEntry(
+      id: id,
+      title: entry.title,
+      streamUrl: entry.streamUrl,
+      kind: entry.kind,
+      updatedAt: entry.updatedAt,
+      artworkUrl: entry.artworkUrl,
+      subtitle: entry.subtitle,
+      positionSeconds: entry.positionSeconds,
+      durationSeconds: entry.durationSeconds,
+    );
+  }
+
+  Future<void> _migrateLegacyLibraryToCurrentScope() async {
+    if (account == null || (!config.isLocked && activeProfileId == null)) return;
+    final prefix = '$_libraryScope|';
+
+    var favoritesChanged = false;
+    var recentChanged = false;
+
+    favorites = [
+      for (final entry in favorites)
+        if (_isLegacyLibraryId(entry.id))
+          (() {
+            favoritesChanged = true;
+            return _rekeyLibraryEntry(entry, '$prefix${entry.id}');
+          })()
+        else
+          entry,
+    ];
+
+    recent = [
+      for (final entry in recent)
+        if (_isLegacyLibraryId(entry.id))
+          (() {
+            recentChanged = true;
+            return _rekeyLibraryEntry(entry, '$prefix${entry.id}');
+          })()
+        else
+          entry,
+    ];
+
+    if (favoritesChanged) await libraryStore.saveFavorites(favorites);
+    if (recentChanged) await libraryStore.saveRecent(recent);
+  }
+
+  bool _isLegacyLibraryId(String id) =>
+      id.startsWith('live:') ||
+      id.startsWith('movie:') ||
+      id.startsWith('episode:');
+
+  Future<void> _removeLibraryScope(String scope) async {
+    final prefix = '$scope|';
+    final nextFavorites =
+        favorites.where((entry) => !entry.id.startsWith(prefix)).toList();
+    final nextRecent =
+        recent.where((entry) => !entry.id.startsWith(prefix)).toList();
+
+    final favoritesChanged = nextFavorites.length != favorites.length;
+    final recentChanged = nextRecent.length != recent.length;
+    favorites = nextFavorites;
+    recent = nextRecent;
+
+    if (favoritesChanged) await libraryStore.saveFavorites(favorites);
+    if (recentChanged) await libraryStore.saveRecent(recent);
+  }
+
+  List<IptvCategory> _categoriesFromChannels(List<IptvChannel> loaded) {
     final groups = <String>{};
     for (final channel in loaded) {
       groups.add(channel.categoryId);
     }
-    liveCategories = groups
+    return groups
         .map((name) => IptvCategory(id: name, name: name))
         .toList()
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    liveCategoryId = '__all__';
   }
 
   void _resetCatalogs() {
+    _catalogGeneration += 1;
+    _epgGeneration += 1;
     liveCategories = const [];
     channels = const [];
     movieCategories = const [];

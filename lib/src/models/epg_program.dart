@@ -15,4 +15,27 @@ class EpgProgram {
 
   bool isLiveAt(DateTime time) =>
       !time.isBefore(start) && time.isBefore(stop);
+
+  Map<String, dynamic> toJson() => {
+        'channelId': channelId,
+        'title': title,
+        'start': start.toIso8601String(),
+        'stop': stop.toIso8601String(),
+        'description': description,
+      };
+
+  factory EpgProgram.fromJson(Map<String, dynamic> json) {
+    return EpgProgram(
+      channelId: '${json['channelId'] ?? ''}',
+      title: '${json['title'] ?? ''}',
+      start: DateTime.parse('${json['start']}'),
+      stop: DateTime.parse('${json['stop']}'),
+      description: _nullable(json['description']),
+    );
+  }
+
+  static String? _nullable(dynamic value) {
+    final text = '${value ?? ''}'.trim();
+    return text.isEmpty || text == 'null' ? null : text;
+  }
 }

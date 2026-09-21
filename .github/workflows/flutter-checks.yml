@@ -5,9 +5,14 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: flutter-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -17,3 +22,24 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter config --enable-windows-desktop
+      - run: flutter create --project-name sb_player --platforms=windows .
+      - run: flutter pub get
+      - run: flutter build windows --release
+      - name: Upload Windows release
+        uses: actions/upload-artifact@v4
+        with:
+          name: SB-Player-Windows-Open-v0.4
+          path: build/windows/x64/runner/Release/**
+          if-no-files-found: error
+          retention-days: 14

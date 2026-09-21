@@ -18,4 +18,20 @@ https://example.test/live/2.ts
     expect(result.channels.first.epgId, 'bbc1');
     expect(result.channels[1].categoryId, 'Sports');
   });
+
+  test('keeps channel ids unique when tvg-id values repeat', () {
+    const body = '''#EXTM3U
+#EXTINF:-1 tvg-id="shared" group-title="One",Channel One
+https://example.test/live/1.m3u8
+#EXTINF:-1 tvg-id="shared" group-title="Two",Channel Two
+https://example.test/live/2.m3u8
+''';
+
+    final result = const M3uParser().parse(body);
+
+    expect(result.channels, hasLength(2));
+    expect(result.channels[0].epgId, 'shared');
+    expect(result.channels[1].epgId, 'shared');
+    expect(result.channels[0].id, isNot(result.channels[1].id));
+  });
 }

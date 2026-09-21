@@ -13,12 +13,16 @@ class SecureAccountStore {
       _storage.write(key: _accountKey, value: account.encode());
 
   Future<IptvAccount?> read() async {
-    final value = await _storage.read(key: _accountKey);
-    if (value == null || value.isEmpty) return null;
     try {
+      final value = await _storage.read(key: _accountKey);
+      if (value == null || value.isEmpty) return null;
       return IptvAccount.decode(value);
     } catch (_) {
-      await clear();
+      try {
+        await clear();
+      } catch (_) {
+        // Ignore cleanup failures and continue without a restored session.
+      }
       return null;
     }
   }
