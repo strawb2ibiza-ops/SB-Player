@@ -6,7 +6,7 @@ import '../models/epg_program.dart';
 class XmlTvService {
   XmlTvService({http.Client? client}) : _client = client ?? http.Client();
 
-  static final RegExp _offsetPattern = RegExp(r'([+-])(\\d{2})(\\d{2})');
+  static final RegExp _offsetPattern = RegExp(r'([+-])(\d{2})(\d{2})');
 
   final http.Client _client;
 
@@ -74,7 +74,7 @@ class XmlTvService {
     if ([year, month, day, hour, minute, second].contains(null)) return null;
 
     final suffix = raw.substring(14);
-    final offsetMatch = RegExp(r'([+-])(\d{2})(\d{2})').firstMatch(suffix);
+    final offsetMatch = _offsetPattern.firstMatch(suffix);
     if (offsetMatch == null) {
       return DateTime(year!, month!, day!, hour!, minute!, second!);
     }
