@@ -367,9 +367,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _time(DateTime value) =>
-      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-
   String _date(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 }
