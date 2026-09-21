@@ -12,6 +12,8 @@ Use only with IPTV services and content you are authorized to access or distribu
 ### Accounts and provider modes
 
 - Xtream-compatible authentication through `player_api.php`
+- Multiple securely stored provider profiles in Open Edition
+- Switch, rename, remove and add provider profiles without retyping existing credentials
 - Open Edition server + username + password login
 - Open Edition M3U URL support
 - SB Edition build-time provider lock
@@ -27,7 +29,9 @@ Use only with IPTV services and content you are authorized to access or distribu
 - XMLTV EPG support
 - Now/Next programme information
 - Timeline-style TV Guide with a four-hour programme window and current-time marker
-- Six-hour persistent EPG cache with manual force refresh
+- Six-hour persistent EPG cache with manual force refresh and up to seven days of cached guide data
+- Guide navigation for Now, ±2 hours and day selection
+- Programme detail sheets with descriptions and Watch actions
 
 ### Movies and series
 
@@ -55,7 +59,10 @@ Use only with IPTV services and content you are authorized to access or distribu
 - Always-on-top mini-player mode using `window_manager`
 - Detailed mini-player with title/programme, progress, volume and playback controls
 - Video-only mini-player with hover controls
-- Remembered mini-player layout preference
+- Remembered mini-player layout, size and screen position
+- Auto / 16:9 / 4:3 / Fill video display modes
+- Keyboard shortcuts for playback, seeking, volume, mute, aspect mode and live channel switching
+- Automatic live-stream reconnect attempts
 
 ## Requirements
 
@@ -128,9 +135,8 @@ test/             parser and model tests
 
 ## Planned next milestones
 
-1. Refine TV Guide navigation with day/time jumping and virtualization for very large channel lists.
-2. Multiple IPTV accounts in the Open Edition.
-3. SB production logo/branding assets.
-4. Windows installer and code-signing workflow.
-5. iOS/Android shells with native Picture-in-Picture and mobile controls.
-6. AirPlay / casting where supported by the target platform and playback source.
+1. Additional v0.4 stability and UX polish based on Windows testing.
+2. SB production logo/branding assets.
+3. Windows installer and code-signing workflow.
+4. iOS/Android shells with native Picture-in-Picture and mobile controls.
+5. AirPlay / casting where supported by the target platform and playback source.
