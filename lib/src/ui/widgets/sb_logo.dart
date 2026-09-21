@@ -27,7 +27,7 @@ class SbLogo extends StatelessWidget {
           compact ? CrossAxisAlignment.start : CrossAxisAlignment.center,
       children: [
         Text(
-          'SB Player',
+          'Player',
           style: TextStyle(
             color: SbBrand.textPrimary,
             fontSize: symbolSize * 0.42,
@@ -84,12 +84,12 @@ class _SbSymbol extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         Text(
-          'S  B',
+          'SB',
           style: TextStyle(
             fontSize: size,
             height: 0.9,
             fontWeight: FontWeight.w900,
-            letterSpacing: -size * 0.13,
+            letterSpacing: -size * 0.08,
             color: SbBrand.electricBlue,
             shadows: [
               Shadow(
@@ -112,12 +112,12 @@ class _SbSymbol extends StatelessWidget {
           blendMode: BlendMode.srcIn,
           shaderCallback: SbBrand.horizontalBrandGradient.createShader,
           child: Text(
-            'S  B',
+            'SB',
             style: TextStyle(
               fontSize: size,
               height: 0.9,
               fontWeight: FontWeight.w900,
-              letterSpacing: -size * 0.13,
+              letterSpacing: -size * 0.08,
               color: Colors.white,
             ),
           ),
