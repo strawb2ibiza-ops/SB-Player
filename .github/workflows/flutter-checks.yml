@@ -2,7 +2,7 @@ name: Flutter checks
 
 on:
   push:
-    branches: [main, v0.5-branding-installer]
+    branches: [main, v0.6-branding-installer]
   pull_request:
 
 concurrency:
@@ -42,7 +42,7 @@ jobs:
       - name: Upload portable Windows release
         uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Windows-Open-v0.5
+          name: SB-Player-Windows-Open-v0.6
           path: build/windows/x64/runner/Release/**
           if-no-files-found: error
           retention-days: 14
@@ -55,7 +55,7 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Setup-v0.5.0
-          path: dist/SB-Player-Setup-v0.5.0.exe
+          name: SB-Player-Setup-v0.6.0
+          path: dist/SB-Player-Setup-v0.6.0.exe
           if-no-files-found: error
           retention-days: 14
