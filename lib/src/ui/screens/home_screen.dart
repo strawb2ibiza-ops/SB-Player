@@ -10,6 +10,7 @@ import '../../models/playback_item.dart';
 import '../../state/app_controller.dart';
 import '../branding/sb_brand.dart';
 import '../widgets/account_manager_dialog.dart';
+import '../widgets/brand_backdrop.dart';
 import '../widgets/channel_tile.dart';
 import '../widgets/epg_timeline.dart';
 import '../widgets/library_tile.dart';
@@ -353,6 +354,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     switch (controller.section) {
+      case ContentSection.home:
+        return _buildHome(controller);
       case ContentSection.live:
         return _buildLive(controller);
       case ContentSection.guide:
@@ -361,11 +364,184 @@ class _HomeScreenState extends State<HomeScreen> {
         return _buildMovies(controller);
       case ContentSection.series:
         return _buildSeries(controller);
+      case ContentSection.continueWatching:
+        return _buildLibrary(
+          controller,
+          controller.continueWatching.where((entry) {
+            final query = _search.text.trim().toLowerCase();
+            return query.isEmpty ||
+                entry.title.toLowerCase().contains(query) ||
+                (entry.subtitle?.toLowerCase().contains(query) ?? false);
+          }).toList(growable: false),
+          empty: 'Nothing to continue yet.',
+        );
       case ContentSection.favorites:
         return _buildLibrary(controller, controller.visibleLibrary(controller.favorites, _search.text), empty: 'No favorites yet.');
       case ContentSection.recent:
         return _buildLibrary(controller, controller.visibleLibrary(controller.recent, _search.text), empty: 'Nothing watched yet.');
     }
+  }
+
+  Widget _buildHome(AppController controller) {
+    final continueItems = controller.continueWatching;
+    final recentItems = controller.visibleLibrary(controller.recent, '');
+    final hero = continueItems.isNotEmpty
+        ? continueItems.first
+        : (recentItems.isNotEmpty ? recentItems.first : null);
+    final liveChannels = controller.channels.take(6).toList(growable: false);
+
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 18),
+      children: [
+        SizedBox(
+          height: 290,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (hero?.artworkUrl != null)
+                  Image.network(
+                    hero!.artworkUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) =>
+                        const BrandBackdrop(child: SizedBox.expand()),
+                  )
+                else
+                  const BrandBackdrop(child: SizedBox.expand()),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Color(0xF2040509),
+                        Color(0xB8040509),
+                        Color(0x38040509),
+                      ],
+                      stops: [0, .58, 1],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(34, 30, 34, 28),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      const Text(
+                        'SB PLAYER',
+                        style: TextStyle(
+                          color: SbBrand.brightBlue,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2.1,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        hero?.title ?? 'Premium watching, made easy.',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                  fontSize: 38,
+                                ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        hero?.subtitle?.trim().isNotEmpty == true
+                            ? hero!.subtitle!
+                            : SbBrand.tagline,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              color: SbBrand.textMuted,
+                            ),
+                      ),
+                      const SizedBox(height: 18),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: [
+                          if (hero != null)
+                            FilledButton.icon(
+                              onPressed: () => _play(hero.toPlaybackItem()),
+                              icon: const Icon(Icons.play_arrow_rounded),
+                              label: Text(
+                                hero.durationSeconds > 0 &&
+                                        hero.positionSeconds > 0
+                                    ? 'Continue watching'
+                                    : 'Play',
+                              ),
+                            ),
+                          OutlinedButton.icon(
+                            onPressed: () =>
+                                unawaited(_changeSection(ContentSection.live)),
+                            icon: const Icon(Icons.live_tv_outlined),
+                            label: const Text('Browse Live TV'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (continueItems.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _HomeShelf(
+            title: 'Continue Watching',
+            entries: continueItems.take(8).toList(growable: false),
+            onTap: (entry) => _play(entry.toPlaybackItem()),
+          ),
+        ],
+        if (liveChannels.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Text(
+            'On now',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 140,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: liveChannels.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final channel = liveChannels[index];
+                final item = controller.playbackForChannel(channel);
+                final now = controller.nowProgram(channel);
+                final next = controller.nextProgram(channel);
+                return SizedBox(
+                  width: 390,
+                  child: ChannelTile(
+                    channel: channel,
+                    channelNumber: index + 1,
+                    nowText: now?.title,
+                    nextText: next?.title,
+                    isFavorite: controller.isFavorite(item),
+                    onFavorite: () => controller.toggleFavorite(item),
+                    onTap: () => _play(item),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+        if (recentItems.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _HomeShelf(
+            title: 'Recently Watched',
+            entries: recentItems.take(8).toList(growable: false),
+            onTap: (entry) => _play(entry.toPlaybackItem()),
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildLive(AppController controller) {
@@ -603,6 +779,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _searchHint(ContentSection section) {
     switch (section) {
+      case ContentSection.home:
+        return 'Search SB Player';
       case ContentSection.live:
         return 'Search channels';
       case ContentSection.guide:
@@ -611,6 +789,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return 'Search movies';
       case ContentSection.series:
         return 'Search series';
+      case ContentSection.continueWatching:
+        return 'Search Continue Watching';
       case ContentSection.favorites:
         return 'Search favorites';
       case ContentSection.recent:
@@ -717,6 +897,13 @@ class _Sidebar extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(10, 6, 10, 12),
               children: [
                 _NavButton(
+                  icon: Icons.home_outlined,
+                  label: 'Home',
+                  collapsed: collapsed,
+                  selected: controller.section == ContentSection.home,
+                  onTap: () => onSection(ContentSection.home),
+                ),
+                _NavButton(
                   icon: Icons.live_tv_outlined,
                   label: 'Live TV',
                   collapsed: collapsed,
@@ -747,6 +934,14 @@ class _Sidebar extends StatelessWidget {
                   ),
                 ],
                 const Divider(height: 24),
+                _NavButton(
+                  icon: Icons.play_circle_outline,
+                  label: 'Continue Watching',
+                  collapsed: collapsed,
+                  selected:
+                      controller.section == ContentSection.continueWatching,
+                  onTap: () => onSection(ContentSection.continueWatching),
+                ),
                 _NavButton(
                   icon: Icons.favorite_border,
                   label: 'Favorites',
@@ -962,10 +1157,12 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = switch (section) {
+      ContentSection.home => 'Home',
       ContentSection.live => 'Live TV',
       ContentSection.guide => 'TV Guide',
       ContentSection.movies => 'Movies',
       ContentSection.series => 'Series',
+      ContentSection.continueWatching => 'Continue Watching',
       ContentSection.favorites => 'Favorites',
       ContentSection.recent => 'Recent',
     };
@@ -973,6 +1170,112 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
+
+class _HomeShelf extends StatelessWidget {
+  const _HomeShelf({
+    required this.title,
+    required this.entries,
+    required this.onTap,
+  });
+
+  final String title;
+  final List<LibraryEntry> entries;
+  final ValueChanged<LibraryEntry> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 170,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: entries.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final entry = entries[index];
+              return SizedBox(
+                width: 290,
+                child: Card(
+                  child: InkWell(
+                    onTap: () => onTap(entry),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (entry.artworkUrl != null)
+                          Image.network(
+                            entry.artworkUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                const BrandBackdrop(child: SizedBox.expand()),
+                          )
+                        else
+                          const BrandBackdrop(child: SizedBox.expand()),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.transparent,
+                                SbBrand.black.withValues(alpha: .88),
+                              ],
+                              stops: const [.2, 1],
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          left: 14,
+                          right: 14,
+                          bottom: 14,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                entry.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              if (entry.subtitle?.isNotEmpty == true) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  entry.subtitle!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                              if (entry.durationSeconds > 0) ...[
+                                const SizedBox(height: 8),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(99),
+                                  child: LinearProgressIndicator(
+                                    value: entry.progress.clamp(0, 1),
+                                    minHeight: 3,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 DateTime _roundedGuideTime(DateTime value) {
   return DateTime(
