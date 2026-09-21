@@ -12,6 +12,14 @@ class EpgCacheService {
   static const _filePrefix = 'epg_cache_v1_';
   static const _legacyFileName = 'epg_cache_v1.json';
 
+  Future<void> cleanupLegacyCache() async {
+    try {
+      await _cacheDirectory();
+    } catch (_) {
+      // Best-effort migration cleanup only.
+    }
+  }
+
   Future<Map<String, List<EpgProgram>>?> load(
     String sourceUrl, {
     Duration maxAge = const Duration(hours: 6),
