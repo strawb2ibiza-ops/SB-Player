@@ -4,6 +4,7 @@ import '../../services/playback_preferences.dart';
 import '../../state/app_controller.dart';
 import '../branding/sb_brand.dart';
 import '../widgets/sb_logo.dart';
+import '../widgets/desktop_window_controls.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key, required this.controller});
@@ -18,7 +19,16 @@ class SettingsScreen extends StatelessWidget {
         final prefs = controller.preferences;
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Settings'),
+            title: const DragToMoveArea(
+              child: SizedBox(
+                height: 42,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Settings'),
+                ),
+              ),
+            ),
+            actions: const [DesktopWindowControls()],
           ),
           body: ListView(
             padding: const EdgeInsets.all(24),
