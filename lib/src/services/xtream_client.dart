@@ -48,7 +48,57 @@ class XtreamClient {
     required String password,
     String label = 'IPTV',
   }) async {
-    final server = normalizeBase(serverUrl);
+    final input = serverUrl.trim();
+    if (input.isEmpty) {
+      throw XtreamException('Enter the IPTV server URL.');
+    }
+
+    final explicitScheme = RegExp(
+      r'^https?://',
+      caseSensitive: false,
+    ).hasMatch(input);
+    final candidates = <String>[];
+
+    void addCandidate(String value) {
+      final normalized = normalizeBase(value);
+      if (!candidates.contains(normalized)) candidates.add(normalized);
+    }
+
+    if (explicitScheme) {
+      addCandidate(input);
+      final parsed = Uri.tryParse(input);
+      if (parsed != null && parsed.scheme.toLowerCase() == 'https') {
+        addCandidate(parsed.replace(scheme: 'http').toString());
+      }
+    } else {
+      addCandidate('https://$input');
+      addCandidate('http://$input');
+    }
+
+    XtreamException? lastFailure;
+    for (final server in candidates) {
+      try {
+        return await _authenticateAt(
+          server: server,
+          username: username,
+          password: password,
+          label: label,
+        );
+      } on XtreamException catch (failure) {
+        lastFailure = failure;
+      }
+    }
+
+    throw lastFailure ??
+        XtreamException('Could not connect to the IPTV provider.');
+  }
+
+  Future<IptvAccount> _authenticateAt({
+    required String server,
+    required String username,
+    required String password,
+    required String label,
+  }) async {
     final uri = Uri.parse('$server/player_api.php').replace(
       queryParameters: {'username': username, 'password': password},
     );
@@ -90,14 +140,45 @@ class XtreamClient {
       expiry = DateTime.fromMillisecondsSinceEpoch(rawExpiry * 1000);
     }
 
-    final epgUri = Uri.parse('$server/xmltv.php').replace(
+    var resolvedServer = server;
+    final serverInfo = decoded['server_info'];
+    if (serverInfo is Map) {
+      final serverProtocol =
+          _nullableString(serverInfo['server_protocol'])?.toLowerCase();
+      final serverUrl = _nullableString(serverInfo['url']);
+      final port = serverProtocol == 'https'
+          ? _nullableString(serverInfo['https_port']) ??
+              _nullableString(serverInfo['port'])
+          : _nullableString(serverInfo['port']);
+      if (serverUrl != null &&
+          (serverProtocol == 'http' || serverProtocol == 'https')) {
+        final host = Uri.tryParse(
+          serverUrl.contains('://') ? serverUrl : '$serverProtocol://$serverUrl',
+        )?.host;
+        if (host?.isNotEmpty == true) {
+          final parsedPort = int.tryParse(port ?? '');
+          resolvedServer = Uri(
+            scheme: serverProtocol,
+            host: host,
+            port: parsedPort != null &&
+                    !((serverProtocol == 'https' && parsedPort == 443) ||
+                        (serverProtocol == 'http' && parsedPort == 80))
+                ? parsedPort
+                : null,
+          ).toString();
+          resolvedServer = normalizeBase(resolvedServer);
+        }
+      }
+    }
+
+    final epgUri = Uri.parse('$resolvedServer/xmltv.php').replace(
       queryParameters: {'username': username, 'password': password},
     );
 
     return IptvAccount(
       type: AccountType.xtream,
       label: label,
-      serverUrl: server,
+      serverUrl: resolvedServer,
       username: username,
       password: password,
       epgUrl: epgUri.toString(),
