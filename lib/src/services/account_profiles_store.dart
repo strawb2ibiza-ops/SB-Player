@@ -17,7 +17,10 @@ class AccountProfilesStore {
     if (raw == null || raw.isEmpty) return const [];
     try {
       final decoded = jsonDecode(raw);
-      if (decoded is! List) return const [];
+      if (decoded is! List) {
+        await _storage.delete(key: _profilesKey);
+        return const [];
+      }
       final profiles = <IptvProfile>[];
       for (final item in decoded.whereType<Map>()) {
         try {
@@ -31,6 +34,7 @@ class AccountProfilesStore {
       profiles.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return profiles;
     } catch (_) {
+      await _storage.delete(key: _profilesKey);
       return const [];
     }
   }
@@ -38,7 +42,9 @@ class AccountProfilesStore {
   Future<void> saveProfiles(List<IptvProfile> profiles) {
     return _storage.write(
       key: _profilesKey,
-      value: jsonEncode(profiles.map((profile) => profile.toJson()).toList()),
+      value: jsonEncode(
+        profiles.map((profile) => profile.toJson()).toList(growable: false),
+      ),
     );
   }
 
