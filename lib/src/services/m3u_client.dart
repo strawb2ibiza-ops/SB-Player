@@ -12,7 +12,9 @@ class M3uClient {
 
   Future<M3uPlaylist> load(String playlistUrl) async {
     final uri = Uri.tryParse(playlistUrl.trim());
-    if (uri == null || !uri.hasScheme || !{'http', 'https'}.contains(uri.scheme)) {
+    if (uri == null ||
+        !uri.hasAuthority ||
+        !{'http', 'https'}.contains(uri.scheme.toLowerCase())) {
       throw const FormatException('Enter a valid HTTP or HTTPS M3U URL.');
     }
 
