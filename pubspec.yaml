@@ -8,6 +8,7 @@ environment:
   flutter: '>=3.32.0'
 
 dependencies:
+  crypto: ^3.0.7
   flutter:
     sdk: flutter
   flutter_secure_storage: ^11.2.0
