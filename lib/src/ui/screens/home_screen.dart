@@ -8,11 +8,13 @@ import '../../models/iptv_channel.dart';
 import '../../models/library_entry.dart';
 import '../../models/playback_item.dart';
 import '../../state/app_controller.dart';
+import '../branding/sb_brand.dart';
 import '../widgets/account_manager_dialog.dart';
 import '../widgets/channel_tile.dart';
 import '../widgets/epg_timeline.dart';
 import '../widgets/library_tile.dart';
 import '../widgets/poster_card.dart';
+import '../widgets/sb_logo.dart';
 import 'movie_details_screen.dart';
 import 'player_screen.dart';
 import 'series_details_screen.dart';
@@ -30,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime _guideAnchor = _roundedGuideTime(DateTime.now());
   Timer? _guideClock;
   Timer? _searchDebounce;
+  bool _sidebarCollapsed = false;
 
   @override
   void initState() {
@@ -190,7 +193,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final controller = widget.controller;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SB Player', style: TextStyle(fontWeight: FontWeight.w900)),
+        title: const SbLogo(
+          symbolSize: 30,
+          compact: true,
+          showTagline: false,
+        ),
         actions: [
           if (controller.epgLoading)
             const Padding(
@@ -236,6 +243,10 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _Sidebar(
                 controller: controller,
+                collapsed: _sidebarCollapsed,
+                onToggle: () => setState(
+                  () => _sidebarCollapsed = !_sidebarCollapsed,
+                ),
                 onSection: (value) => unawaited(_changeSection(value)),
               ),
               Expanded(
@@ -432,7 +443,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final columns = width > 1300 ? 6 : width > 1000 ? 5 : width > 760 ? 4 : width > 520 ? 3 : 2;
+        final columns = width > 1750 ? 5 : width > 1050 ? 4 : width > 760 ? 3 : width > 520 ? 2 : 2;
         return GridView.builder(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
@@ -472,7 +483,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final columns = width > 1300 ? 6 : width > 1000 ? 5 : width > 760 ? 4 : width > 520 ? 3 : 2;
+        final columns = width > 1750 ? 5 : width > 1050 ? 4 : width > 760 ? 3 : width > 520 ? 2 : 2;
         return GridView.builder(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
@@ -566,103 +577,235 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _Sidebar extends StatelessWidget {
-  const _Sidebar({required this.controller, required this.onSection});
+  const _Sidebar({
+    required this.controller,
+    required this.collapsed,
+    required this.onToggle,
+    required this.onSection,
+  });
 
   final AppController controller;
+  final bool collapsed;
+  final VoidCallback onToggle;
   final ValueChanged<ContentSection> onSection;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 245,
-      child: DecoratedBox(
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface),
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-                children: [
-                  _NavButton(
-                    icon: Icons.live_tv_outlined,
-                    label: 'Live TV',
-                    selected: controller.section == ContentSection.live,
-                    onTap: () => onSection(ContentSection.live),
-                  ),
-                  _NavButton(
-                    icon: Icons.calendar_view_week_outlined,
-                    label: 'TV Guide',
-                    selected: controller.section == ContentSection.guide,
-                    onTap: () => onSection(ContentSection.guide),
-                  ),
-                  if (controller.supportsOnDemand) ...[
-                    _NavButton(
-                      icon: Icons.movie_outlined,
-                      label: 'Movies',
-                      selected: controller.section == ContentSection.movies,
-                      onTap: () => onSection(ContentSection.movies),
-                    ),
-                    _NavButton(
-                      icon: Icons.tv_outlined,
-                      label: 'Series',
-                      selected: controller.section == ContentSection.series,
-                      onTap: () => onSection(ContentSection.series),
-                    ),
-                  ],
-                  const Divider(height: 24),
-                  _NavButton(
-                    icon: Icons.favorite_border,
-                    label: 'Favorites',
-                    selected: controller.section == ContentSection.favorites,
-                    onTap: () => onSection(ContentSection.favorites),
-                  ),
-                  _NavButton(
-                    icon: Icons.history,
-                    label: 'Recent',
-                    selected: controller.section == ContentSection.recent,
-                    onTap: () => onSection(ContentSection.recent),
-                  ),
-                  if (controller.activeCategories.isNotEmpty) ...[
-                    const Divider(height: 28),
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(10, 0, 10, 8),
-                      child: Text('CATEGORIES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
-                    ),
-                    _CategoryButton(
-                      label: 'All',
-                      selected: controller.activeCategoryId == '__all__',
-                      onTap: () => controller.selectCategory('__all__'),
-                    ),
-                    for (final category in controller.activeCategories)
-                      _CategoryButton(
-                        label: category.name,
-                        selected: controller.activeCategoryId == category.id,
-                        onTap: () => controller.selectCategory(category.id),
-                      ),
-                  ],
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  const Text('SB', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20)),
-                  const Spacer(),
-                  Text(
-                    controller.config.isLocked
-                        ? 'SB Edition'
-                        : controller.activeProfile?.name ?? 'Open Edition',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
-            ),
-          ],
+    final width = collapsed ? 82.0 : 245.0;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      width: width,
+      decoration: BoxDecoration(
+        color: SbBrand.elevated,
+        border: Border(
+          right: BorderSide(
+            color: SbBrand.electricBlue.withValues(alpha: 0.16),
+          ),
         ),
       ),
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              collapsed ? 14 : 16,
+              16,
+              collapsed ? 14 : 12,
+              10,
+            ),
+            child: Row(
+              children: [
+                if (!collapsed)
+                  const Expanded(
+                    child: SbLogo(
+                      symbolSize: 24,
+                      compact: true,
+                      showTagline: false,
+                    ),
+                  ),
+                if (collapsed)
+                  const Expanded(
+                    child: Center(
+                      child: SbLogo(
+                        symbolSize: 26,
+                        showWordmark: false,
+                      ),
+                    ),
+                  ),
+                IconButton(
+                  tooltip: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onToggle,
+                  icon: Icon(
+                    collapsed
+                        ? Icons.keyboard_double_arrow_right_rounded
+                        : Icons.keyboard_double_arrow_left_rounded,
+                    size: 19,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 12),
+              children: [
+                _NavButton(
+                  icon: Icons.live_tv_outlined,
+                  label: 'Live TV',
+                  collapsed: collapsed,
+                  selected: controller.section == ContentSection.live,
+                  onTap: () => onSection(ContentSection.live),
+                ),
+                _NavButton(
+                  icon: Icons.calendar_view_week_outlined,
+                  label: 'TV Guide',
+                  collapsed: collapsed,
+                  selected: controller.section == ContentSection.guide,
+                  onTap: () => onSection(ContentSection.guide),
+                ),
+                if (controller.supportsOnDemand) ...[
+                  _NavButton(
+                    icon: Icons.movie_outlined,
+                    label: 'Movies',
+                    collapsed: collapsed,
+                    selected: controller.section == ContentSection.movies,
+                    onTap: () => onSection(ContentSection.movies),
+                  ),
+                  _NavButton(
+                    icon: Icons.tv_outlined,
+                    label: 'Series',
+                    collapsed: collapsed,
+                    selected: controller.section == ContentSection.series,
+                    onTap: () => onSection(ContentSection.series),
+                  ),
+                ],
+                const Divider(height: 24),
+                _NavButton(
+                  icon: Icons.favorite_border,
+                  label: 'Favorites',
+                  collapsed: collapsed,
+                  selected: controller.section == ContentSection.favorites,
+                  onTap: () => onSection(ContentSection.favorites),
+                ),
+                _NavButton(
+                  icon: Icons.history,
+                  label: 'Recent',
+                  collapsed: collapsed,
+                  selected: controller.section == ContentSection.recent,
+                  onTap: () => onSection(ContentSection.recent),
+                ),
+                if (!collapsed && controller.activeCategories.isNotEmpty) ...[
+                  const Divider(height: 28),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(10, 0, 10, 8),
+                    child: Text(
+                      'CATEGORIES',
+                      style: TextStyle(
+                        color: SbBrand.textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.25,
+                      ),
+                    ),
+                  ),
+                  _CategoryButton(
+                    label: 'All',
+                    selected: controller.activeCategoryId == '__all__',
+                    onTap: () => controller.selectCategory('__all__'),
+                  ),
+                  for (final category in controller.activeCategories)
+                    _CategoryButton(
+                      label: category.name,
+                      selected: controller.activeCategoryId == category.id,
+                      onTap: () => controller.selectCategory(category.id),
+                    ),
+                ],
+              ],
+            ),
+          ),
+          _AccountFooter(
+            controller: controller,
+            collapsed: collapsed,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountFooter extends StatelessWidget {
+  const _AccountFooter({
+    required this.controller,
+    required this.collapsed,
+  });
+
+  final AppController controller;
+  final bool collapsed;
+
+  @override
+  Widget build(BuildContext context) {
+    final username = controller.account?.username?.trim();
+    final displayName = username?.isNotEmpty == true
+        ? username!
+        : controller.activeProfile?.name ?? 'Account';
+    final edition =
+        controller.config.isLocked ? 'SB Edition' : 'Open Edition';
+
+    return Container(
+      padding: EdgeInsets.all(collapsed ? 11 : 14),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: SbBrand.electricBlue.withValues(alpha: 0.14),
+          ),
+        ),
+      ),
+      child: collapsed
+          ? Tooltip(
+              message: '$displayName • $edition',
+              child: const CircleAvatar(
+                radius: 20,
+                backgroundColor: SbBrand.panelBlue,
+                child: Icon(
+                  Icons.person_outline,
+                  color: SbBrand.brightBlue,
+                ),
+              ),
+            )
+          : Row(
+              children: [
+                const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: SbBrand.panelBlue,
+                  child: Icon(
+                    Icons.person_outline,
+                    color: SbBrand.brightBlue,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        edition,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -671,12 +814,14 @@ class _NavButton extends StatelessWidget {
   const _NavButton({
     required this.icon,
     required this.label,
+    required this.collapsed,
     required this.selected,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
+  final bool collapsed;
   final bool selected;
   final VoidCallback onTap;
 
@@ -687,10 +832,34 @@ class _NavButton extends StatelessWidget {
       child: ListTile(
         dense: true,
         selected: selected,
-        selectedTileColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.14),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        leading: Icon(icon),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        selectedTileColor: SbBrand.electricBlue.withValues(alpha: 0.14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(9),
+          side: BorderSide(
+            color: selected
+                ? SbBrand.electricBlue.withValues(alpha: 0.46)
+                : Colors.transparent,
+          ),
+        ),
+        leading: Icon(
+          icon,
+          color: selected ? SbBrand.brightBlue : SbBrand.textMuted,
+        ),
+        title: collapsed
+            ? null
+            : Text(
+                label,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: selected
+                      ? SbBrand.textPrimary
+                      : SbBrand.textMuted,
+                ),
+              ),
+        contentPadding: collapsed
+            ? const EdgeInsets.symmetric(horizontal: 16)
+            : const EdgeInsets.symmetric(horizontal: 12),
+        horizontalTitleGap: 10,
         onTap: onTap,
       ),
     );
