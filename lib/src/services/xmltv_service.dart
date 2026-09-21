@@ -56,12 +56,17 @@ class XmlTvService {
     final second = int.tryParse(datePart.substring(12, 14));
     if ([year, month, day, hour, minute, second].contains(null)) return null;
 
-    final local = DateTime.utc(year!, month!, day!, hour!, minute!, second!);
-    final offsetMatch = RegExp(r'([+-])(\d{2})(\d{2})').firstMatch(raw.substring(14));
-    if (offsetMatch == null) return local;
-    final minutes = int.parse(offsetMatch.group(2)!) * 60 + int.parse(offsetMatch.group(3)!);
+    final suffix = raw.substring(14);
+    final offsetMatch = RegExp(r'([+-])(\d{2})(\d{2})').firstMatch(suffix);
+    if (offsetMatch == null) {
+      return DateTime(year!, month!, day!, hour!, minute!, second!);
+    }
+
+    final utc = DateTime.utc(year!, month!, day!, hour!, minute!, second!);
+    final minutes =
+        int.parse(offsetMatch.group(2)!) * 60 + int.parse(offsetMatch.group(3)!);
     final signed = offsetMatch.group(1) == '+' ? minutes : -minutes;
-    return local.subtract(Duration(minutes: signed)).toLocal();
+    return utc.subtract(Duration(minutes: signed)).toLocal();
   }
 
   void dispose() => _client.close();
