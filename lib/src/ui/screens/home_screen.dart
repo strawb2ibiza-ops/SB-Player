@@ -15,6 +15,7 @@ import '../widgets/account_manager_dialog.dart';
 import '../widgets/brand_backdrop.dart';
 import '../widgets/channel_tile.dart';
 import '../widgets/epg_timeline.dart';
+import '../widgets/desktop_window_controls.dart';
 import '../widgets/library_tile.dart';
 import '../widgets/poster_card.dart';
 import '../widgets/sb_logo.dart';
@@ -263,10 +264,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final controller = widget.controller;
     return Scaffold(
       appBar: AppBar(
-        title: const SbLogo(
-          symbolSize: 30,
-          compact: true,
-          showTagline: false,
+        title: const DragToMoveArea(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: SbLogo(
+              symbolSize: 30,
+              compact: true,
+              showTagline: false,
+            ),
+          ),
         ),
         actions: [
           if (controller.epgLoading)
@@ -303,7 +309,9 @@ class _HomeScreenState extends State<HomeScreen> {
               const PopupMenuItem(value: 'logout', child: Text('Log out')),
             ],
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
+          const DesktopWindowControls(),
+          const SizedBox(width: 4),
         ],
       ),
       body: AnimatedBuilder(
