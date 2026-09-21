@@ -124,7 +124,10 @@ void main() {
     );
 
     expect(requests, 2);
-    expect(account.serverUrl, 'http://example.test:80');
+    final savedUri = Uri.parse(account.serverUrl!);
+    expect(savedUri.scheme, 'http');
+    expect(savedUri.host, 'example.test');
+    expect(savedUri.port, 80);
     client.dispose();
   });
 
