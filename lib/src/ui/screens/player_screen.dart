@@ -104,7 +104,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (mounted) setState(() => _miniLayout = layout);
   }
 
-  Future<void> _open() async {
+  Future<void> _open({Duration? resumeAt}) async {
     if (mounted) {
       setState(() {
         _playbackError = null;
@@ -114,9 +114,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     try {
       await _player.open(Media(_item.streamUrl), play: true);
-      if (!_item.isLive &&
-          _item.startPosition > const Duration(seconds: 5)) {
-        await _player.seek(_item.startPosition);
+      final target = resumeAt ?? _item.startPosition;
+      if (!_item.isLive && target > const Duration(seconds: 5)) {
+        await _player.seek(target);
       }
     } catch (_) {
       _handlePlaybackFailure();
@@ -128,8 +128,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _reconnectTimer?.cancel();
       _reconnectAttempts = 0;
     }
+    final resumeAt = _item.isLive ? null : _position;
     await _player.stop();
-    await _open();
+    await _open(resumeAt: resumeAt);
   }
 
   void _handlePlaybackFailure() {
