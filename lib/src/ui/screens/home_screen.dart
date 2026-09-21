@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../models/content_section.dart';
+import '../../models/epg_program.dart';
+import '../../models/iptv_channel.dart';
 import '../../models/library_entry.dart';
 import '../../models/playback_item.dart';
 import '../../state/app_controller.dart';
@@ -24,6 +26,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _search = TextEditingController();
+  DateTime _guideAnchor = DateTime.now();
 
   @override
   void initState() {
@@ -52,6 +55,109 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(
         builder: (_) => PlayerScreen(controller: widget.controller, item: item),
       ),
+    );
+  }
+
+  void _jumpGuideToNow() {
+    setState(() => _guideAnchor = DateTime.now());
+  }
+
+  void _shiftGuide(Duration offset) {
+    setState(() => _guideAnchor = _guideAnchor.add(offset));
+  }
+
+  void _selectGuideDay(int offset) {
+    final day = DateTime.now().add(Duration(days: offset));
+    setState(() {
+      _guideAnchor = DateTime(
+        day.year,
+        day.month,
+        day.day,
+        _guideAnchor.hour,
+        _guideAnchor.minute,
+      );
+    });
+  }
+
+  Future<void> _showProgrammeDetails(
+    IptvChannel channel,
+    EpgProgram programme,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 42,
+                      height: 42,
+                      child: channel.logoUrl == null
+                          ? const Icon(Icons.live_tv_outlined)
+                          : Image.network(
+                              channel.logoUrl!,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, _, _) =>
+                                  const Icon(Icons.live_tv_outlined),
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        channel.name,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  programme.title,
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${_guideTime(programme.start)}–${_guideTime(programme.stop)}',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                if (programme.description?.trim().isNotEmpty == true) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    programme.description!.trim(),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          height: 1.45,
+                        ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _play(widget.controller.playbackForChannel(channel));
+                  },
+                  icon: const Icon(Icons.play_arrow),
+                  label: Text(
+                    programme.isLiveAt(DateTime.now())
+                        ? 'Watch live'
+                        : 'Watch channel',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -223,28 +329,63 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Column(
       children: [
-        Row(
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
+            IconButton.filledTonal(
+              tooltip: 'Back 2 hours',
+              onPressed: () => _shiftGuide(const Duration(hours: -2)),
+              icon: const Icon(Icons.chevron_left),
+            ),
+            FilledButton.tonalIcon(
+              onPressed: _jumpGuideToNow,
+              icon: const Icon(Icons.schedule),
+              label: const Text('Now'),
+            ),
+            PopupMenuButton<int>(
+              tooltip: 'Choose day',
+              onSelected: _selectGuideDay,
+              itemBuilder: (context) => [
+                for (var day = 0; day < 7; day++)
+                  PopupMenuItem(
+                    value: day,
+                    child: Text(_dayMenuLabel(day)),
+                  ),
+              ],
+              child: Chip(
+                avatar: const Icon(Icons.calendar_today, size: 17),
+                label: Text(_guideDayLabel(_guideAnchor)),
+              ),
+            ),
+            IconButton.filledTonal(
+              tooltip: 'Forward 2 hours',
+              onPressed: () => _shiftGuide(const Duration(hours: 2)),
+              icon: const Icon(Icons.chevron_right),
+            ),
             Text(
-              'Now + 4 hours',
+              '${_guideTime(_guideAnchor)} + 4 hours',
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            const Spacer(),
             TextButton.icon(
-              onPressed:
-                  controller.epgLoading ? null : () => controller.loadEpg(force: true),
+              onPressed: controller.epgLoading
+                  ? null
+                  : () => controller.loadEpg(force: true),
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Refresh guide'),
             ),
           ],
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Expanded(
           child: EpgTimeline(
             controller: controller,
             channels: channels,
+            anchor: _guideAnchor,
             onPlayChannel: (channel) =>
                 _play(controller.playbackForChannel(channel)),
+            onProgrammeSelected: _showProgrammeDetails,
           ),
         ),
       ],
@@ -369,6 +510,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _date(DateTime value) =>
       '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
+
+  String _guideTime(DateTime value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
+  String _guideDayLabel(DateTime value) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selected = DateTime(value.year, value.month, value.day);
+    final difference = selected.difference(today).inDays;
+    if (difference == 0) return 'Today';
+    if (difference == 1) return 'Tomorrow';
+    return _date(value);
+  }
+
+  String _dayMenuLabel(int offset) {
+    if (offset == 0) return 'Today';
+    if (offset == 1) return 'Tomorrow';
+    final date = DateTime.now().add(Duration(days: offset));
+    return _date(date);
+  }
 }
 
 class _Sidebar extends StatelessWidget {
