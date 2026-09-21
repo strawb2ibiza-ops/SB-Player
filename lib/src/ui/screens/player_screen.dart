@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:window_manager/window_manager.dart';
@@ -40,7 +41,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   bool _buffering = true;
   bool _playing = false;
   bool _hoveringVideoOnly = false;
+  bool _reconnecting = false;
   double _volume = 100;
+  double _lastNonZeroVolume = 100;
+  int _reconnectAttempts = 0;
+  Timer? _reconnectTimer;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   String? _playbackError;
@@ -48,6 +53,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Tracks _tracks = const Tracks();
   Track _selectedTracks = const Track();
   MiniPlayerLayout _miniLayout = MiniPlayerLayout.detailed;
+  _VideoDisplayMode _displayMode = _VideoDisplayMode.auto;
 
   @override
   void initState() {
@@ -59,7 +65,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }));
     _subscriptions.add(_player.stream.error.listen((value) {
       if (value.trim().isEmpty) return;
-      if (mounted) setState(() => _playbackError = value.trim());
+      _handlePlaybackFailure();
     }));
     _subscriptions.add(_player.stream.tracks.listen((value) {
       if (mounted) setState(() => _tracks = value);
@@ -68,6 +74,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (mounted) setState(() => _selectedTracks = value);
     }));
     _subscriptions.add(_player.stream.playing.listen((value) {
+      if (value) {
+        _reconnectTimer?.cancel();
+        _reconnectAttempts = 0;
+        _reconnecting = false;
+      }
       if (mounted) setState(() => _playing = value);
     }));
     _subscriptions.add(_player.stream.position.listen((value) {
@@ -77,6 +88,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (mounted) setState(() => _duration = value);
     }));
     _subscriptions.add(_player.stream.volume.listen((value) {
+      if (value > 0) _lastNonZeroVolume = value;
       if (mounted) setState(() => _volume = value);
     }));
 
@@ -104,16 +116,39 @@ class _PlayerScreenState extends State<PlayerScreen> {
           widget.item.startPosition > const Duration(seconds: 5)) {
         await _player.seek(widget.item.startPosition);
       }
-    } catch (error) {
-      if (mounted) {
-        setState(() => _playbackError = 'Could not start this stream: $error');
-      }
+    } catch (_) {
+      _handlePlaybackFailure();
     }
   }
 
-  Future<void> _retry() async {
+  Future<void> _retry({bool manual = true}) async {
+    if (manual) {
+      _reconnectTimer?.cancel();
+      _reconnectAttempts = 0;
+    }
     await _player.stop();
     await _open();
+  }
+
+  void _handlePlaybackFailure() {
+    if (!mounted) return;
+    setState(() {
+      _playbackError = widget.item.isLive
+          ? 'The live stream was interrupted.'
+          : 'Playback stopped unexpectedly.';
+    });
+    if (widget.item.isLive) _scheduleReconnect();
+  }
+
+  void _scheduleReconnect() {
+    if (_reconnectAttempts >= 3 || _reconnectTimer?.isActive == true) return;
+    final delaySeconds = 2 << _reconnectAttempts;
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
+      if (!mounted) return;
+      _reconnectAttempts += 1;
+      setState(() => _reconnecting = true);
+      unawaited(_retry(manual: false));
+    });
   }
 
   Future<void> _toggleMiniPlayer() async {
@@ -122,6 +157,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!_miniMode) {
       _previousWindowSize = await windowManager.getSize();
       await windowManager.setAlwaysOnTop(true);
+      await _applyMiniChrome();
       await _applyMiniWindowSize();
       if (mounted) setState(() => _miniMode = true);
       return;
@@ -136,29 +172,65 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final next = _miniLayout == MiniPlayerLayout.detailed
         ? MiniPlayerLayout.videoOnly
         : MiniPlayerLayout.detailed;
+    await _saveMiniGeometry();
     setState(() {
       _miniLayout = next;
       _hoveringVideoOnly = false;
     });
     await _miniPreferences.saveLayout(next);
+    await _applyMiniChrome();
     await _applyMiniWindowSize();
   }
 
   Future<void> _applyMiniWindowSize() async {
     if (!Platform.isWindows) return;
     final detailed = _miniLayout == MiniPlayerLayout.detailed;
-    await windowManager.setMinimumSize(
-      detailed ? _detailedMiniMinimumSize : _videoOnlyMiniMinimumSize,
+    final minimum =
+        detailed ? _detailedMiniMinimumSize : _videoOnlyMiniMinimumSize;
+    final fallback = detailed ? _detailedMiniSize : _videoOnlyMiniSize;
+    final saved = await _miniPreferences.readGeometry(_miniLayout);
+    final size = saved == null
+        ? fallback
+        : Size(
+            saved.size.width < minimum.width ? minimum.width : saved.size.width,
+            saved.size.height < minimum.height
+                ? minimum.height
+                : saved.size.height,
+          );
+
+    await windowManager.setMinimumSize(minimum);
+    await windowManager.setSize(size, animate: true);
+    if (saved != null) {
+      await windowManager.setPosition(saved.position, animate: true);
+    }
+  }
+
+  Future<void> _applyMiniChrome() async {
+    if (!Platform.isWindows) return;
+    await windowManager.setTitleBarStyle(
+      _miniLayout == MiniPlayerLayout.videoOnly
+          ? TitleBarStyle.hidden
+          : TitleBarStyle.normal,
+      windowButtonVisibility: _miniLayout != MiniPlayerLayout.videoOnly,
     );
-    await windowManager.setSize(
-      detailed ? _detailedMiniSize : _videoOnlyMiniSize,
-      animate: true,
+  }
+
+  Future<void> _saveMiniGeometry() async {
+    if (!Platform.isWindows || !_miniMode) return;
+    final size = await windowManager.getSize();
+    final position = await windowManager.getPosition();
+    await _miniPreferences.saveGeometry(
+      _miniLayout,
+      size: size,
+      position: position,
     );
   }
 
   Future<void> _restoreWindow() async {
     if (!Platform.isWindows || !_miniMode) return;
+    await _saveMiniGeometry();
     await windowManager.setAlwaysOnTop(false);
+    await windowManager.setTitleBarStyle(TitleBarStyle.normal);
     await windowManager.setMinimumSize(_normalMinimumSize);
     if (_previousWindowSize != null) {
       await windowManager.setSize(_previousWindowSize!, animate: true);
@@ -221,6 +293,79 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await _player.seek(Duration(milliseconds: value.round()));
   }
 
+  Future<void> _seekRelative(int seconds) async {
+    if (widget.item.isLive || _duration.inMilliseconds <= 0) return;
+    final target = (_position + Duration(seconds: seconds)).inMilliseconds;
+    final clamped = target.clamp(0, _duration.inMilliseconds);
+    await _player.seek(Duration(milliseconds: clamped));
+  }
+
+  Future<void> _changeVolume(double delta) async {
+    final next = (_volume + delta).clamp(0, 100).toDouble();
+    await _player.setVolume(next);
+  }
+
+  Future<void> _toggleMute() async {
+    if (_volume <= 0) {
+      await _player.setVolume(_lastNonZeroVolume.clamp(1, 100).toDouble());
+    } else {
+      _lastNonZeroVolume = _volume;
+      await _player.setVolume(0);
+    }
+  }
+
+  void _cycleDisplayMode() {
+    final index = _VideoDisplayMode.values.indexOf(_displayMode);
+    setState(() {
+      _displayMode =
+          _VideoDisplayMode.values[(index + 1) % _VideoDisplayMode.values.length];
+    });
+  }
+
+  Future<void> _switchLiveChannel(int delta) async {
+    if (!widget.item.isLive || widget.controller.channels.isEmpty) return;
+    final id = widget.item.id.replaceFirst('live:', '');
+    final currentIndex =
+        widget.controller.channels.indexWhere((channel) => channel.id == id);
+    if (currentIndex < 0) return;
+    final length = widget.controller.channels.length;
+    final nextIndex = (currentIndex + delta + length) % length;
+    final next = widget.controller.playbackForChannel(
+      widget.controller.channels[nextIndex],
+    );
+    if (!mounted) return;
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => PlayerScreen(controller: widget.controller, item: next),
+      ),
+    );
+  }
+
+  Widget _withKeyboardShortcuts(Widget child) {
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(LogicalKeyboardKey.space): () =>
+            unawaited(_player.playOrPause()),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            unawaited(_seekRelative(-10)),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            unawaited(_seekRelative(10)),
+        const SingleActivator(LogicalKeyboardKey.arrowUp): () =>
+            unawaited(_changeVolume(5)),
+        const SingleActivator(LogicalKeyboardKey.arrowDown): () =>
+            unawaited(_changeVolume(-5)),
+        const SingleActivator(LogicalKeyboardKey.keyM): () =>
+            unawaited(_toggleMute()),
+        const SingleActivator(LogicalKeyboardKey.keyA): _cycleDisplayMode,
+        const SingleActivator(LogicalKeyboardKey.pageUp): () =>
+            unawaited(_switchLiveChannel(-1)),
+        const SingleActivator(LogicalKeyboardKey.pageDown): () =>
+            unawaited(_switchLiveChannel(1)),
+      },
+      child: Focus(autofocus: true, child: child),
+    );
+  }
+
   String? get _displaySubtitle {
     if (!widget.item.isLive) return widget.item.subtitle;
     final id = widget.item.id.replaceFirst('live:', '');
@@ -244,6 +389,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         duration: duration,
       ),
     );
+    _reconnectTimer?.cancel();
     unawaited(_restoreWindow());
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
@@ -254,13 +400,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_miniMode && Platform.isWindows) {
-      return _miniLayout == MiniPlayerLayout.detailed
-          ? _buildDetailedMiniPlayer()
-          : _buildVideoOnlyMiniPlayer();
-    }
-
-    return _buildFullPlayer();
+    final child = _miniMode && Platform.isWindows
+        ? (_miniLayout == MiniPlayerLayout.detailed
+            ? _buildDetailedMiniPlayer()
+            : _buildVideoOnlyMiniPlayer())
+        : _buildFullPlayer();
+    return _withKeyboardShortcuts(child);
   }
 
   Widget _buildFullPlayer() {
@@ -290,6 +435,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ],
             ),
             actions: [
+              if (widget.item.isLive)
+                IconButton(
+                  tooltip: 'Previous channel (Page Up)',
+                  onPressed: () => _switchLiveChannel(-1),
+                  icon: const Icon(Icons.skip_previous),
+                ),
+              if (widget.item.isLive)
+                IconButton(
+                  tooltip: 'Next channel (Page Down)',
+                  onPressed: () => _switchLiveChannel(1),
+                  icon: const Icon(Icons.skip_next),
+                ),
+              PopupMenuButton<_VideoDisplayMode>(
+                tooltip: 'Aspect ratio / fit (A)',
+                initialValue: _displayMode,
+                onSelected: (value) => setState(() => _displayMode = value),
+                itemBuilder: (context) => [
+                  for (final value in _VideoDisplayMode.values)
+                    PopupMenuItem(
+                      value: value,
+                      child: Text(value.label),
+                    ),
+                ],
+                icon: const Icon(Icons.aspect_ratio),
+              ),
               IconButton(
                 tooltip: 'Audio and subtitles',
                 onPressed: _showTrackPicker,
@@ -394,7 +564,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            _buildVideo(useBuiltInControls: false, fit: BoxFit.cover),
+            _buildVideo(useBuiltInControls: false, forceFill: true),
             IgnorePointer(
               ignoring: !_hoveringVideoOnly,
               child: AnimatedOpacity(
@@ -419,7 +589,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         child: Row(
                           children: [
                             Expanded(
-                              child: Text(
+                              child: DragToMoveArea(
+                                child: Text(
                                 widget.item.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -474,8 +645,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Widget _buildVideo({
     required bool useBuiltInControls,
-    BoxFit fit = BoxFit.contain,
+    bool forceFill = false,
   }) {
+    final mode = forceFill ? _VideoDisplayMode.fill : _displayMode;
+    final aspectRatio = switch (mode) {
+      _VideoDisplayMode.auto => null,
+      _VideoDisplayMode.wide => 16 / 9,
+      _VideoDisplayMode.standard => 4 / 3,
+      _VideoDisplayMode.fill => null,
+    };
+    final fit = mode == _VideoDisplayMode.fill ? BoxFit.cover : BoxFit.contain;
     return Stack(
       alignment: Alignment.center,
       children: [
@@ -483,7 +662,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           child: Video(
             controller: _videoController,
             fit: fit,
-            controls: useBuiltInControls ? AdaptiveVideoControls : NoVideoControls,
+            aspectRatio: aspectRatio,
+            controls:
+                useBuiltInControls ? AdaptiveVideoControls : NoVideoControls,
           ),
         ),
         if (_buffering && _playbackError == null)
@@ -519,14 +700,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _playbackError!,
+                  _reconnecting
+                      ? 'Reconnecting automatically… attempt $_reconnectAttempts of 3'
+                      : _playbackError!,
                   maxLines: 5,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 FilledButton.icon(
-                  onPressed: _retry,
+                  onPressed: () => _retry(),
                   icon: const Icon(Icons.refresh),
                   label: const Text('Retry stream'),
                 ),
@@ -732,4 +915,15 @@ String _formatDuration(Duration duration) {
     return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
   return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+}
+
+
+enum _VideoDisplayMode {
+  auto('Auto fit'),
+  wide('16:9'),
+  standard('4:3'),
+  fill('Fill / crop');
+
+  const _VideoDisplayMode(this.label);
+  final String label;
 }
