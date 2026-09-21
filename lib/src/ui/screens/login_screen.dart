@@ -278,6 +278,24 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller.loading ? 'Connecting…' : 'Continue',
                         ),
                       ),
+                      if (!locked && !_useM3u) ...[
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          onPressed: controller.loading
+                              ? null
+                              : controller.signInDebug,
+                          icon: const Icon(Icons.bug_report_outlined),
+                          label: const Text('Debug UI login'),
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          'Loads offline sample Movies, Series and a populated Live TV Guide. No video streams are included.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: SbBrand.textMuted,
+                              ),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       Align(
                         alignment: Alignment.center,
