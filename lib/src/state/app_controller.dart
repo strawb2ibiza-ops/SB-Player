@@ -391,24 +391,34 @@ class AppController extends ChangeNotifier {
     final id = channel.epgId;
     if (id == null) return null;
     final programmes = epg[id];
-    if (programmes == null) return null;
+    if (programmes == null || programmes.isEmpty) return null;
+
     final time = at ?? DateTime.now();
-    for (final programme in programmes) {
-      if (programme.isLiveAt(time)) return programme;
-    }
-    return null;
+    final nextIndex = _lowerBoundProgrammeStart(
+      programmes,
+      time,
+      strictlyAfter: true,
+    );
+    final currentIndex = nextIndex - 1;
+    if (currentIndex < 0) return null;
+
+    final current = programmes[currentIndex];
+    return current.isLiveAt(time) ? current : null;
   }
 
   EpgProgram? nextProgram(IptvChannel channel, {DateTime? at}) {
     final id = channel.epgId;
     if (id == null) return null;
     final programmes = epg[id];
-    if (programmes == null) return null;
+    if (programmes == null || programmes.isEmpty) return null;
+
     final time = at ?? DateTime.now();
-    for (final programme in programmes) {
-      if (programme.start.isAfter(time)) return programme;
-    }
-    return null;
+    final index = _lowerBoundProgrammeStart(
+      programmes,
+      time,
+      strictlyAfter: true,
+    );
+    return index < programmes.length ? programmes[index] : null;
   }
 
   List<EpgProgram> programmesForChannel(
@@ -417,14 +427,16 @@ class AppController extends ChangeNotifier {
     int limit = 6,
   }) {
     final id = channel.epgId;
-    if (id == null) return const [];
+    if (id == null || limit <= 0) return const [];
     final programmes = epg[id];
-    if (programmes == null) return const [];
+    if (programmes == null || programmes.isEmpty) return const [];
+
     final time = from ?? DateTime.now();
-    return programmes
-        .where((programme) => programme.stop.isAfter(time))
-        .take(limit)
-        .toList(growable: false);
+    var index = _lowerBoundProgrammeStart(programmes, time);
+    if (index > 0 && programmes[index - 1].stop.isAfter(time)) {
+      index -= 1;
+    }
+    return programmes.skip(index).take(limit).toList(growable: false);
   }
 
   List<EpgProgram> programmesForWindow(
@@ -433,22 +445,11 @@ class AppController extends ChangeNotifier {
     required DateTime end,
   }) {
     final id = channel.epgId;
-    if (id == null) return const [];
+    if (id == null || !end.isAfter(start)) return const [];
     final programmes = epg[id];
     if (programmes == null || programmes.isEmpty) return const [];
 
-    var low = 0;
-    var high = programmes.length;
-    while (low < high) {
-      final mid = (low + high) >> 1;
-      if (programmes[mid].start.isBefore(start)) {
-        low = mid + 1;
-      } else {
-        high = mid;
-      }
-    }
-
-    var index = low;
+    var index = _lowerBoundProgrammeStart(programmes, start);
     while (index > 0 && programmes[index - 1].stop.isAfter(start)) {
       index -= 1;
     }
@@ -460,6 +461,27 @@ class AppController extends ChangeNotifier {
       if (programme.stop.isAfter(start)) output.add(programme);
     }
     return output;
+  }
+
+  int _lowerBoundProgrammeStart(
+    List<EpgProgram> programmes,
+    DateTime time, {
+    bool strictlyAfter = false,
+  }) {
+    var low = 0;
+    var high = programmes.length;
+    while (low < high) {
+      final mid = (low + high) >> 1;
+      final start = programmes[mid].start;
+      final belongsBefore =
+          strictlyAfter ? !start.isAfter(time) : start.isBefore(time);
+      if (belongsBefore) {
+        low = mid + 1;
+      } else {
+        high = mid;
+      }
+    }
+    return low;
   }
 
   Future<void> loadEpg({bool force = false}) async {
