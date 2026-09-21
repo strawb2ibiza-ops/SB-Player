@@ -155,6 +155,9 @@ class AccountManagerDialog extends StatelessWidget {
     );
     if (confirmed == true) {
       await controller.removeProfile(profile.id);
+      if (context.mounted && !controller.signedIn) {
+        Navigator.of(context).pop();
+      }
     }
   }
 }
