@@ -13,9 +13,9 @@ class AccountProfilesStore {
   FlutterSecureStorage get _storage => const FlutterSecureStorage();
 
   Future<List<IptvProfile>> loadProfiles() async {
-    final raw = await _storage.read(key: _profilesKey);
-    if (raw == null || raw.isEmpty) return const [];
     try {
+      final raw = await _storage.read(key: _profilesKey);
+      if (raw == null || raw.isEmpty) return const [];
       final decoded = jsonDecode(raw);
       if (decoded is! List) {
         await _storage.delete(key: _profilesKey);
@@ -34,7 +34,11 @@ class AccountProfilesStore {
       profiles.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       return profiles;
     } catch (_) {
-      await _storage.delete(key: _profilesKey);
+      try {
+        await _storage.delete(key: _profilesKey);
+      } catch (_) {
+        // Ignore cleanup failures and continue without saved profiles.
+      }
       return const [];
     }
   }
