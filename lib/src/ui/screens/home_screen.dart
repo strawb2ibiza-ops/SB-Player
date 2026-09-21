@@ -103,77 +103,134 @@ class _HomeScreenState extends State<HomeScreen> {
     IptvChannel channel,
     EpgProgram programme,
   ) async {
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      showDragHandle: true,
+      barrierColor: Colors.black.withValues(alpha: 0.58),
       builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    SizedBox(
-                      width: 42,
-                      height: 42,
-                      child: channel.logoUrl == null
-                          ? const Icon(Icons.live_tv_outlined)
-                          : Image.network(
-                              channel.logoUrl!,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, _, _) =>
-                                  const Icon(Icons.live_tv_outlined),
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        channel.name,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+        final live = programme.isLiveAt(DateTime.now());
+        return Dialog(
+          alignment: Alignment.centerRight,
+          insetPadding: const EdgeInsets.fromLTRB(64, 18, 18, 18),
+          backgroundColor: SbBrand.elevated,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(
+              color: SbBrand.electricBlue.withValues(alpha: 0.28),
+            ),
+          ),
+          child: SizedBox(
+            width: 430,
+            height: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(28, 24, 28, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: channel.logoUrl == null
+                            ? const Icon(
+                                Icons.live_tv_outlined,
+                                color: SbBrand.brightBlue,
+                              )
+                            : Image.network(
+                                channel.logoUrl!,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, _, _) => const Icon(
+                                  Icons.live_tv_outlined,
+                                  color: SbBrand.brightBlue,
+                                ),
+                              ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  programme.title,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${_guideTime(programme.start)}–${_guideTime(programme.stop)}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                if (programme.description?.trim().isNotEmpty == true) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    programme.description!.trim(),
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          height: 1.45,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          channel.name,
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
                         ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+                  if (live)
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Color(0x24FF405B),
+                        borderRadius: BorderRadius.all(Radius.circular(5)),
+                      ),
+                      child: Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Text(
+                          'LIVE',
+                          style: TextStyle(
+                            color: SbBrand.liveError,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (live) const SizedBox(height: 10),
+                  Text(
+                    programme.title,
+                    style:
+                        Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${_guideTime(programme.start)}–${_guideTime(programme.stop)}',
+                    style: const TextStyle(
+                      color: SbBrand.brightBlue,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Text(
+                        programme.description?.trim().isNotEmpty == true
+                            ? programme.description!.trim()
+                            : 'No programme description is available.',
+                        style:
+                            Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  color: programme.description
+                                              ?.trim()
+                                              .isNotEmpty ==
+                                          true
+                                      ? SbBrand.textPrimary
+                                      : SbBrand.textMuted,
+                                  height: 1.55,
+                                ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _play(widget.controller.playbackForChannel(channel));
+                    },
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: Text(live ? 'Watch live' : 'Watch channel'),
                   ),
                 ],
-                const SizedBox(height: 20),
-                FilledButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _play(widget.controller.playbackForChannel(channel));
-                  },
-                  icon: const Icon(Icons.play_arrow),
-                  label: Text(
-                    programme.isLiveAt(DateTime.now())
-                        ? 'Watch live'
-                        : 'Watch channel',
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );
