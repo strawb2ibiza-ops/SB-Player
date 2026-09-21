@@ -690,12 +690,10 @@ class AppController extends ChangeNotifier {
     List<IptvChannel> loadedChannels;
 
     if (value.type == AccountType.xtream) {
-      final results = await Future.wait([
-        _xtreamClient.fetchLiveCategories(value),
-        _xtreamClient.fetchLiveChannels(value),
-      ]);
-      loadedCategories = results[0] as List<IptvCategory>;
-      loadedChannels = results[1] as List<IptvChannel>;
+      final categoriesFuture = _xtreamClient.fetchLiveCategories(value);
+      final channelsFuture = _xtreamClient.fetchLiveChannels(value);
+      loadedCategories = await categoriesFuture;
+      loadedChannels = await channelsFuture;
     } else {
       final playlist = await _m3uClient.load(value.playlistUrl!);
       loadedChannels = playlist.channels;
@@ -726,12 +724,10 @@ class AppController extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final results = await Future.wait([
-        _xtreamClient.fetchVodCategories(current),
-        _xtreamClient.fetchVodStreams(current),
-      ]);
-      movieCategories = results[0] as List<IptvCategory>;
-      movies = results[1] as List<VodItem>;
+      final categoriesFuture = _xtreamClient.fetchVodCategories(current);
+      final moviesFuture = _xtreamClient.fetchVodStreams(current);
+      movieCategories = await categoriesFuture;
+      movies = await moviesFuture;
       _moviesLoaded = true;
       movieCategoryId = '__all__';
     } catch (exception) {
@@ -749,12 +745,10 @@ class AppController extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
-      final results = await Future.wait([
-        _xtreamClient.fetchSeriesCategories(current),
-        _xtreamClient.fetchSeries(current),
-      ]);
-      seriesCategories = results[0] as List<IptvCategory>;
-      series = results[1] as List<SeriesItem>;
+      final categoriesFuture = _xtreamClient.fetchSeriesCategories(current);
+      final seriesFuture = _xtreamClient.fetchSeries(current);
+      seriesCategories = await categoriesFuture;
+      series = await seriesFuture;
       _seriesLoaded = true;
       seriesCategoryId = '__all__';
     } catch (exception) {
