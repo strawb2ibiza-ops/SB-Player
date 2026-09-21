@@ -61,6 +61,45 @@ void main() {
     client.dispose();
   });
 
+  test('falls back from HTTPS to HTTP and saves resolved provider URL', () async {
+    final requests = <Uri>[];
+    final client = XtreamClient(
+      client: MockClient((request) async {
+        requests.add(request.url);
+        if (request.url.scheme == 'https') {
+          return http.Response('not available', 502);
+        }
+        return http.Response(
+          jsonEncode({
+            'user_info': {
+              'auth': 1,
+              'status': 'Active',
+              'exp_date': '0',
+            },
+            'server_info': {
+              'server_protocol': 'http',
+              'url': 'provider.example.test',
+              'port': '8080',
+            },
+          }),
+          200,
+        );
+      }),
+    );
+
+    final account = await client.authenticate(
+      serverUrl: 'provider.example.test',
+      username: 'viewer',
+      password: 'secret',
+    );
+
+    expect(requests.first.scheme, 'https');
+    expect(requests.last.scheme, 'http');
+    expect(account.serverUrl, 'http://provider.example.test:8080');
+    expect(account.epgUrl, startsWith('http://provider.example.test:8080/xmltv.php?'));
+    client.dispose();
+  });
+
   test('ignores malformed direct stream sources', () async {
     final client = XtreamClient(
       client: MockClient((request) async {
