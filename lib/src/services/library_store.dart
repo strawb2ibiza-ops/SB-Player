@@ -22,7 +22,9 @@ class LibraryStore {
       _save(_recentKey, entries);
 
   Future<void> _save(String key, List<LibraryEntry> entries) async {
-    final encoded = jsonEncode(entries.map((entry) => entry.toJson()).toList());
+    final encoded = jsonEncode(
+      entries.map((entry) => entry.toJson()).toList(growable: false),
+    );
     await _storage.write(key: key, value: encoded);
   }
 
@@ -31,13 +33,17 @@ class LibraryStore {
     if (value == null || value.isEmpty) return const [];
     try {
       final decoded = jsonDecode(value);
-      if (decoded is! List) return const [];
+      if (decoded is! List) {
+        await _storage.delete(key: key);
+        return const [];
+      }
       return decoded
           .whereType<Map>()
           .map((item) => LibraryEntry.fromJson(Map<String, dynamic>.from(item)))
           .where((entry) => entry.id.isNotEmpty && entry.streamUrl.isNotEmpty)
           .toList(growable: false);
     } catch (_) {
+      await _storage.delete(key: key);
       return const [];
     }
   }
