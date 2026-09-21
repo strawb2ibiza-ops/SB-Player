@@ -98,8 +98,9 @@ class AppController extends ChangeNotifier {
   List<IptvCategory> get activeCategories {
     switch (section) {
       case ContentSection.live:
-      case ContentSection.guide:
         return liveCategories;
+      case ContentSection.guide:
+        return const [];
       case ContentSection.movies:
         return movieCategories;
       case ContentSection.series:
@@ -115,8 +116,9 @@ class AppController extends ChangeNotifier {
   String get activeCategoryId {
     switch (section) {
       case ContentSection.live:
-      case ContentSection.guide:
         return liveCategoryId;
+      case ContentSection.guide:
+        return '__all__';
       case ContentSection.movies:
         return movieCategoryId;
       case ContentSection.series:
@@ -264,9 +266,10 @@ class AppController extends ChangeNotifier {
   void selectCategory(String categoryId) {
     switch (section) {
       case ContentSection.live:
-      case ContentSection.guide:
         liveCategoryId = categoryId;
         break;
+      case ContentSection.guide:
+        return;
       case ContentSection.movies:
         movieCategoryId = categoryId;
         break;
