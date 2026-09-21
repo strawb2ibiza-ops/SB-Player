@@ -282,6 +282,47 @@ class AppController extends ChangeNotifier {
     }).toList(growable: false);
   }
 
+  List<VodItem> get recentlyAddedMovies {
+    final items = [...movies];
+    items.sort((a, b) {
+      final dateCompare =
+          _contentDate(b.releaseDate).compareTo(_contentDate(a.releaseDate));
+      if (dateCompare != 0) return dateCompare;
+      return _numericContentId(b.id).compareTo(_numericContentId(a.id));
+    });
+    return items.take(12).toList(growable: false);
+  }
+
+  List<SeriesItem> get recentlyAddedSeries {
+    final items = [...series];
+    items.sort((a, b) {
+      final dateCompare =
+          _contentDate(b.releaseDate).compareTo(_contentDate(a.releaseDate));
+      if (dateCompare != 0) return dateCompare;
+      return _numericContentId(b.id).compareTo(_numericContentId(a.id));
+    });
+    return items.take(12).toList(growable: false);
+  }
+
+  DateTime _contentDate(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    final direct = DateTime.tryParse(value.trim());
+    if (direct != null) return direct;
+    final match = RegExp(r'(\\d{4})[-/.](\\d{1,2})[-/.](\\d{1,2})')
+        .firstMatch(value);
+    if (match == null) return DateTime.fromMillisecondsSinceEpoch(0);
+    return DateTime(
+      int.parse(match.group(1)!),
+      int.parse(match.group(2)!),
+      int.parse(match.group(3)!),
+    );
+  }
+
+  int _numericContentId(String value) =>
+      int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
   List<LibraryEntry> get continueWatching {
     return visibleLibrary(recent, '').where((entry) {
       if (entry.durationSeconds <= 0) return false;
