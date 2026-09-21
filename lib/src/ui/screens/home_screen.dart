@@ -372,7 +372,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildContent(AppController controller) {
-    if ((controller.loading && controller.channels.isEmpty) || controller.contentLoading) {
+    if ((controller.loading && controller.channels.isEmpty) ||
+        (controller.contentLoading &&
+            controller.section != ContentSection.home)) {
       return const Center(child: CircularProgressIndicator());
     }
 
