@@ -29,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _search = TextEditingController();
   DateTime _guideAnchor = _roundedGuideTime(DateTime.now());
   Timer? _guideClock;
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -46,8 +47,16 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _guideClock?.cancel();
+    _searchDebounce?.cancel();
     _search.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String _) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 120), () {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _changeSection(ContentSection section) async {
@@ -243,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 hintText: _searchHint(controller.section),
                                 prefixIcon: const Icon(Icons.search),
                               ),
-                              onChanged: (_) => setState(() {}),
+                              onChanged: _onSearchChanged,
                             ),
                           ),
                           const SizedBox(width: 12),
