@@ -128,7 +128,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _reconnectTimer?.cancel();
       _reconnectAttempts = 0;
     }
-    final resumeAt = _item.isLive ? null : _position;
+    final resumeAt = _item.isLive
+        ? null
+        : (_position > const Duration(seconds: 5)
+            ? _position
+            : _item.startPosition);
     await _player.stop();
     await _open(resumeAt: resumeAt);
   }
