@@ -22,11 +22,21 @@ class XtreamClient {
 
   String normalizeBase(String value) {
     var result = value.trim();
+    if (result.isEmpty) {
+      throw XtreamException('Enter the IPTV server URL.');
+    }
     if (!result.startsWith('http://') && !result.startsWith('https://')) {
       result = 'https://$result';
     }
     while (result.endsWith('/')) {
       result = result.substring(0, result.length - 1);
+    }
+
+    final uri = Uri.tryParse(result);
+    if (uri == null ||
+        !uri.hasAuthority ||
+        !{'http', 'https'}.contains(uri.scheme.toLowerCase())) {
+      throw XtreamException('Enter a valid HTTP or HTTPS IPTV server URL.');
     }
     return result;
   }
@@ -127,7 +137,7 @@ class XtreamClient {
         categoryId: '${item['category_id'] ?? ''}',
         logoUrl: _nullableString(item['stream_icon']),
         epgId: _nullableString(item['epg_channel_id']),
-        streamUrl: direct.startsWith('http') ? direct : fallback,
+        streamUrl: _httpSource(direct) ?? fallback,
       );
     }).where((channel) => channel.id.isNotEmpty).toList(growable: false);
   }
@@ -156,7 +166,7 @@ class XtreamClient {
         rating: _rating(item['rating_5based'] ?? item['rating']),
         releaseDate: _nullableString(item['releasedate'] ?? item['release_date']),
         duration: _nullableString(item['duration']),
-        streamUrl: direct.startsWith('http') ? direct : fallback,
+        streamUrl: _httpSource(direct) ?? fallback,
       );
     }).where((item) => item.id.isNotEmpty).toList(growable: false);
   }
@@ -246,7 +256,7 @@ class XtreamClient {
       title: '${raw['title'] ?? raw['name'] ?? 'Episode $episodeNumber'}',
       season: season,
       episodeNumber: episodeNumber,
-      streamUrl: direct.startsWith('http') ? direct : fallback,
+      streamUrl: _httpSource(direct) ?? fallback,
       extension: extension,
       plot: _nullableString(info['plot'] ?? raw['plot']),
       duration: _nullableString(info['duration'] ?? raw['duration']),
@@ -280,6 +290,17 @@ class XtreamClient {
       throw XtreamException('Provider returned HTTP ${response.statusCode}.');
     }
     return jsonDecode(response.body);
+  }
+
+  String? _httpSource(String value) {
+    if (value.isEmpty) return null;
+    final uri = Uri.tryParse(value);
+    if (uri == null ||
+        !uri.hasAuthority ||
+        !{'http', 'https'}.contains(uri.scheme.toLowerCase())) {
+      return null;
+    }
+    return value;
   }
 
   String _segment(String value) => Uri.encodeComponent(value);
