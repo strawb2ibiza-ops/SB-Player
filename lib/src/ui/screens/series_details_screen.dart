@@ -4,6 +4,7 @@ import '../../models/series_item.dart';
 import '../../models/playback_item.dart';
 import '../../state/app_controller.dart';
 import 'player_screen.dart';
+import '../widgets/desktop_window_controls.dart';
 
 class SeriesDetailsScreen extends StatefulWidget {
   const SeriesDetailsScreen({
@@ -39,7 +40,18 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
     final series = widget.series;
     final controller = widget.controller;
     return Scaffold(
-      appBar: AppBar(title: Text(series.name)),
+      appBar: AppBar(
+        title: DragToMoveArea(
+          child: SizedBox(
+            height: 42,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(series.name),
+            ),
+          ),
+        ),
+        actions: const [DesktopWindowControls()],
+      ),
       body: FutureBuilder<SeriesDetails>(
         future: _details,
         builder: (context, snapshot) {
