@@ -26,7 +26,7 @@ Use only with IPTV services and content you are authorized to access or distribu
 - Video playback with `media_kit`
 - XMLTV EPG support
 - Now/Next programme information
-- TV Guide view
+- Timeline-style TV Guide with a four-hour programme window and current-time marker
 - Six-hour persistent EPG cache with manual force refresh
 
 ### Movies and series
@@ -53,6 +53,9 @@ Use only with IPTV services and content you are authorized to access or distribu
 - Buffering indicator, playback-error overlay and retry action
 - Hardware-accelerated playback through `media_kit`
 - Always-on-top mini-player mode using `window_manager`
+- Detailed mini-player with title/programme, progress, volume and playback controls
+- Video-only mini-player with hover controls
+- Remembered mini-player layout preference
 
 ## Requirements
 
@@ -125,7 +128,7 @@ test/             parser and model tests
 
 ## Planned next milestones
 
-1. Improved TV Guide timeline layout and EPG caching.
+1. Refine TV Guide navigation with day/time jumping and virtualization for very large channel lists.
 2. Multiple IPTV accounts in the Open Edition.
 3. SB production logo/branding assets.
 4. Windows installer and code-signing workflow.
