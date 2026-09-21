@@ -7,6 +7,11 @@
 - Cache writes prune stale programmes and cap future guide data to two days to keep disk usage bounded.
 - Added force-refresh support for the TV guide.
 - Added JSON serialization tests for cached EPG programme data.
+- Replaced the basic guide list with a four-hour visual EPG timeline and current-time marker.
+- Added two Windows mini-player layouts: Detailed and Video-only.
+- Video-only mini-player hides app chrome and reveals controls on hover.
+- Mini-player layout preference is remembered between sessions.
+- Mini mode now temporarily lowers the Windows minimum-size limit so the player can actually shrink, then restores the normal limit on exit.
 
 ## 0.3.0
 
@@ -16,8 +21,6 @@
 - Added buffering feedback during playback.
 - Added playback-error overlay and in-player stream retry.
 - Kept Windows always-on-top mini-player support and shared Open/SB provider build modes.
-
-# Changelog
 
 ## 0.2.0
 
