@@ -100,7 +100,7 @@ void main() {
       client: MockClient((request) async {
         requests += 1;
         if (request.url.scheme == 'https') {
-          throw const http.ClientException('TLS failed');
+          throw http.ClientException('TLS failed');
         }
         expect(request.url.scheme, 'http');
         expect(request.url.port, 80);
