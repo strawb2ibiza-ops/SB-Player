@@ -52,12 +52,22 @@ class XtreamClient {
       queryParameters: {'username': username, 'password': password},
     );
 
-    final response = await _client.get(uri).timeout(const Duration(seconds: 15));
+    late http.Response response;
+    try {
+      response = await _client.get(uri).timeout(const Duration(seconds: 15));
+    } catch (_) {
+      throw XtreamException('Could not connect to the IPTV provider.');
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw XtreamException('Provider returned HTTP ${response.statusCode}.');
     }
 
-    final decoded = jsonDecode(response.body);
+    dynamic decoded;
+    try {
+      decoded = jsonDecode(response.body);
+    } catch (_) {
+      throw XtreamException('Provider returned invalid account data.');
+    }
     if (decoded is! Map<String, dynamic>) {
       throw XtreamException('Provider returned an unexpected response.');
     }
@@ -285,11 +295,20 @@ class XtreamClient {
       },
     );
 
-    final response = await _client.get(uri).timeout(const Duration(seconds: 25));
+    late http.Response response;
+    try {
+      response = await _client.get(uri).timeout(const Duration(seconds: 25));
+    } catch (_) {
+      throw XtreamException('Could not load data from the IPTV provider.');
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw XtreamException('Provider returned HTTP ${response.statusCode}.');
     }
-    return jsonDecode(response.body);
+    try {
+      return jsonDecode(response.body);
+    } catch (_) {
+      throw XtreamException('Provider returned invalid data.');
+    }
   }
 
   String? _httpSource(String value) {
