@@ -7,6 +7,8 @@ import '../../models/epg_program.dart';
 import '../../models/iptv_channel.dart';
 import '../../models/library_entry.dart';
 import '../../models/playback_item.dart';
+import '../../models/series_item.dart';
+import '../../models/vod_item.dart';
 import '../../state/app_controller.dart';
 import '../branding/sb_brand.dart';
 import '../widgets/account_manager_dialog.dart';
@@ -19,6 +21,7 @@ import '../widgets/sb_logo.dart';
 import 'movie_details_screen.dart';
 import 'player_screen.dart';
 import 'series_details_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.controller});
@@ -40,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(widget.controller.loadEpg());
+      unawaited(widget.controller.prepareHome());
     });
     _guideClock = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted && widget.controller.section == ContentSection.guide) {
@@ -246,6 +250,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showSettings() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(controller: widget.controller),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
@@ -306,6 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   () => _sidebarCollapsed = !_sidebarCollapsed,
                 ),
                 onSection: (value) => unawaited(_changeSection(value)),
+                onSettings: _showSettings,
               ),
               Expanded(
                 child: Padding(
@@ -365,16 +378,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case ContentSection.series:
         return _buildSeries(controller);
       case ContentSection.continueWatching:
-        return _buildLibrary(
-          controller,
-          controller.continueWatching.where((entry) {
-            final query = _search.text.trim().toLowerCase();
-            return query.isEmpty ||
-                entry.title.toLowerCase().contains(query) ||
-                (entry.subtitle?.toLowerCase().contains(query) ?? false);
-          }).toList(growable: false),
-          empty: 'Nothing to continue yet.',
-        );
+        return _buildContinueWatchingPage(controller);
       case ContentSection.favorites:
         return _buildLibrary(controller, controller.visibleLibrary(controller.favorites, _search.text), empty: 'No favorites yet.');
       case ContentSection.recent:
@@ -388,7 +392,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final hero = continueItems.isNotEmpty
         ? continueItems.first
         : (recentItems.isNotEmpty ? recentItems.first : null);
-    final liveChannels = controller.channels.take(6).toList(growable: false);
+    final liveChannels = controller.channels
+        .where((channel) => controller.nowProgram(channel) != null)
+        .take(8)
+        .toList(growable: false);
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 18),
@@ -514,15 +521,21 @@ class _HomeScreenState extends State<HomeScreen> {
               itemBuilder: (context, index) {
                 final channel = liveChannels[index];
                 final item = controller.playbackForChannel(channel);
-                final now = controller.nowProgram(channel);
+                final now = controller.nowProgram(channel)!;
                 final next = controller.nextProgram(channel);
+                final total = now.stop.difference(now.start).inSeconds;
+                final elapsed = DateTime.now().difference(now.start).inSeconds;
+                final progress = total <= 0
+                    ? null
+                    : (elapsed / total).clamp(0.0, 1.0);
                 return SizedBox(
                   width: 390,
                   child: ChannelTile(
                     channel: channel,
                     channelNumber: index + 1,
-                    nowText: now?.title,
+                    nowText: now.title,
                     nextText: next?.title,
+                    nowProgress: progress,
                     isFavorite: controller.isFavorite(item),
                     onFavorite: () => controller.toggleFavorite(item),
                     onTap: () => _play(item),
@@ -530,6 +543,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
+          ),
+        ],
+        if (controller.recentlyAddedMovies.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _MovieShelf(
+            title: 'Recently Added Movies',
+            controller: controller,
+            movies: controller.recentlyAddedMovies.take(10).toList(growable: false),
+          ),
+        ],
+        if (controller.recentlyAddedSeries.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _SeriesShelf(
+            title: 'Recently Added Series',
+            controller: controller,
+            series: controller.recentlyAddedSeries.take(10).toList(growable: false),
+          ),
+        ],
+        if (controller.newReleaseMovies.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          _MovieShelf(
+            title: 'New Releases',
+            controller: controller,
+            movies: controller.newReleaseMovies.take(10).toList(growable: false),
           ),
         ],
         if (recentItems.isNotEmpty) ...[
@@ -545,6 +582,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildLive(AppController controller) {
+    if (controller.activeCategoryId == '__browse__') {
+      return _buildCategoryBrowser(
+        controller,
+        title: 'Live TV categories',
+        categories: controller.liveCategories,
+        countFor: (id) =>
+            controller.channels.where((item) => item.categoryId == id).length,
+      );
+    }
     final channels = controller.visibleChannels(_search.text);
     if (channels.isEmpty) return const Center(child: Text('No channels found.'));
 
@@ -588,7 +634,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildGuide(AppController controller) {
-    final channels = controller.visibleChannels(_search.text);
+    final channels = controller.visibleChannels(
+      _search.text,
+      ignoreCategory: true,
+    );
     if (channels.isEmpty) {
       return const Center(child: Text('No channels found.'));
     }
@@ -681,6 +730,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMovies(AppController controller) {
+    if (controller.activeCategoryId == '__browse__') {
+      return _buildCategoryBrowser(
+        controller,
+        title: 'Movie categories',
+        categories: controller.movieCategories,
+        countFor: (id) =>
+            controller.movies.where((item) => item.categoryId == id).length,
+      );
+    }
     final movies = controller.visibleMovies(_search.text);
     if (movies.isEmpty) return const Center(child: Text('No movies found.'));
 
@@ -720,6 +778,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildSeries(AppController controller) {
+    if (controller.activeCategoryId == '__browse__') {
+      return _buildCategoryBrowser(
+        controller,
+        title: 'Series categories',
+        categories: controller.seriesCategories,
+        countFor: (id) =>
+            controller.series.where((item) => item.categoryId == id).length,
+      );
+    }
     final items = controller.visibleSeries(_search.text);
     if (items.isEmpty) return const Center(child: Text('No series found.'));
 
@@ -750,6 +817,85 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             );
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildCategoryBrowser(
+    AppController controller, {
+    required String title,
+    required List<IptvCategory> categories,
+    required int Function(String id) countFor,
+  }) {
+    final query = _search.text.trim().toLowerCase();
+    final visible = categories
+        .where((category) =>
+            query.isEmpty || category.name.toLowerCase().contains(query))
+        .toList(growable: false);
+
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 310,
+        mainAxisExtent: 112,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: visible.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return _CategoryCard(
+            title: 'All',
+            count: switch (controller.section) {
+              ContentSection.live => controller.channels.length,
+              ContentSection.movies => controller.movies.length,
+              ContentSection.series => controller.series.length,
+              _ => 0,
+            },
+            icon: Icons.grid_view_rounded,
+            onTap: () => controller.selectCategory('__all__'),
+          );
+        }
+        final category = visible[index - 1];
+        return _CategoryCard(
+          title: category.name,
+          count: countFor(category.id),
+          icon: controller.section == ContentSection.live
+              ? Icons.live_tv_outlined
+              : controller.section == ContentSection.movies
+                  ? Icons.movie_outlined
+                  : Icons.tv_outlined,
+          onTap: () => controller.selectCategory(category.id),
+        );
+      },
+    );
+  }
+
+  Widget _buildContinueWatchingPage(AppController controller) {
+    final query = _search.text.trim().toLowerCase();
+    final entries = controller.continueWatching.where((entry) {
+      return query.isEmpty ||
+          entry.title.toLowerCase().contains(query) ||
+          (entry.subtitle?.toLowerCase().contains(query) ?? false);
+    }).toList(growable: false);
+
+    if (entries.isEmpty) {
+      return const Center(child: Text('Nothing to continue yet.'));
+    }
+
+    return GridView.builder(
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 360,
+        mainAxisExtent: 205,
+        crossAxisSpacing: 14,
+        mainAxisSpacing: 14,
+      ),
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        return _ContinueCard(
+          entry: entry,
+          onTap: () => _play(entry.toPlaybackItem()),
         );
       },
     );
@@ -828,12 +974,14 @@ class _Sidebar extends StatelessWidget {
     required this.collapsed,
     required this.onToggle,
     required this.onSection,
+    required this.onSettings,
   });
 
   final AppController controller;
   final bool collapsed;
   final VoidCallback onToggle;
   final ValueChanged<ContentSection> onSection;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -956,7 +1104,17 @@ class _Sidebar extends StatelessWidget {
                   selected: controller.section == ContentSection.recent,
                   onTap: () => onSection(ContentSection.recent),
                 ),
-                if (!collapsed && controller.activeCategories.isNotEmpty) ...[
+                const Divider(height: 20),
+                _NavButton(
+                  icon: Icons.settings_outlined,
+                  label: 'Settings',
+                  collapsed: collapsed,
+                  selected: false,
+                  onTap: onSettings,
+                ),
+                if (!collapsed &&
+                    controller.activeCategories.isNotEmpty &&
+                    controller.activeCategoryId != '__browse__') ...[
                   const Divider(height: 28),
                   const Padding(
                     padding: EdgeInsets.fromLTRB(10, 0, 10, 8),
@@ -1171,6 +1329,257 @@ class _SectionTitle extends StatelessWidget {
 }
 
 
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({
+    required this.title,
+    required this.count,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final int count;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(11),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: SbBrand.panelBlue,
+                child: Icon(icon, color: SbBrand.brightBlue),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$count items',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContinueCard extends StatelessWidget {
+  const _ContinueCard({required this.entry, required this.onTap});
+
+  final LibraryEntry entry;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            const ColoredBox(color: SbBrand.panel),
+            if (entry.artworkUrl != null)
+              Image.network(
+                entry.artworkUrl!,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) =>
+                    const BrandBackdrop(child: SizedBox.expand()),
+              )
+            else
+              const BrandBackdrop(child: SizedBox.expand()),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    SbBrand.black.withValues(alpha: .18),
+                    SbBrand.black.withValues(alpha: .92),
+                  ],
+                  stops: const [.15, .56, 1],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: 13,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  if (entry.durationSeconds > 0) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(99),
+                      child: LinearProgressIndicator(
+                        value: entry.progress.clamp(0, 1),
+                        minHeight: 3,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MovieShelf extends StatelessWidget {
+  const _MovieShelf({
+    required this.title,
+    required this.controller,
+    required this.movies,
+  });
+
+  final String title;
+  final AppController controller;
+  final List<VodItem> movies;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PosterShelf(
+      title: title,
+      items: [
+        for (final movie in movies)
+          _PosterShelfItem(
+            title: movie.name,
+            imageUrl: movie.posterUrl,
+            rating: movie.rating,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => MovieDetailsScreen(
+                  controller: controller,
+                  movie: movie,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SeriesShelf extends StatelessWidget {
+  const _SeriesShelf({
+    required this.title,
+    required this.controller,
+    required this.series,
+  });
+
+  final String title;
+  final AppController controller;
+  final List<SeriesItem> series;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PosterShelf(
+      title: title,
+      items: [
+        for (final item in series)
+          _PosterShelfItem(
+            title: item.name,
+            imageUrl: item.coverUrl,
+            rating: item.rating,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SeriesDetailsScreen(
+                  controller: controller,
+                  series: item,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _PosterShelfItem {
+  const _PosterShelfItem({
+    required this.title,
+    required this.imageUrl,
+    required this.rating,
+    required this.onTap,
+  });
+
+  final String title;
+  final String? imageUrl;
+  final double? rating;
+  final VoidCallback onTap;
+}
+
+class _PosterShelf extends StatelessWidget {
+  const _PosterShelf({required this.title, required this.items});
+
+  final String title;
+  final List<_PosterShelfItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 300,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return SizedBox(
+                width: 185,
+                child: PosterCard(
+                  title: item.title,
+                  imageUrl: item.imageUrl,
+                  rating: item.rating,
+                  onTap: item.onTap,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _HomeShelf extends StatelessWidget {
   const _HomeShelf({
     required this.title,
@@ -1198,75 +1607,10 @@ class _HomeShelf extends StatelessWidget {
             itemBuilder: (context, index) {
               final entry = entries[index];
               return SizedBox(
-                width: 290,
-                child: Card(
-                  child: InkWell(
-                    onTap: () => onTap(entry),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (entry.artworkUrl != null)
-                          Image.network(
-                            entry.artworkUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
-                                const BrandBackdrop(child: SizedBox.expand()),
-                          )
-                        else
-                          const BrandBackdrop(child: SizedBox.expand()),
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                SbBrand.black.withValues(alpha: .88),
-                              ],
-                              stops: const [.2, 1],
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: 14,
-                          right: 14,
-                          bottom: 14,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                entry.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              if (entry.subtitle?.isNotEmpty == true) ...[
-                                const SizedBox(height: 3),
-                                Text(
-                                  entry.subtitle!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                              if (entry.durationSeconds > 0) ...[
-                                const SizedBox(height: 8),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(99),
-                                  child: LinearProgressIndicator(
-                                    value: entry.progress.clamp(0, 1),
-                                    minHeight: 3,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                width: 310,
+                child: _ContinueCard(
+                  entry: entry,
+                  onTap: () => onTap(entry),
                 ),
               );
             },
