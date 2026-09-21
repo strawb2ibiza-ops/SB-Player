@@ -35,7 +35,7 @@ class _EpgTimelineState extends State<EpgTimeline> {
   static const double _channelWidth = 190;
   static const double _pixelsPerMinute = 3.6;
   static const double _rowHeight = 72;
-  static const Duration _windowLength = Duration(hours: 4);
+  static const Duration _windowLength = Duration(hours: 2);
 
   final ScrollController _horizontalController = ScrollController();
 
