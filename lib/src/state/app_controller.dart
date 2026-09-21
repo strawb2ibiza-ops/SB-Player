@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -513,8 +514,18 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    if (account == null) return;
-    await _guard(() => _loadAccount(account!));
+    final current = account;
+    if (current == null) return;
+
+    final refreshed = await _guard(() async {
+      await _loadAccount(current);
+      await accountStore.save(account!);
+      if (!config.isLocked) {
+        await _updateActiveProfileAccount(account!);
+      }
+    });
+
+    if (refreshed) unawaited(loadEpg());
   }
 
   Future<bool> switchProfile(String profileId) async {
@@ -530,7 +541,7 @@ class AppController extends ChangeNotifier {
     if (selected == null) return false;
     final profile = selected;
 
-    return _guard(() async {
+    final switched = await _guard(() async {
       await _loadAccount(profile.account);
       activeProfileId = profile.id;
       await profileStore.setActiveProfileId(profile.id);
@@ -538,6 +549,9 @@ class AppController extends ChangeNotifier {
       await _updateActiveProfileAccount(account!);
       await _migrateLegacyLibraryToCurrentScope();
     });
+
+    if (switched) unawaited(loadEpg());
+    return switched;
   }
 
   Future<void> renameProfile(String profileId, String name) async {
