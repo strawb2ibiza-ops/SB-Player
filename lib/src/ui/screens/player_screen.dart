@@ -111,7 +111,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
 
     try {
-      await widget.controller.recordPlayback(widget.item);
       await _player.open(Media(widget.item.streamUrl), play: true);
       if (!widget.item.isLive &&
           widget.item.startPosition > const Duration(seconds: 5)) {
@@ -560,6 +559,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               onSwitchLayout: _toggleMiniLayout,
               onRestore: _toggleMiniPlayer,
               detailed: true,
+              isLive: widget.item.isLive,
             ),
           ],
         ),
@@ -644,6 +644,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         onSwitchLayout: _toggleMiniLayout,
                         onRestore: _toggleMiniPlayer,
                         detailed: false,
+                        isLive: widget.item.isLive,
                       ),
                     ],
                   ),
@@ -747,6 +748,7 @@ class _MiniControls extends StatelessWidget {
     required this.onSwitchLayout,
     required this.onRestore,
     required this.detailed,
+    required this.isLive,
   });
 
   final bool playing;
@@ -760,10 +762,11 @@ class _MiniControls extends StatelessWidget {
   final Future<void> Function() onSwitchLayout;
   final Future<void> Function() onRestore;
   final bool detailed;
+  final bool isLive;
 
   @override
   Widget build(BuildContext context) {
-    final canSeek = duration.inMilliseconds > 0;
+    final canSeek = !isLive && duration.inMilliseconds > 0;
     final maxPosition =
         canSeek ? duration.inMilliseconds.toDouble() : 1.0;
     final currentPosition = canSeek
