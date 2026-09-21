@@ -10,7 +10,7 @@ void main() {
   test('encodes credentials used in fallback live stream paths', () async {
     final client = XtreamClient(
       client: MockClient((request) async {
-        expect(request.queryParameters['action'], 'get_live_streams');
+        expect(request.url.queryParameters['action'], 'get_live_streams');
         return http.Response(
           jsonEncode([
             {
