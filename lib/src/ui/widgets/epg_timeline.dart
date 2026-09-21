@@ -33,7 +33,7 @@ class EpgTimeline extends StatefulWidget {
 
 class _EpgTimelineState extends State<EpgTimeline> {
   static const double _channelWidth = 190;
-  static const double _pixelsPerMinute = 3.6;
+  static const double _minimumPixelsPerMinute = 3.6;
   static const double _rowHeight = 72;
   static const Duration _windowLength = Duration(hours: 2);
 
@@ -47,69 +47,86 @@ class _EpgTimelineState extends State<EpgTimeline> {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final rounded = DateTime(
-      widget.anchor.year,
-      widget.anchor.month,
-      widget.anchor.day,
-      widget.anchor.hour,
-      widget.anchor.minute < 30 ? 0 : 30,
-    );
-    final start = rounded;
-    final end = start.add(_windowLength);
-    final timelineWidth = _windowLength.inMinutes * _pixelsPerMinute;
-    final totalWidth = _channelWidth + timelineWidth;
-    final nowOffset =
-        now.difference(start).inSeconds / 60 * _pixelsPerMinute;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final now = DateTime.now();
+        final rounded = DateTime(
+          widget.anchor.year,
+          widget.anchor.month,
+          widget.anchor.day,
+          widget.anchor.hour,
+          widget.anchor.minute < 30 ? 0 : 30,
+        );
+        final start = rounded;
+        final end = start.add(_windowLength);
 
-    return Scrollbar(
-      controller: _horizontalController,
-      thumbVisibility: true,
-      child: SingleChildScrollView(
-        controller: _horizontalController,
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: totalWidth,
-          child: Column(
-            children: [
-              _TimelineHeader(
-                start: start,
-                width: timelineWidth,
-                channelWidth: _channelWidth,
-                pixelsPerMinute: _pixelsPerMinute,
+        final availableTimeline =
+            math.max(720.0, constraints.maxWidth - _channelWidth);
+        final pixelsPerMinute = math.max(
+          _minimumPixelsPerMinute,
+          availableTimeline / _windowLength.inMinutes,
+        );
+        final timelineWidth =
+            _windowLength.inMinutes * pixelsPerMinute;
+        final totalWidth = _channelWidth + timelineWidth;
+        final nowOffset =
+            now.difference(start).inSeconds / 60 * pixelsPerMinute;
+
+        return Scrollbar(
+          controller: _horizontalController,
+          thumbVisibility: totalWidth > constraints.maxWidth,
+          child: SingleChildScrollView(
+            controller: _horizontalController,
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: totalWidth,
+              height: constraints.maxHeight,
+              child: Column(
+                children: [
+                  _TimelineHeader(
+                    start: start,
+                    width: timelineWidth,
+                    channelWidth: _channelWidth,
+                    pixelsPerMinute: pixelsPerMinute,
+                  ),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: widget.channels.length,
+                      itemExtent: _rowHeight,
+                      itemBuilder: (context, index) {
+                        final channel = widget.channels[index];
+                        final programmes =
+                            widget.controller.programmesForWindow(
+                          channel,
+                          start: start,
+                          end: end,
+                        );
+                        return _TimelineRow(
+                          channel: channel,
+                          programmes: programmes,
+                          start: start,
+                          end: end,
+                          timelineWidth: timelineWidth,
+                          channelWidth: _channelWidth,
+                          pixelsPerMinute: pixelsPerMinute,
+                          nowOffset: nowOffset,
+                          onTap: () => widget.onPlayChannel(channel),
+                          onProgrammeTap: (programme) =>
+                              widget.onProgrammeSelected(
+                            channel,
+                            programme,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: widget.channels.length,
-                  itemExtent: _rowHeight,
-                  itemBuilder: (context, index) {
-                    final channel = widget.channels[index];
-                    final programmes = widget.controller.programmesForWindow(
-                      channel,
-                      start: start,
-                      end: end,
-                    );
-                    return _TimelineRow(
-                      channel: channel,
-                      programmes: programmes,
-                      start: start,
-                      end: end,
-                      timelineWidth: timelineWidth,
-                      channelWidth: _channelWidth,
-                      pixelsPerMinute: _pixelsPerMinute,
-                      nowOffset: nowOffset,
-                      onTap: () => widget.onPlayChannel(channel),
-                      onProgrammeTap: (programme) =>
-                          widget.onProgrammeSelected(channel, programme),
-                    );
-                  },
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
