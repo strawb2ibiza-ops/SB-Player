@@ -5,11 +5,13 @@ import '../models/content_section.dart';
 import '../models/epg_program.dart';
 import '../models/iptv_account.dart';
 import '../models/iptv_category.dart';
+import '../models/iptv_profile.dart';
 import '../models/iptv_channel.dart';
 import '../models/library_entry.dart';
 import '../models/playback_item.dart';
 import '../models/series_item.dart';
 import '../models/vod_item.dart';
+import '../services/account_profiles_store.dart';
 import '../services/epg_cache_service.dart';
 import '../services/library_store.dart';
 import '../services/m3u_client.dart';
@@ -22,6 +24,7 @@ class AppController extends ChangeNotifier {
     required this.config,
     required this.accountStore,
     this.libraryStore = const LibraryStore(),
+    this.profileStore = const AccountProfilesStore(),
     XtreamClient? xtreamClient,
     M3uClient? m3uClient,
     XmlTvService? xmlTvService,
@@ -34,12 +37,24 @@ class AppController extends ChangeNotifier {
   final AppConfig config;
   final SecureAccountStore accountStore;
   final LibraryStore libraryStore;
+  final AccountProfilesStore profileStore;
   final EpgCacheService _epgCacheService;
   final XtreamClient _xtreamClient;
   final M3uClient _m3uClient;
   final XmlTvService _xmlTvService;
 
   IptvAccount? account;
+  List<IptvProfile> profiles = const [];
+  String? activeProfileId;
+
+  IptvProfile? get activeProfile {
+    final id = activeProfileId;
+    if (id == null) return null;
+    for (final profile in profiles) {
+      if (profile.id == id) return profile;
+    }
+    return null;
+  }
 
   List<IptvCategory> liveCategories = const [];
   List<IptvChannel> channels = const [];
@@ -100,15 +115,33 @@ class AppController extends ChangeNotifier {
 
   Future<void> restoreSession() async {
     await _loadLibrary();
-    final stored = await accountStore.read();
-    if (stored == null) return;
+
+    IptvAccount? stored;
+    if (!config.isLocked) {
+      profiles = await profileStore.loadProfiles();
+      activeProfileId = await profileStore.readActiveProfileId();
+      final profile = activeProfile;
+      if (profile != null) stored = profile.account;
+    }
+
+    stored ??= await accountStore.read();
+    if (stored == null) {
+      notifyListeners();
+      return;
+    }
+
     account = stored;
     loading = true;
     notifyListeners();
     try {
+      if (!config.isLocked) {
+        await _saveOpenProfile(stored);
+      }
       await _loadAccount(stored);
     } catch (_) {
       account = null;
+      activeProfileId = null;
+      await profileStore.setActiveProfileId(null);
       await accountStore.clear();
     } finally {
       loading = false;
@@ -134,6 +167,9 @@ class AppController extends ChangeNotifier {
       );
       account = authenticated;
       await accountStore.save(authenticated);
+      if (!config.isLocked) {
+        await _saveOpenProfile(authenticated);
+      }
       await _loadAccount(authenticated);
     });
   }
@@ -154,6 +190,7 @@ class AppController extends ChangeNotifier {
       );
       account = next;
       await accountStore.save(next);
+      await _saveOpenProfile(next);
       _resetCatalogs();
       _setM3uChannels(playlist.channels);
     });
@@ -403,11 +440,83 @@ class AppController extends ChangeNotifier {
     await _guard(() => _loadAccount(account!));
   }
 
-  Future<void> logout() async {
+  Future<bool> switchProfile(String profileId) async {
+    if (config.isLocked) return false;
+    IptvProfile? selected;
+    for (final profile in profiles) {
+      if (profile.id == profileId) {
+        selected = profile;
+        break;
+      }
+    }
+    if (selected == null) return false;
+    final profile = selected;
+
+    return _guard(() async {
+      account = profile.account;
+      activeProfileId = profile.id;
+      await profileStore.setActiveProfileId(profile.id);
+      await accountStore.save(profile.account);
+      await _loadAccount(profile.account);
+    });
+  }
+
+  Future<void> renameProfile(String profileId, String name) async {
+    if (config.isLocked) return;
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    profiles = [
+      for (final profile in profiles)
+        if (profile.id == profileId)
+          profile.copyWith(name: trimmed, updatedAt: DateTime.now())
+        else
+          profile,
+    ];
+    await profileStore.saveProfiles(profiles);
+    notifyListeners();
+  }
+
+  Future<void> removeProfile(String profileId) async {
+    if (config.isLocked) return;
+    final removingActive = activeProfileId == profileId;
+    profiles = profiles
+        .where((profile) => profile.id != profileId)
+        .toList(growable: false);
+    await profileStore.saveProfiles(profiles);
+
+    if (!removingActive) {
+      notifyListeners();
+      return;
+    }
+
+    if (profiles.isNotEmpty) {
+      await switchProfile(profiles.first.id);
+    } else {
+      await beginAddAccount();
+    }
+  }
+
+  Future<void> beginAddAccount() async {
+    if (config.isLocked) return;
     account = null;
+    activeProfileId = null;
     _resetCatalogs();
     section = ContentSection.live;
     error = null;
+    await profileStore.setActiveProfileId(null);
+    await accountStore.clear();
+    notifyListeners();
+  }
+
+  Future<void> logout() async {
+    account = null;
+    activeProfileId = null;
+    _resetCatalogs();
+    section = ContentSection.live;
+    error = null;
+    if (!config.isLocked) {
+      await profileStore.setActiveProfileId(null);
+    }
     await accountStore.clear();
     notifyListeners();
   }
@@ -415,6 +524,64 @@ class AppController extends ChangeNotifier {
   Future<void> _loadLibrary() async {
     favorites = await libraryStore.loadFavorites();
     recent = await libraryStore.loadRecent();
+  }
+
+  Future<void> _saveOpenProfile(IptvAccount value) async {
+    if (config.isLocked) return;
+
+    IptvProfile? existing;
+    for (final profile in profiles) {
+      if (_sameProfileAccount(profile.account, value)) {
+        existing = profile;
+        break;
+      }
+    }
+
+    final now = DateTime.now();
+    final next = IptvProfile(
+      id: existing?.id ?? now.microsecondsSinceEpoch.toString(),
+      name: existing?.name ?? _defaultProfileName(value),
+      account: value,
+      updatedAt: now,
+    );
+
+    profiles = [
+      next,
+      ...profiles.where((profile) => profile.id != next.id),
+    ];
+    activeProfileId = next.id;
+    await profileStore.saveProfiles(profiles);
+    await profileStore.setActiveProfileId(next.id);
+  }
+
+  Future<void> _updateActiveProfileAccount(IptvAccount value) async {
+    final id = activeProfileId;
+    if (id == null) return;
+    profiles = [
+      for (final profile in profiles)
+        if (profile.id == id)
+          profile.copyWith(account: value, updatedAt: DateTime.now())
+        else
+          profile,
+    ];
+    await profileStore.saveProfiles(profiles);
+  }
+
+  bool _sameProfileAccount(IptvAccount left, IptvAccount right) {
+    if (left.type != right.type) return false;
+    if (left.type == AccountType.xtream) {
+      return left.serverUrl == right.serverUrl &&
+          left.username == right.username;
+    }
+    return left.playlistUrl == right.playlistUrl;
+  }
+
+  String _defaultProfileName(IptvAccount value) {
+    final source =
+        value.type == AccountType.xtream ? value.serverUrl : value.playlistUrl;
+    final host = Uri.tryParse(source ?? '')?.host;
+    if (host?.isNotEmpty == true) return host!;
+    return value.type == AccountType.xtream ? 'Xtream account' : 'M3U playlist';
   }
 
   Future<void> _loadAccount(IptvAccount value) async {
@@ -437,6 +604,9 @@ class AppController extends ChangeNotifier {
           epgUrl: playlist.epgUrl,
         );
         await accountStore.save(account!);
+        if (!config.isLocked) {
+          await _updateActiveProfileAccount(account!);
+        }
       }
     }
     liveCategoryId = '__all__';
