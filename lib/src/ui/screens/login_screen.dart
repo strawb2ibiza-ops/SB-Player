@@ -4,6 +4,7 @@ import '../../config/app_config.dart';
 import '../../state/app_controller.dart';
 import '../branding/sb_brand.dart';
 import '../widgets/brand_backdrop.dart';
+import '../widgets/desktop_window_controls.dart';
 import '../widgets/sb_logo.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -52,8 +53,11 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: BrandBackdrop(
         dense: true,
-        child: SafeArea(
-          child: Center(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: SafeArea(
+                child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(32),
               child: ConstrainedBox(
@@ -310,9 +314,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
+                  ),
+                ),
               ),
             ),
-          ),
+            const Positioned(
+              top: 0,
+              right: 0,
+              child: SafeArea(
+                child: DesktopWindowControls(),
+              ),
+            ),
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 150,
+              height: 42,
+              child: DragToMoveArea(
+                child: SizedBox.expand(),
+              ),
+            ),
+          ],
         ),
       ),
     );
