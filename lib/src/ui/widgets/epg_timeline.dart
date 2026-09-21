@@ -6,17 +6,26 @@ import '../../models/epg_program.dart';
 import '../../models/iptv_channel.dart';
 import '../../state/app_controller.dart';
 
+typedef EpgProgrammeSelected = void Function(
+  IptvChannel channel,
+  EpgProgram programme,
+);
+
 class EpgTimeline extends StatelessWidget {
   const EpgTimeline({
     super.key,
     required this.controller,
     required this.channels,
+    required this.anchor,
     required this.onPlayChannel,
+    required this.onProgrammeSelected,
   });
 
   final AppController controller;
   final List<IptvChannel> channels;
+  final DateTime anchor;
   final ValueChanged<IptvChannel> onPlayChannel;
+  final EpgProgrammeSelected onProgrammeSelected;
 
   static const double _channelWidth = 190;
   static const double _pixelsPerMinute = 3.6;
@@ -27,13 +36,13 @@ class EpgTimeline extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final rounded = DateTime(
-      now.year,
-      now.month,
-      now.day,
-      now.hour,
-      now.minute < 30 ? 0 : 30,
+      anchor.year,
+      anchor.month,
+      anchor.day,
+      anchor.hour,
+      anchor.minute < 30 ? 0 : 30,
     );
-    final start = rounded.subtract(const Duration(minutes: 30));
+    final start = rounded;
     final end = start.add(_windowLength);
     final timelineWidth = _windowLength.inMinutes * _pixelsPerMinute;
     final totalWidth = _channelWidth + timelineWidth;
@@ -76,6 +85,8 @@ class EpgTimeline extends StatelessWidget {
                       pixelsPerMinute: _pixelsPerMinute,
                       nowOffset: nowOffset,
                       onTap: () => onPlayChannel(channel),
+                      onProgrammeTap: (programme) =>
+                          onProgrammeSelected(channel, programme),
                     );
                   },
                 ),
@@ -174,6 +185,7 @@ class _TimelineRow extends StatelessWidget {
     required this.pixelsPerMinute,
     required this.nowOffset,
     required this.onTap,
+    required this.onProgrammeTap,
   });
 
   final IptvChannel channel;
@@ -185,6 +197,7 @@ class _TimelineRow extends StatelessWidget {
   final double pixelsPerMinute;
   final double nowOffset;
   final VoidCallback onTap;
+  final ValueChanged<EpgProgram> onProgrammeTap;
 
   @override
   Widget build(BuildContext context) {
@@ -300,7 +313,7 @@ class _TimelineRow extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
-            onTap: onTap,
+            onTap: () => onProgrammeTap(programme),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
               child: Column(
