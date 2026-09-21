@@ -328,6 +328,7 @@ class AppController extends ChangeNotifier {
   }
 
   List<VodItem> get recentlyAddedMovies {
+    if (movies.length <= 1) return movies;
     final items = [...movies];
     items.sort((a, b) {
       final dateCompare =
@@ -339,6 +340,7 @@ class AppController extends ChangeNotifier {
   }
 
   List<SeriesItem> get recentlyAddedSeries {
+    if (series.length <= 1) return series;
     final items = [...series];
     items.sort((a, b) {
       final dateCompare =
