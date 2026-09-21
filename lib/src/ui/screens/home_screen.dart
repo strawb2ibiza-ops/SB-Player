@@ -329,10 +329,21 @@ class _HomeScreenState extends State<HomeScreen> {
           itemBuilder: (context, index) {
             final channel = channels[index];
             final item = controller.playbackForChannel(channel);
+            final now = controller.nowProgram(channel);
+            final next = controller.nextProgram(channel);
+            final nowTime = DateTime.now();
+            final duration = now?.stop.difference(now.start).inSeconds ?? 0;
+            final elapsed =
+                now == null ? 0 : nowTime.difference(now.start).inSeconds;
+            final progress = duration <= 0
+                ? null
+                : (elapsed / duration).clamp(0.0, 1.0);
             return ChannelTile(
               channel: channel,
-              nowText: controller.nowProgram(channel)?.title,
-              nextText: controller.nextProgram(channel)?.title,
+              channelNumber: index + 1,
+              nowText: now?.title,
+              nextText: next?.title,
+              nowProgress: progress,
               isFavorite: controller.isFavorite(item),
               onFavorite: () => controller.toggleFavorite(item),
               onTap: () => _play(item),
@@ -409,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: const Icon(Icons.chevron_right),
             ),
             Text(
-              '${_guideTime(_guideAnchor)} + 4 hours',
+              '${_guideTime(_guideAnchor)} + 2 hours',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             TextButton.icon(
@@ -458,7 +469,6 @@ class _HomeScreenState extends State<HomeScreen> {
             return PosterCard(
               title: movie.name,
               imageUrl: movie.posterUrl,
-              subtitle: movie.releaseDate,
               rating: movie.rating,
               favorite: controller.isFavorite(item),
               onFavorite: () => controller.toggleFavorite(item),
@@ -497,7 +507,6 @@ class _HomeScreenState extends State<HomeScreen> {
             return PosterCard(
               title: series.name,
               imageUrl: series.coverUrl,
-              subtitle: series.releaseDate,
               rating: series.rating,
               onTap: () {
                 Navigator.of(context).push(
