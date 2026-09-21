@@ -71,7 +71,7 @@ class AppController extends ChangeNotifier {
   List<LibraryEntry> recent = const [];
   Map<String, List<EpgProgram>> epg = const {};
 
-  ContentSection section = ContentSection.live;
+  ContentSection section = ContentSection.home;
   String liveCategoryId = '__all__';
   String movieCategoryId = '__all__';
   String seriesCategoryId = '__all__';
@@ -100,6 +100,8 @@ class AppController extends ChangeNotifier {
         return movieCategories;
       case ContentSection.series:
         return seriesCategories;
+      case ContentSection.home:
+      case ContentSection.continueWatching:
       case ContentSection.favorites:
       case ContentSection.recent:
         return const [];
@@ -115,6 +117,8 @@ class AppController extends ChangeNotifier {
         return movieCategoryId;
       case ContentSection.series:
         return seriesCategoryId;
+      case ContentSection.home:
+      case ContentSection.continueWatching:
       case ContentSection.favorites:
       case ContentSection.recent:
         return '__all__';
@@ -242,6 +246,8 @@ class AppController extends ChangeNotifier {
       case ContentSection.series:
         seriesCategoryId = categoryId;
         break;
+      case ContentSection.home:
+      case ContentSection.continueWatching:
       case ContentSection.favorites:
       case ContentSection.recent:
         return;
@@ -273,6 +279,14 @@ class AppController extends ChangeNotifier {
       final categoryMatches = seriesCategoryId == '__all__' || item.categoryId == seriesCategoryId;
       final searchMatches = query.isEmpty || item.name.toLowerCase().contains(query);
       return categoryMatches && searchMatches;
+    }).toList(growable: false);
+  }
+
+  List<LibraryEntry> get continueWatching {
+    return visibleLibrary(recent, '').where((entry) {
+      if (entry.durationSeconds <= 0) return false;
+      final progress = entry.progress;
+      return progress > 0 && progress < 0.95;
     }).toList(growable: false);
   }
 
@@ -733,7 +747,7 @@ class AppController extends ChangeNotifier {
     liveCategories = loadedCategories;
     channels = loadedChannels;
     liveCategoryId = '__all__';
-    section = ContentSection.live;
+    section = ContentSection.home;
   }
 
   Future<void> _loadMovies() async {
