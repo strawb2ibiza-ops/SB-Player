@@ -205,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const Text('No EPG data is available from this provider.'),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: controller.loadEpg,
+              onPressed: () => controller.loadEpg(force: true),
               icon: const Icon(Icons.refresh),
               label: const Text('Try loading guide'),
             ),
