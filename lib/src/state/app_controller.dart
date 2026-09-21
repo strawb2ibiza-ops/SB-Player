@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
@@ -727,7 +730,15 @@ class AppController extends ChangeNotifier {
   }
 
   String get _libraryScope {
-    if (config.isLocked) return 'sb';
+    if (config.isLocked) {
+      final current = account;
+      if (current == null) return 'sb:pending';
+      final identity =
+          '${current.serverUrl ?? config.providerBaseUrl}|${current.username ?? ''}';
+      final digest = sha256.convert(utf8.encode(identity)).toString();
+      return 'sb:${digest.substring(0, 16)}';
+    }
+
     final id = activeProfileId;
     return id == null ? 'profile:pending' : 'profile:$id';
   }
