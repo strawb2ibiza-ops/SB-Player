@@ -42,7 +42,7 @@ class ChannelTile extends StatelessWidget {
                     : Image.network(
                         channel.logoUrl!,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.live_tv_outlined),
+                        errorBuilder: (_, _, _) => const Icon(Icons.live_tv_outlined),
                       ),
               ),
               const SizedBox(width: 12),
