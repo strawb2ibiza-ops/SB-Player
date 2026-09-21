@@ -100,7 +100,7 @@ class _Poster extends StatelessWidget {
             : Image.network(
                 url!,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (_, _, _) =>
                     const Center(child: Icon(Icons.movie_outlined, size: 72)),
               ),
       ),
