@@ -27,7 +27,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final _search = TextEditingController();
-  DateTime _guideAnchor = DateTime.now();
+  DateTime _guideAnchor = _roundedGuideTime(DateTime.now());
+  Timer? _guideClock;
 
   @override
   void initState() {
@@ -35,10 +36,16 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(widget.controller.loadEpg());
     });
+    _guideClock = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted && widget.controller.section == ContentSection.guide) {
+        setState(() {});
+      }
+    });
   }
 
   @override
   void dispose() {
+    _guideClock?.cancel();
     _search.dispose();
     super.dispose();
   }
@@ -60,7 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _jumpGuideToNow() {
-    setState(() => _guideAnchor = DateTime.now());
+    setState(() => _guideAnchor = _roundedGuideTime(DateTime.now()));
   }
 
   void _shiftGuide(Duration offset) {
@@ -720,4 +727,15 @@ class _SectionTitle extends StatelessWidget {
     };
     return Text(label, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900));
   }
+}
+
+
+DateTime _roundedGuideTime(DateTime value) {
+  return DateTime(
+    value.year,
+    value.month,
+    value.day,
+    value.hour,
+    value.minute < 30 ? 0 : 30,
+  );
 }
