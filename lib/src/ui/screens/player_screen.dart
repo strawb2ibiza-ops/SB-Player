@@ -36,6 +36,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   late final Player _player;
   late final VideoController _videoController;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
+  DateTime _lastPositionRebuild = DateTime.fromMillisecondsSinceEpoch(0);
   final MiniPlayerPreferences _miniPreferences = const MiniPlayerPreferences();
 
   bool _miniMode = false;
@@ -85,7 +86,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (mounted) setState(() => _playing = value);
     }));
     _subscriptions.add(_player.stream.position.listen((value) {
-      if (mounted) setState(() => _position = value);
+      _position = value;
+      if (!mounted) return;
+      final now = DateTime.now();
+      if (now.difference(_lastPositionRebuild) >=
+          const Duration(milliseconds: 250)) {
+        _lastPositionRebuild = now;
+        setState(() {});
+      }
     }));
     _subscriptions.add(_player.stream.duration.listen((value) {
       if (mounted) setState(() => _duration = value);
@@ -165,6 +173,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _previousWindowSize = await windowManager.getSize();
       _previousWindowPosition = await windowManager.getPosition();
       await windowManager.setAlwaysOnTop(true);
+      if (!mounted) return;
       await _applyMiniChrome();
       await _applyMiniWindowSize();
       if (mounted) setState(() => _miniMode = true);
@@ -181,11 +190,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ? MiniPlayerLayout.videoOnly
         : MiniPlayerLayout.detailed;
     await _saveMiniGeometry();
+    if (!mounted) return;
     setState(() {
       _miniLayout = next;
       _hoveringVideoOnly = false;
     });
     await _miniPreferences.saveLayout(next);
+    if (!mounted || !_miniMode) return;
     await _applyMiniChrome();
     await _applyMiniWindowSize();
   }
