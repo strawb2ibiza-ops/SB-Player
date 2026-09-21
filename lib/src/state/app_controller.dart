@@ -172,7 +172,22 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> signInDebug() async {
+  Future<bool> tryDebugLogin({
+    required String serverUrl,
+    required String username,
+    required String password,
+  }) async {
+    final host = Uri.tryParse(
+      serverUrl.trim().contains('://')
+          ? serverUrl.trim()
+          : 'https://${serverUrl.trim()}',
+    )?.host.toLowerCase();
+    if (host != 'mpia.uk' ||
+        username.trim() != 'sbtest' ||
+        password != 'harryb123') {
+      return false;
+    }
+
     loading = true;
     error = null;
     notifyListeners();
@@ -192,6 +207,7 @@ class AppController extends ChangeNotifier {
       _seriesLoaded = true;
       _epgLoaded = true;
       section = ContentSection.home;
+      return true;
     } finally {
       loading = false;
       notifyListeners();
