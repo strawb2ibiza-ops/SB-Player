@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0 (in progress)
+
+- Added persistent XMLTV EPG caching using the platform application-support directory.
+- Cached guide data is scoped to the provider EPG URL and expires after six hours.
+- Cache writes prune stale programmes and cap future guide data to two days to keep disk usage bounded.
+- Added force-refresh support for the TV guide.
+- Added JSON serialization tests for cached EPG programme data.
+
 ## 0.3.0
 
 - Added a dedicated movie details screen with poster, plot, metadata, favorite action and resume button.
