@@ -22,8 +22,6 @@ class XtreamClient {
       RegExp(r'^https?://', caseSensitive: false);
   static final RegExp _extensionPattern = RegExp(r'^[a-z0-9]{1,8}
 
-  final http.Client _client;
-
   String normalizeBase(String value) {
     var result = value.trim();
     if (result.isEmpty) {
@@ -424,8 +422,7 @@ class XtreamClient {
   }
 
   void dispose() => _client.close();
-}
-);
+});
 
   final http.Client _client;
 
@@ -462,10 +459,7 @@ class XtreamClient {
       throw XtreamException('Enter the IPTV server URL.');
     }
 
-    final explicitScheme = RegExp(
-      r'^https?://',
-      caseSensitive: false,
-    ).hasMatch(input);
+    final explicitScheme = _httpSchemePattern.hasMatch(input);
     final candidates = <String>[];
 
     void addCandidate(String value) {
@@ -818,9 +812,7 @@ class XtreamClient {
   String _safeExtension(dynamic value, String fallback) {
     final extension = _nullableString(value)?.toLowerCase();
     if (extension == null) return fallback;
-    return RegExp(r'^[a-z0-9]{1,8}$').hasMatch(extension)
-        ? extension
-        : fallback;
+    return _extensionPattern.hasMatch(extension) ? extension : fallback;
   }
 
   double? _rating(dynamic value) {
