@@ -108,26 +108,24 @@ jobs:
         run: flutter create --project-name sb_player --platforms=ios .
       - name: Configure iOS branding and PiP
         run: |
-          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName SB Player" ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName SB Player" ios/Runner/Info.plist || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'SB Player'" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist || true
           python3 - <<'PY'
-          w=h=1024
-          bg=(4,5,9); blue=(24,160,255); purple=(122,77,255)
-          pix=[list(bg)*w for _ in range(h)]
+          import struct,zlib,binascii,glob
+          W=H=1024; bg=(4,5,9); blue=(24,160,255); purple=(122,77,255)
+          rows=[bytearray(bg*W) for _ in range(H)]
           def rect(x0,y0,x1,y1,col):
               for y in range(y0,y1):
-                  row=pix[y]
-                  for x in range(x0,x1): row[x*3:x*3+3]=col
-          # bold geometric S
+                  row=rows[y]
+                  for x in range(x0,x1): row[x*3:x*3+3]=bytes(col)
           rect(150,180,440,270,blue); rect(150,270,240,470,blue); rect(150,470,440,560,blue); rect(350,560,440,760,blue); rect(150,760,440,850,blue)
-          # bold geometric B
           rect(520,180,610,850,purple); rect(610,180,790,270,purple); rect(610,470,790,560,purple); rect(610,760,790,850,purple); rect(760,250,850,490,purple); rect(760,540,850,780,purple)
-          with open('/tmp/sb.ppm','wb') as o:
-              o.write(f'P6\\n{w} {h}\\n255\\n'.encode())
-              for row in pix: o.write(bytes(row))
+          raw=b''.join(b'\\x00'+bytes(r) for r in rows)
+          def chunk(t,d): return struct.pack('>I',len(d))+t+d+struct.pack('>I',binascii.crc32(t+d)&0xffffffff)
+          png=b'\\x89PNG\\r\\n\\x1a\\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',W,H,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
+          open('/tmp/sb.png','wb').write(png)
           PY
-          sips -s format png /tmp/sb.ppm --out /tmp/sb.png >/dev/null
           for icon in ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png; do
             width=$(sips -g pixelWidth "$icon" | tail -1 | awk '{print $2}')
             height=$(sips -g pixelHeight "$icon" | tail -1 | awk '{print $2}')
