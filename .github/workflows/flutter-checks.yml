@@ -113,6 +113,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" ios/Runner/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" ios/Runner/Info.plist || /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsArbitraryLoads true" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Scan the QR code on your TV to securely link SB Player.'" ios/Runner/Info.plist || /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 'Scan the QR code on your TV to securely link SB Player.'" ios/Runner/Info.plist
           python3 - <<'PY'
           import struct,zlib,binascii,glob,json,os
           W=H=1024; bg=(4,5,9); blue=(24,160,255); purple=(122,77,255)
@@ -152,6 +153,12 @@ jobs:
           path: SB-Player-iOS-v0.6-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
+      - name: Update v0.6.2 iOS release asset
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          cp SB-Player-iOS-v0.6-unsigned.ipa SB-Player-iOS-v0.6.2-unsigned.ipa
+          gh release upload v0.6.2 SB-Player-iOS-v0.6.2-unsigned.ipa --clobber
 
   android-build:
     runs-on: ubuntu-latest
