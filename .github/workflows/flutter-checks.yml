@@ -2,7 +2,7 @@ name: Flutter checks
 
 on:
   push:
-    branches: [main, v0.5-branding-installer, v0.6-ios]
+    branches: [main, v0.5-branding-installer, v0.6-ios, v0.6-unified]
   pull_request:
 
 concurrency:
@@ -119,5 +119,34 @@ jobs:
         with:
           name: SB-Player-iOS-v0.6-unsigned-IPA
           path: SB-Player-iOS-v0.6-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+  android-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create Android platform
+        run: flutter create --project-name sb_player --platforms=android .
+      - run: flutter pub get
+      - name: Build Android APK
+        run: flutter build apk --release
+      - name: Build Android App Bundle
+        run: flutter build appbundle --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SB-Player-Android-v0.6-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SB-Player-Android-v0.6-AAB
+          path: build/app/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 14
