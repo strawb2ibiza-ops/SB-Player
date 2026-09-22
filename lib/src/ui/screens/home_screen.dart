@@ -14,6 +14,7 @@ import '../widgets/channel_tile.dart';
 import '../widgets/epg_timeline.dart';
 import '../widgets/library_tile.dart';
 import '../widgets/poster_card.dart';
+import '../widgets/resume_card.dart';
 import '../widgets/sb_logo.dart';
 import 'movie_details_screen.dart';
 import 'player_screen.dart';
@@ -413,15 +414,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ? _buildCategoryLanding(controller, ContentSection.series)
             : _buildSeries(controller);
       case ContentSection.continueWatching:
-        return _buildLibrary(
-          controller,
+        return _buildContinueWatching(
           controller.continueWatching.where((entry) {
             final query = _search.text.trim().toLowerCase();
             return query.isEmpty ||
                 entry.title.toLowerCase().contains(query) ||
                 (entry.subtitle?.toLowerCase().contains(query) ?? false);
           }).toList(growable: false),
-          empty: 'Nothing to continue yet.',
         );
       case ContentSection.favorites:
         return _buildLibrary(controller, controller.visibleLibrary(controller.favorites, _search.text), empty: 'No favorites yet.');
@@ -893,6 +892,39 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildContinueWatching(List<LibraryEntry> entries) {
+    if (entries.isEmpty) {
+      return const Center(child: Text('Nothing to continue yet.'));
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth > 1500
+            ? 4
+            : constraints.maxWidth > 1050
+                ? 3
+                : constraints.maxWidth > 680
+                    ? 2
+                    : 1;
+        return GridView.builder(
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.72,
+          ),
+          itemCount: entries.length,
+          itemBuilder: (context, index) {
+            final entry = entries[index];
+            return ResumeCard(
+              entry: entry,
+              onTap: () => _play(entry.toPlaybackItem()),
             );
           },
         );
@@ -1406,74 +1438,9 @@ class _HomeShelf extends StatelessWidget {
               final entry = entries[index];
               return SizedBox(
                 width: 290,
-                child: Card(
-                  child: InkWell(
-                    onTap: () => onTap(entry),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        if (entry.artworkUrl != null)
-                          Image.network(
-                            entry.artworkUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
-                                const BrandBackdrop(child: SizedBox.expand()),
-                          )
-                        else
-                          const BrandBackdrop(child: SizedBox.expand()),
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                SbBrand.black.withValues(alpha: .88),
-                              ],
-                              stops: const [.2, 1],
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: 14,
-                          right: 14,
-                          bottom: 14,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                entry.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              if (entry.subtitle?.isNotEmpty == true) ...[
-                                const SizedBox(height: 3),
-                                Text(
-                                  entry.subtitle!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                              if (entry.durationSeconds > 0) ...[
-                                const SizedBox(height: 8),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(99),
-                                  child: LinearProgressIndicator(
-                                    value: entry.progress.clamp(0, 1),
-                                    minHeight: 3,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                child: ResumeCard(
+                  entry: entry,
+                  onTap: () => onTap(entry),
                 ),
               );
             },
