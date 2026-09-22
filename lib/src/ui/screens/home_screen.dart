@@ -62,22 +62,10 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _onSearchChanged(String value) {
+  void _onSearchChanged(String _) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 120), () {
-      if (!mounted) return;
-      final query = value.trim();
-      final section = widget.controller.section;
-      setState(() {
-        if (query.isNotEmpty &&
-            (section == ContentSection.live ||
-                section == ContentSection.movies ||
-                section == ContentSection.series)) {
-          // Searching should search the actual content, not leave the user on
-          // the category landing page where the query has no visible effect.
-          _categoryLanding.remove(section);
-        }
-      });
+      if (mounted) setState(() {});
     });
   }
 
@@ -662,8 +650,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryLanding(AppController controller, ContentSection section) {
-    final categories = controller.activeCategories;
-    if (categories.isEmpty) return const Center(child: Text('No categories found.'));
+    final query = _search.text.trim().toLowerCase();
+    final categories = controller.activeCategories
+        .where((category) =>
+            query.isEmpty || category.name.toLowerCase().contains(query))
+        .toList(growable: false);
+    if (categories.isEmpty) {
+      return Center(
+        child: Text(query.isEmpty
+            ? 'No categories found.'
+            : 'No categories match "${_search.text.trim()}".'),
+      );
+    }
     return LayoutBuilder(builder: (context, constraints) {
       final columns = constraints.maxWidth > 1400 ? 4 : constraints.maxWidth > 900 ? 3 : constraints.maxWidth > 560 ? 2 : 1;
       return GridView.builder(
