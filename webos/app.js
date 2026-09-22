@@ -1,14 +1,16 @@
 (()=>{"use strict";
 const $=id=>document.getElementById(id);
 const PAIR_ENDPOINT="https://ehdvyarueeaetsvzdboo.supabase.co/functions/v1/device-pairing";
-let auth=null,view="live",items=[],categories=[],activeCat="all",lastFocus=null,pairing=null,pairTimer=null,renderTimer=null,focusCache=null;\nconst WEBOS_RENDER_LIMIT=240;
+let auth=null,view="live",items=[],categories=[],activeCat="all",lastFocus=null,pairing=null,pairTimer=null,renderTimer=null,focusCache=null,pairPollBusy=false,viewGeneration=0;
+const WEBOS_RENDER_LIMIT=120;
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function base(){return auth.server.replace(/\/$/,"")}
 function api(action,extra){extra=extra||"";return base()+"/player_api.php?username="+encodeURIComponent(auth.username)+"&password="+encodeURIComponent(auth.password)+(action?"&action="+action:"")+extra}
 async function get(url){const r=await fetch(url);if(!r.ok)throw Error("HTTP "+r.status);return r.json()}
 async function pairPost(body){const r=await fetch(PAIR_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let d={};try{d=await r.json()}catch(_){d={}}if(!r.ok)throw Error(d.error||("HTTP "+r.status));return d}
 function save(){localStorage.setItem("sb.webos.auth",JSON.stringify(auth))}
-function invalidateFocus(){focusCache=null}\nfunction focusables(){if(focusCache)return focusCache;focusCache=Array.prototype.slice.call(document.querySelectorAll("button:not([disabled]),input,.card,.cat")).filter(function(x){return x.offsetParent!==null});return focusCache}
+function invalidateFocus(){focusCache=null}
+function focusables(){if(focusCache)return focusCache;focusCache=Array.prototype.slice.call(document.querySelectorAll("button:not([disabled]),input,.card,.cat")).filter(function(x){return x.offsetParent!==null});return focusCache}
 function focusFirst(){setTimeout(function(){var f=focusables();if(f.length)f[0].focus()},30)}
 function moveFocus(key){
  const all=focusables(),cur=document.activeElement;if(!all.length)return;
@@ -66,7 +68,8 @@ async function decryptPairPayload(ciphertext,nonce,token){
  return JSON.parse(new TextDecoder("utf-8").decode(new Uint8Array(plain)));
 }
 async function pollPairing(){
- if(!pairing)return;
+ if(!pairing||pairPollBusy)return;
+ pairPollBusy=true;
  try{
    const d=await pairPost({action:"poll",pairingId:pairing.pairingId,token:pairing.token});
    if(d.status==="pending")return;
@@ -88,7 +91,7 @@ async function pollPairing(){
  }catch(e){
    if(pairTimer){clearInterval(pairTimer);pairTimer=null}
    $("pairStatus").className="pairStatus err";$("pairStatus").textContent="Pairing failed: "+e.message;
- }
+ }finally{pairPollBusy=false}
 }
 async function stopPairing(cancelRemote){
  if(pairTimer){clearInterval(pairTimer);pairTimer=null}
@@ -97,20 +100,21 @@ async function stopPairing(cancelRemote){
 }
 async function cancelPairing(){await stopPairing(true);$("pairing").classList.add("hidden");$("login").classList.remove("hidden");$("phoneSignIn").focus()}
 async function loadView(v){
+ const generation=++viewGeneration;
  view=v;activeCat="all";$("heading").textContent=v==="live"?"Live TV":v==="movies"?"Movies":"Series";
  document.querySelectorAll(".nav[data-view]").forEach(function(b){b.classList.toggle("active",b.dataset.view===v)});
  $("grid").innerHTML="<p>Loading…</p>";
  try{
   const ca=v==="live"?"get_live_categories":v==="movies"?"get_vod_categories":"get_series_categories";
   const ia=v==="live"?"get_live_streams":v==="movies"?"get_vod_streams":"get_series";
-  const loaded=await Promise.all([get(api(ca)),get(api(ia))]);categories=loaded[0];items=loaded[1];renderCats();render();focusFirst()
- }catch(e){$("grid").innerHTML="<p>Unable to load: "+esc(e.message)+"</p>"}
+  const loaded=await Promise.all([get(api(ca)),get(api(ia))]);if(generation!==viewGeneration)return;categories=loaded[0]||[];items=loaded[1]||[];for(let i=0;i<items.length;i++)items[i].__sbIndex=i;renderCats();render();focusFirst()
+ }catch(e){if(generation===viewGeneration)$("grid").innerHTML="<p>Unable to load: "+esc(e.message)+"</p>"}
 }
 function renderCats(){invalidateFocus();$("categories").innerHTML='<button class="cat focusable active" data-cat="all">All</button>'+categories.map(function(c){return '<button class="cat focusable" data-cat="'+esc(c.category_id)+'">'+esc(c.category_name)+"</button>"}).join("")}
 function render(){
  const q=$("search").value.trim().toLowerCase();
  const filtered=items.filter(function(x){const name=x.name!=null?x.name:(x.title!=null?x.title:"");return(activeCat==="all"||String(x.category_id)===activeCat)&&String(name).toLowerCase().indexOf(q)>=0});
- $("grid").innerHTML=filtered.slice(0,WEBOS_RENDER_LIMIT).map(function(x){const name=x.name!=null?x.name:(x.title!=null?x.title:"Untitled"),img=x.stream_icon!=null?x.stream_icon:(x.cover!=null?x.cover:"");return '<button class="card focusable" data-i="'+items.indexOf(x)+'">'+(img?'<img src="'+esc(img)+'" onerror="this.style.display=\'none\'">':"")+"<strong>"+esc(name)+"</strong><small>"+esc(view==="live"?"Live":view==="movies"?"Movie":"Series")+"</small></button>"}).join("")||"<p>No results.</p>";
+ $("grid").innerHTML=filtered.slice(0,WEBOS_RENDER_LIMIT).map(function(x){const name=x.name!=null?x.name:(x.title!=null?x.title:"Untitled"),img=x.stream_icon!=null?x.stream_icon:(x.cover!=null?x.cover:"");return '<button class="card focusable" data-i="'+x.__sbIndex+'">'+(img?'<img src="'+esc(img)+'" onerror="this.style.display=\'none\'">':"")+"<strong>"+esc(name)+"</strong><small>"+esc(view==="live"?"Live":view==="movies"?"Movie":"Series")+"</small></button>"}).join("")||"<p>No results.</p>";
 }
 function play(x){
  if(view==="series")return loadSeries(x);
