@@ -91,7 +91,7 @@ class _SbSymbol extends StatelessWidget {
             style: TextStyle(
               height: 0.9,
               fontWeight: FontWeight.w900,
-              letterSpacing: -4,
+              letterSpacing: 1.5,
             ),
             children: [
               TextSpan(text: 'S', style: TextStyle(color: SbBrand.electricBlue)),
