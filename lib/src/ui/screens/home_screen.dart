@@ -34,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _guideClock;
   Timer? _searchDebounce;
   bool _sidebarCollapsed = false;
+  final Set<ContentSection> _categoryLanding = <ContentSection>{};
 
   @override
   void initState() {
@@ -65,6 +66,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _changeSection(ContentSection section) async {
     _search.clear();
+    if (section == ContentSection.live || section == ContentSection.movies || section == ContentSection.series) {
+      _categoryLanding.add(section);
+    } else {
+      _categoryLanding.remove(section);
+    }
     await widget.controller.selectSection(section);
     if (section == ContentSection.live || section == ContentSection.guide) {
       unawaited(widget.controller.loadEpg());
@@ -357,13 +363,19 @@ class _HomeScreenState extends State<HomeScreen> {
       case ContentSection.home:
         return _buildHome(controller);
       case ContentSection.live:
-        return _buildLive(controller);
+        return _categoryLanding.contains(ContentSection.live)
+            ? _buildCategoryLanding(controller, ContentSection.live)
+            : _buildLive(controller);
       case ContentSection.guide:
         return _buildGuide(controller);
       case ContentSection.movies:
-        return _buildMovies(controller);
+        return _categoryLanding.contains(ContentSection.movies)
+            ? _buildCategoryLanding(controller, ContentSection.movies)
+            : _buildMovies(controller);
       case ContentSection.series:
-        return _buildSeries(controller);
+        return _categoryLanding.contains(ContentSection.series)
+            ? _buildCategoryLanding(controller, ContentSection.series)
+            : _buildSeries(controller);
       case ContentSection.continueWatching:
         return _buildLibrary(
           controller,
@@ -600,6 +612,45 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ],
     );
+  }
+
+  Widget _buildCategoryLanding(AppController controller, ContentSection section) {
+    final categories = controller.activeCategories;
+    if (categories.isEmpty) return const Center(child: Text('No categories found.'));
+    return LayoutBuilder(builder: (context, constraints) {
+      final columns = constraints.maxWidth > 1400 ? 4 : constraints.maxWidth > 900 ? 3 : constraints.maxWidth > 560 ? 2 : 1;
+      return GridView.builder(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: columns,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+          childAspectRatio: 1.65,
+        ),
+        itemCount: categories.length + 1,
+        itemBuilder: (context, index) {
+          final category = index == 0 ? null : categories[index - 1];
+          final id = category?.id ?? '__all__';
+          final name = category?.name ?? 'All';
+          final images = <String>[];
+          if (section == ContentSection.live) {
+            images.addAll(controller.channels.where((x) => id == '__all__' || x.categoryId == id).map((x) => x.logoUrl).whereType<String>().where((x) => x.isNotEmpty).take(4));
+          } else if (section == ContentSection.movies) {
+            images.addAll(controller.movies.where((x) => id == '__all__' || x.categoryId == id).map((x) => x.posterUrl).whereType<String>().where((x) => x.isNotEmpty).take(4));
+          } else {
+            images.addAll(controller.series.where((x) => id == '__all__' || x.categoryId == id).map((x) => x.coverUrl).whereType<String>().where((x) => x.isNotEmpty).take(4));
+          }
+          return _CategoryCard(
+            name: name,
+            imageUrls: images,
+            fallbackIcon: section == ContentSection.live ? Icons.live_tv_outlined : section == ContentSection.movies ? Icons.movie_outlined : Icons.tv_outlined,
+            onTap: () {
+              controller.selectCategory(id);
+              setState(() => _categoryLanding.remove(section));
+            },
+          );
+        },
+      );
+    });
   }
 
   Widget _buildLive(AppController controller) {
@@ -877,6 +928,40 @@ class _HomeScreenState extends State<HomeScreen> {
     if (offset == 1) return 'Tomorrow';
     final date = DateTime.now().add(Duration(days: offset));
     return _date(date);
+  }
+}
+
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({required this.name, required this.imageUrls, required this.fallbackIcon, required this.onTap});
+  final String name;
+  final List<String> imageUrls;
+  final IconData fallbackIcon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(fit: StackFit.expand, children: [
+          if (imageUrls.isEmpty)
+            BrandBackdrop(child: Center(child: Icon(fallbackIcon, size: 52, color: SbBrand.brightBlue)))
+          else
+            GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
+              itemCount: 4,
+              itemBuilder: (_, i) => i < imageUrls.length
+                  ? Image.network(imageUrls[i], fit: BoxFit.cover, errorBuilder: (_, _, _) => const ColoredBox(color: SbBrand.panelBlue))
+                  : const ColoredBox(color: SbBrand.panelBlue),
+            ),
+          DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, SbBrand.black.withValues(alpha: .94)], stops: const [.28, 1]))),
+          Positioned(left: 16, right: 16, bottom: 14, child: Row(children: [Expanded(child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900))), const Icon(Icons.chevron_right_rounded, color: SbBrand.brightBlue)])),
+        ]),
+      ),
+    );
   }
 }
 
