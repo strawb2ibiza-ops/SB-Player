@@ -47,7 +47,17 @@ class LibraryTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(entry.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                    Tooltip(
+                      message: entry.title,
+                      waitDuration: const Duration(milliseconds: 350),
+                      child: Text(
+                        entry.title,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
                     if (entry.subtitle != null) ...[
                       const SizedBox(height: 3),
                       Text(entry.subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis),
