@@ -8,6 +8,14 @@
 
 > Open the successful build above and download **SB-Player-Setup-v0.5.0** from the Artifacts section. The portable build is also available as **SB-Player-Windows-Open-v0.5**.
 
+## Android download
+
+**SB Player Android v0.6 (.apk)**
+
+[Download SB Player Android v0.6 APK](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35680675545)
+
+> Open the successful Android build above and download **SB-Player-Android-v0.6-APK** from the Artifacts section. The Play Store bundle is also available as **SB-Player-Android-v0.6-AAB**.
+
 Windows-first Flutter IPTV player with two distributions from one codebase:
 
 - **Open Edition** — users can sign in with an Xtream-compatible account or an M3U playlist URL.
