@@ -729,6 +729,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
           fit: StackFit.expand,
           children: [
             _buildVideo(useBuiltInControls: false, forceFill: true),
+            // Keep the entire video surface draggable in borderless mini mode.
+            // Controls rendered above this layer still receive their own clicks.
+            Positioned.fill(
+              child: DragToMoveArea(
+                child: const ColoredBox(color: Colors.transparent),
+              ),
+            ),
             IgnorePointer(
               ignoring: !_hoveringVideoOnly,
               child: AnimatedOpacity(
