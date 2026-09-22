@@ -80,49 +80,26 @@ class _SbSymbol extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Text(
-          'SB',
-          style: TextStyle(
-            fontSize: size,
-            height: 0.9,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -size * 0.08,
-            color: SbBrand.electricBlue,
-            shadows: [
-              Shadow(
-                color: SbBrand.electricBlue.withValues(alpha: 0.45),
-                blurRadius: size * 0.22,
-              ),
-              Shadow(
-                color: SbBrand.purple.withValues(alpha: 0.28),
-                blurRadius: size * 0.38,
-              ),
-              Shadow(
-                color: Colors.black.withValues(alpha: 0.9),
-                blurRadius: size * 0.05,
-                offset: Offset(0, size * 0.055),
-              ),
+    return SizedBox(
+      height: size,
+      child: FittedBox(
+        fit: BoxFit.contain,
+        child: RichText(
+          maxLines: 1,
+          softWrap: false,
+          text: const TextSpan(
+            style: TextStyle(
+              height: 0.9,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -4,
+            ),
+            children: [
+              TextSpan(text: 'S', style: TextStyle(color: SbBrand.electricBlue)),
+              TextSpan(text: 'B', style: TextStyle(color: SbBrand.purple)),
             ],
           ),
         ),
-        ShaderMask(
-          blendMode: BlendMode.srcIn,
-          shaderCallback: SbBrand.horizontalBrandGradient.createShader,
-          child: Text(
-            'SB',
-            style: TextStyle(
-              fontSize: size,
-              height: 0.9,
-              fontWeight: FontWeight.w900,
-              letterSpacing: -size * 0.08,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
