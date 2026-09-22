@@ -139,7 +139,7 @@ function render(){
 function play(x){
  if(view==="series")return loadSeries(x);
  const id=x.stream_id||x.num;if(!id)return;
- const ext=view==="live"?"m3u8":(x.container_extension||"mp4");
+ const ext=view==="live"?"ts":(x.container_extension||"mp4");
  const url=base()+"/"+(view==="live"?"live":"movie")+"/"+encodeURIComponent(auth.username)+"/"+encodeURIComponent(auth.password)+"/"+id+"."+ext;
  openVideo(url,x.name!=null?x.name:x.title);
 }
@@ -155,8 +155,10 @@ async function loadSeries(x){
 }
 function openVideo(url,title){
  lastFocus=document.activeElement;
- $("player").classList.remove("hidden","mini");$("playingTitle").textContent=title||"";$("video").src=url;
- const result=$("video").play();if(result&&result.catch)result.catch(function(){});
+ $("player").classList.remove("hidden","mini");$("playingTitle").textContent=title||"";
+ var video=$("video");video.onerror=function(){ $("playingTitle").textContent=(title||"")+" — Playback failed"; };
+ video.src=url;video.load();
+ var result=video.play();if(result&&result.catch)result.catch(function(){ $("playingTitle").textContent=(title||"")+" — Unable to start"; });
  $("nowPlaying").classList.remove("hidden");$("back").focus();
 }
 function minimizeVideo(){
@@ -174,7 +176,7 @@ function stopVideo(){
 function activate(el){if(!el)return;if(el.tagName==="INPUT"){el.focus();return}el.click()}
 document.addEventListener("click",function(e){
  const choice=e.target.closest("[data-tv-view]");if(choice){e.preventDefault();return loadView(choice.dataset.tvView)}
- const nav=e.target.closest("[data-view]");if(nav)return loadView(nav.dataset.view);
+ const nav=e.target.closest("[data-view]");if(nav){if(nav.id==="nowPlaying")return expandVideo();return loadView(nav.dataset.view)}
  const cat=e.target.closest("[data-cat]");if(cat){activeCat=cat.dataset.cat;document.querySelectorAll(".cat").forEach(function(x){x.classList.toggle("active",x===cat)});render();return}
  const card=e.target.closest("[data-i]");if(card){e.preventDefault();return play(items[parseInt(card.dataset.i,10)])}
 });
