@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   webos-build:
@@ -51,3 +51,8 @@ jobs:
           name: SB-Player-webOS-v0.6.2-IPK
           path: dist/SB-Player-webOS-v0.6.2.ipk
           if-no-files-found: error
+
+      - name: Add IPK to v0.6.2 release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: gh release upload v0.6.2 dist/SB-Player-webOS-v0.6.2.ipk --clobber
