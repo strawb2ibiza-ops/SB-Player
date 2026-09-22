@@ -172,6 +172,25 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  void enterUiCaptureMode() {
+    _resetCatalogs();
+    debugMode = true;
+    account = DebugCatalog.account;
+    activeProfileId = null;
+    liveCategories = DebugCatalog.liveCategories;
+    channels = DebugCatalog.channels;
+    movieCategories = DebugCatalog.movieCategories;
+    movies = DebugCatalog.movies;
+    seriesCategories = DebugCatalog.seriesCategories;
+    series = DebugCatalog.series;
+    epg = DebugCatalog.epg(DateTime.now());
+    _moviesLoaded = true;
+    _seriesLoaded = true;
+    _epgLoaded = true;
+    section = ContentSection.home;
+    notifyListeners();
+  }
+
   Future<bool> tryDebugLogin({
     required String serverUrl,
     required String username,
