@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../services/playback_preferences.dart';
 import '../../state/app_controller.dart';
 import '../widgets/account_manager_dialog.dart';
+import 'link_tv_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.controller});
@@ -44,6 +46,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const Divider(),
         const ListTile(title: Text('Account'), leading: Icon(Icons.person_outline)),
+        if (Platform.isAndroid || Platform.isIOS)
+          ListTile(
+            leading: const Icon(Icons.qr_code_scanner_rounded),
+            title: const Text('Link a TV'),
+            subtitle: const Text('Scan the QR code on SB Player for TV.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => LinkTvScreen(controller: widget.controller),
+              ),
+            ),
+          ),
         if (!widget.controller.config.isLocked)
           ListTile(
             title: const Text('Manage accounts'),
