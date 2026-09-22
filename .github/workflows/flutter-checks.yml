@@ -112,25 +112,29 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist || true
           /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist || true
           python3 - <<'PY'
-          import struct,zlib,binascii,glob
+          import struct,zlib,binascii,glob,json,os
           W=H=1024; bg=(4,5,9); blue=(24,160,255); purple=(122,77,255)
           rows=[bytearray(bg*W) for _ in range(H)]
           def rect(x0,y0,x1,y1,col):
+              block=bytes(col)
               for y in range(y0,y1):
                   row=rows[y]
-                  for x in range(x0,x1): row[x*3:x*3+3]=bytes(col)
+                  for x in range(x0,x1): row[x*3:x*3+3]=block
           rect(150,180,440,270,blue); rect(150,270,240,470,blue); rect(150,470,440,560,blue); rect(350,560,440,760,blue); rect(150,760,440,850,blue)
           rect(520,180,610,850,purple); rect(610,180,790,270,purple); rect(610,470,790,560,purple); rect(610,760,790,850,purple); rect(760,250,850,490,purple); rect(760,540,850,780,purple)
           raw=b''.join(b'\\x00'+bytes(r) for r in rows)
           def chunk(t,d): return struct.pack('>I',len(d))+t+d+struct.pack('>I',binascii.crc32(t+d)&0xffffffff)
           png=b'\\x89PNG\\r\\n\\x1a\\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',W,H,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
-          open('/tmp/sb.png','wb').write(png)
+          src='/tmp/sb.png'; open(src,'wb').write(png)
+          app='ios/Runner/Assets.xcassets/AppIcon.appiconset'
+          data=json.load(open(os.path.join(app,'Contents.json')))
+          scales={'1x':1,'2x':2,'3x':3}
+          for image in data['images']:
+              name=image.get('filename')
+              if not name: continue
+              points=float(image['size'].split('x')[0]); px=round(points*scales[image['scale']])
+              os.system(f"sips -z {px} {px} {src} --out '{os.path.join(app,name)}' >/dev/null")
           PY
-          for icon in ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png; do
-            width=$(sips -g pixelWidth "$icon" | tail -1 | awk '{print $2}')
-            height=$(sips -g pixelHeight "$icon" | tail -1 | awk '{print $2}')
-            sips -z "$height" "$width" /tmp/sb.png --out "$icon" >/dev/null
-          done
       - run: flutter pub get
       - name: Build unsigned iOS release
         run: flutter build ios --release --no-codesign
