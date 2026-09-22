@@ -62,7 +62,7 @@ class _LinkTvScreenState extends State<LinkTvScreen> {
 
   @override
   void dispose() {
-    unawaited(_scannerController.dispose());
+    _scannerController.dispose();
     _pairingService.dispose();
     super.dispose();
   }
