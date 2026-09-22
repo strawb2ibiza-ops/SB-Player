@@ -1,0 +1,53 @@
+name: Build webOS IPK
+
+on:
+  push:
+    branches: [v0.6-unified]
+    paths:
+      - 'webos/**'
+      - '.github/workflows/webos-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  webos-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install webOS CLI
+        run: npm install -g @webos-tools/cli
+      - name: Generate SB Player icon
+        run: |
+          python3 - <<'PY'
+          import struct,zlib
+          w=h=80
+          rows=[]
+          for y in range(h):
+              row=bytearray([0])
+              for x in range(w):
+                  t=(x+y)/(w+h-2)
+                  r=int(35+(145-35)*t); g=int(140+(71-140)*t); b=255
+                  row += bytes((r,g,b,255))
+              rows.append(bytes(row))
+          raw=b''.join(rows)
+          def chunk(t,d):
+              return struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff)
+          png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
+          open('webos/icon.png','wb').write(png)
+          PY
+      - name: Package webOS app
+        run: |
+          mkdir -p dist
+          ares-package -o dist webos
+          mv dist/*.ipk dist/SB-Player-webOS-v0.6.2.ipk
+      - name: Upload IPK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SB-Player-webOS-v0.6.2-IPK
+          path: dist/SB-Player-webOS-v0.6.2.ipk
+          if-no-files-found: error
