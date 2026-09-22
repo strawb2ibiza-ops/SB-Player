@@ -9,7 +9,20 @@
       <label>Server URL<input id="server" placeholder="http://provider.example:8080"></label>
       <label>Username<input id="username" autocomplete="username"></label>
       <label>Password<input id="password" type="password" autocomplete="current-password"></label>
-      <button id="signin" class="focusable">Sign in</button><div id="error"></div>
+      <button id="signin" class="focusable">Sign in</button>
+      <div class="or"><span>or</span></div>
+      <button id="phoneSignIn" class="focusable secondary">Sign in with phone</button>
+      <p class="phoneHint">Use SB Player on your phone to scan a QR code. No typing your IPTV password on the TV.</p>
+      <div id="error"></div>
+    </section>
+    <section id="pairing" class="panel hidden">
+      <h1>Sign in with your phone</h1>
+      <p>Open SB Player on your phone, go to <b>Settings → Link a TV</b>, then scan this code.</p>
+      <div id="qrWrap"><div id="qr"></div></div>
+      <div class="pairCodeLabel">TV CODE</div>
+      <div id="pairCode" class="pairCode">--------</div>
+      <p id="pairStatus" class="pairStatus">Creating secure pairing…</p>
+      <button id="cancelPair" class="focusable secondary">Cancel</button>
     </section>
     <section id="home" class="hidden">
       <aside><button data-view="live" class="nav focusable active">Live TV</button><button data-view="movies" class="nav focusable">Movies</button><button data-view="series" class="nav focusable">Series</button><button id="logout" class="nav focusable">Sign out</button></aside>
