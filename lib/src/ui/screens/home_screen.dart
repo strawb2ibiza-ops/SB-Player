@@ -19,6 +19,7 @@ import '../widgets/sb_logo.dart';
 import 'movie_details_screen.dart';
 import 'player_screen.dart';
 import 'series_details_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.controller});
@@ -277,29 +278,14 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: controller.loading ? null : controller.refresh,
             icon: const Icon(Icons.refresh),
           ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'accounts') {
-                unawaited(_showAccounts());
-              } else if (value == 'logout') {
-                unawaited(controller.logout());
-              }
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                enabled: false,
-                child: Text(controller.account?.expiresAt == null
-                    ? controller.account?.label ?? 'Account'
-                    : 'Expires ${_date(controller.account!.expiresAt!)}'),
+          IconButton(
+            tooltip: 'Settings',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SettingsScreen(controller: controller),
               ),
-              const PopupMenuDivider(),
-              if (!controller.config.isLocked)
-                const PopupMenuItem(
-                  value: 'accounts',
-                  child: Text('Manage accounts'),
-                ),
-              const PopupMenuItem(value: 'logout', child: Text('Log out')),
-            ],
+            ),
+            icon: const Icon(Icons.account_circle_outlined),
           ),
           const SizedBox(width: 8),
         ],
