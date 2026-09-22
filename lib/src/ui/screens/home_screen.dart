@@ -36,6 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _sidebarCollapsed = false;
   final Set<ContentSection> _categoryLanding = <ContentSection>{};
 
+  bool _showsCategoryLanding(ContentSection section) =>
+      (section == ContentSection.live || section == ContentSection.movies || section == ContentSection.series) &&
+      (_categoryLanding.contains(section) || widget.controller.activeCategoryId == '__all__');
+
   @override
   void initState() {
     super.initState();
@@ -363,17 +367,17 @@ class _HomeScreenState extends State<HomeScreen> {
       case ContentSection.home:
         return _buildHome(controller);
       case ContentSection.live:
-        return _categoryLanding.contains(ContentSection.live)
+        return _showsCategoryLanding(ContentSection.live)
             ? _buildCategoryLanding(controller, ContentSection.live)
             : _buildLive(controller);
       case ContentSection.guide:
         return _buildGuide(controller);
       case ContentSection.movies:
-        return _categoryLanding.contains(ContentSection.movies)
+        return _showsCategoryLanding(ContentSection.movies)
             ? _buildCategoryLanding(controller, ContentSection.movies)
             : _buildMovies(controller);
       case ContentSection.series:
-        return _categoryLanding.contains(ContentSection.series)
+        return _showsCategoryLanding(ContentSection.series)
             ? _buildCategoryLanding(controller, ContentSection.series)
             : _buildSeries(controller);
       case ContentSection.continueWatching:
