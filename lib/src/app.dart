@@ -10,9 +10,10 @@ import 'ui/screens/login_screen.dart';
 import 'ui/screens/splash_screen.dart';
 
 class SbPlayerApp extends StatefulWidget {
-  const SbPlayerApp({super.key, required this.controller});
+  const SbPlayerApp({super.key, required this.controller, this.tvMode = false});
 
   final AppController controller;
+  final bool tvMode;
 
   @override
   State<SbPlayerApp> createState() => _SbPlayerAppState();
@@ -57,7 +58,7 @@ class _SbPlayerAppState extends State<SbPlayerApp> {
             animation: widget.controller,
             builder: (context, _) {
               if (widget.controller.signedIn) {
-                return HomeScreen(controller: widget.controller);
+                return HomeScreen(controller: widget.controller, tvMode: widget.tvMode);
               }
               return LoginScreen(controller: widget.controller);
             },
