@@ -38,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _showsCategoryLanding(ContentSection section) =>
       (section == ContentSection.live || section == ContentSection.movies || section == ContentSection.series) &&
-      (_categoryLanding.contains(section) || widget.controller.activeCategoryId == '__all__');
+      _categoryLanding.contains(section);
 
   @override
   void initState() {
@@ -307,52 +307,87 @@ class _HomeScreenState extends State<HomeScreen> {
       body: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
-          return Row(
-            children: [
+          final mobile = MediaQuery.sizeOf(context).width < 700;
+          final content = Expanded(
+            child: Padding(
+              padding: EdgeInsets.all(mobile ? 12 : 18),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _search,
+                          decoration: InputDecoration(
+                            hintText: controller.section == ContentSection.home
+                                ? 'Search everything'
+                                : _searchHint(controller.section),
+                            prefixIcon: const Icon(Icons.search),
+                          ),
+                          onChanged: _onSearchChanged,
+                        ),
+                      ),
+                      if (controller.section == ContentSection.live) ...[
+                        const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          tooltip: 'TV Guide',
+                          onPressed: () => unawaited(_changeSection(ContentSection.guide)),
+                          icon: const Icon(Icons.calendar_view_week_outlined),
+                        ),
+                      ],
+                      if (!mobile) ...[
+                        const SizedBox(width: 12),
+                        _SectionTitle(section: controller.section),
+                      ],
+                    ],
+                  ),
+                  if (controller.error != null) ...[
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(controller.error!, style: const TextStyle(color: Colors.redAccent)),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  Expanded(child: _buildContent(controller)),
+                ],
+              ),
+            ),
+          );
+          if (!mobile) {
+            return Row(children: [
               _Sidebar(
                 controller: controller,
                 collapsed: _sidebarCollapsed,
-                onToggle: () => setState(
-                  () => _sidebarCollapsed = !_sidebarCollapsed,
-                ),
+                onToggle: () => setState(() => _sidebarCollapsed = !_sidebarCollapsed),
                 onSection: (value) => unawaited(_changeSection(value)),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _search,
-                              decoration: InputDecoration(
-                                hintText: _searchHint(controller.section),
-                                prefixIcon: const Icon(Icons.search),
-                              ),
-                              onChanged: _onSearchChanged,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          _SectionTitle(section: controller.section),
-                        ],
-                      ),
-                      if (controller.error != null) ...[
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(controller.error!, style: const TextStyle(color: Colors.redAccent)),
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      Expanded(child: _buildContent(controller)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
+              content,
+            ]);
+          }
+          return Column(children: [
+            content,
+            NavigationBar(
+              selectedIndex: switch (controller.section) {
+                ContentSection.live || ContentSection.guide => 1,
+                ContentSection.movies => 2,
+                ContentSection.series => 3,
+                _ => 0,
+              },
+              onDestinationSelected: (index) => unawaited(_changeSection([
+                ContentSection.home,
+                ContentSection.live,
+                ContentSection.movies,
+                ContentSection.series,
+              ][index])),
+              destinations: const [
+                NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
+                NavigationDestination(icon: Icon(Icons.live_tv_outlined), label: 'Live'),
+                NavigationDestination(icon: Icon(Icons.movie_outlined), label: 'Movies'),
+                NavigationDestination(icon: Icon(Icons.tv_outlined), label: 'Series'),
+              ],
+            ),
+          ]);
         },
       ),
     );
