@@ -182,7 +182,7 @@ jobs:
           sed -i 's/: FlutterActivity()/: FlutterFragmentActivity()/' "$main"
       - run: flutter pub get
       - name: Build Android APK
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=SB_ANDROID_TV=true
       - name: Build Android App Bundle
         run: flutter build appbundle --release
       - uses: actions/upload-artifact@v4
