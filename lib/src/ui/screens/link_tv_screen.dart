@@ -234,7 +234,7 @@ class _LinkTvScreenState extends State<LinkTvScreen> {
                       const SizedBox(height: 28),
                       if (profiles.length > 1) ...[
                         DropdownButtonFormField<String>(
-                          value: _selectedProfileId,
+                          initialValue: _selectedProfileId,
                           decoration: const InputDecoration(
                             labelText: 'Account to send',
                             prefixIcon: Icon(Icons.person_outline),
