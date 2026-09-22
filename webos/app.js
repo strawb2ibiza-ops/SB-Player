@@ -173,6 +173,7 @@ function stopVideo(){
 }
 function activate(el){if(!el)return;if(el.tagName==="INPUT"){el.focus();return}el.click()}
 document.addEventListener("click",function(e){
+ const choice=e.target.closest("[data-tv-view]");if(choice){e.preventDefault();return loadView(choice.dataset.tvView)}
  const nav=e.target.closest("[data-view]");if(nav)return loadView(nav.dataset.view);
  const cat=e.target.closest("[data-cat]");if(cat){activeCat=cat.dataset.cat;document.querySelectorAll(".cat").forEach(function(x){x.classList.toggle("active",x===cat)});render();return}
  const card=e.target.closest("[data-i]");if(card){e.preventDefault();return play(items[parseInt(card.dataset.i,10)])}
@@ -187,7 +188,6 @@ document.addEventListener("keydown",function(e){
    if(!$("home").classList.contains("hidden")){e.preventDefault();showHome();return}
  }
 });
-document.addEventListener("click",function(e){const choice=e.target.closest("[data-tv-view]");if(choice){e.preventDefault();loadView(choice.dataset.tvView)}});
 $("signin").addEventListener("click",signin);
 $("phoneSignIn").addEventListener("click",startPairing);
 $("cancelPair").addEventListener("click",cancelPairing);
