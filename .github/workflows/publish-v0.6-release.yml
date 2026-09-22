@@ -17,15 +17,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download successful v0.6 artifacts
+      - name: Download corrected successful v0.6 artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p release/windows release/android-apk release/android-aab release/ios
-          gh run download 35697234228 -n SB-Player-Setup-v0.5.0 -D release/windows
-          gh run download 35697234228 -n SB-Player-Android-v0.6-APK -D release/android-apk
-          gh run download 35697234228 -n SB-Player-Android-v0.6-AAB -D release/android-aab
-          gh run download 35697234228 -n SB-Player-iOS-v0.6-unsigned-IPA -D release/ios
+          gh run download 35699439104 -n SB-Player-Setup-v0.5.0 -D release/windows
+          gh run download 35699439104 -n SB-Player-Android-v0.6-APK -D release/android-apk
+          gh run download 35699439104 -n SB-Player-Android-v0.6-AAB -D release/android-aab
+          gh run download 35699439104 -n SB-Player-iOS-v0.6-unsigned-IPA -D release/ios
 
       - name: Normalize release filenames
         run: |
@@ -34,8 +34,16 @@ jobs:
           mv release/android-aab/app-release.aab release/SB-Player-Android-v0.6.aab
           mv release/ios/SB-Player-iOS-v0.6-unsigned.ipa release/SB-Player-iOS-v0.6-unsigned.ipa
 
-      - name: Create GitHub Release
+      - name: Replace v0.6.0 with corrected build
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create v0.6.0             release/SB-Player-Setup-v0.6.0.exe             release/SB-Player-Android-v0.6.apk             release/SB-Player-Android-v0.6.aab             release/SB-Player-iOS-v0.6-unsigned.ipa             --target d381663ecf86975ef3d0e813f77d450c4882b71b             --title "SB Player v0.6.0"             --notes "SB Player v0.6 unified release for Windows, Android and iOS. The iOS IPA is unsigned and must be signed before installation."
+          gh release delete v0.6.0 --cleanup-tag -y || true
+          gh release create v0.6.0 \
+            release/SB-Player-Setup-v0.6.0.exe \
+            release/SB-Player-Android-v0.6.apk \
+            release/SB-Player-Android-v0.6.aab \
+            release/SB-Player-iOS-v0.6-unsigned.ipa \
+            --target ba7ca94824f235270bed11ac20083ad698600194 \
+            --title "SB Player v0.6.0" \
+            --notes "Corrected SB Player v0.6 unified release for Windows, Android and iOS, including the mobile navigation/settings work, corrected app icon, and the latest PiP fixes. The iOS IPA is unsigned and must be signed before installation."
