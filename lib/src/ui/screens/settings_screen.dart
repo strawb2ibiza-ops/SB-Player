@@ -62,7 +62,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           leading: const Icon(Icons.logout),
           onTap: () async {
             await widget.controller.logout();
-            if (mounted) Navigator.of(context).pop();
+            if (!context.mounted) return;
+            Navigator.of(context).pop();
           },
         ),
       ],
