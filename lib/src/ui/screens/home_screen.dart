@@ -250,13 +250,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _showAccounts() {
-    return showDialog<void>(
-      context: context,
-      builder: (context) => AccountManagerDialog(controller: widget.controller),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
