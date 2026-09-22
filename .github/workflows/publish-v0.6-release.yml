@@ -6,6 +6,7 @@ on:
       - v0.6-unified
     paths:
       - .github/workflows/publish-v0.6-release.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,32 +18,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download corrected successful v0.6 artifacts
+      - name: Download latest verified v0.6 artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p release/windows release/android-apk release/android-aab release/ios
-          gh run download 35699439104 -n SB-Player-Setup-v0.5.0 -D release/windows
-          gh run download 35699439104 -n SB-Player-Android-v0.6-APK -D release/android-apk
-          gh run download 35699439104 -n SB-Player-Android-v0.6-AAB -D release/android-aab
-          gh run download 35699439104 -n SB-Player-iOS-v0.6-unsigned-IPA -D release/ios
+          gh run download 35760302631 -n SB-Player-Setup-v0.5.0 -D release/windows
+          gh run download 35760302631 -n SB-Player-Android-v0.6-APK -D release/android-apk
+          gh run download 35760302631 -n SB-Player-Android-v0.6-AAB -D release/android-aab
+          gh run download 35760302631 -n SB-Player-iOS-v0.6-unsigned-IPA -D release/ios
 
       - name: Normalize release filenames
         run: |
-          mv release/windows/SB-Player-Setup-v0.5.0.exe release/SB-Player-Setup-v0.6.1.exe
-          mv release/android-apk/app-release.apk release/SB-Player-Android-v0.6.1.apk
-          mv release/android-aab/app-release.aab release/SB-Player-Android-v0.6.1.aab
-          mv release/ios/SB-Player-iOS-v0.6-unsigned.ipa release/SB-Player-iOS-v0.6.1-unsigned.ipa
+          mv release/windows/SB-Player-Setup-v0.5.0.exe release/SB-Player-Setup-v0.6.2.exe
+          mv release/android-apk/app-release.apk release/SB-Player-Android-TV-v0.6.2.apk
+          mv release/android-aab/app-release.aab release/SB-Player-Android-v0.6.2.aab
+          mv release/ios/SB-Player-iOS-v0.6-unsigned.ipa release/SB-Player-iOS-v0.6.2-unsigned.ipa
 
-      - name: Publish corrected v0.6.1 build
+      - name: Publish SB Player v0.6.2
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create v0.6.1 \
-            release/SB-Player-Setup-v0.6.1.exe \
-            release/SB-Player-Android-v0.6.1.apk \
-            release/SB-Player-Android-v0.6.1.aab \
-            release/SB-Player-iOS-v0.6.1-unsigned.ipa \
-            --target ba7ca94824f235270bed11ac20083ad698600194 \
-            --title "SB Player v0.6.1" \
-            --notes "Corrected SB Player v0.6 unified release for Windows, Android and iOS, including mobile navigation/settings, corrected app icon, and the latest PiP fixes. The iOS IPA is unsigned and must be signed before installation."
+          gh release create v0.6.2 \
+            release/SB-Player-Setup-v0.6.2.exe \
+            release/SB-Player-Android-TV-v0.6.2.apk \
+            release/SB-Player-Android-v0.6.2.aab \
+            release/SB-Player-iOS-v0.6.2-unsigned.ipa \
+            --target b2aa573ca2c665d9643ec60e01a512b19ea4a4d7 \
+            --title "SB Player v0.6.2" \
+            --notes "Latest verified SB Player unified build for Windows, Android/Android TV and iOS. Includes playback recovery, faster category switching, Windows PiP improvements, Continue Watching hover previews, long-title handling and Android TV launcher support. The iOS IPA is unsigned and must be signed before installation."
