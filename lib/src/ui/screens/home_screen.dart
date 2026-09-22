@@ -335,6 +335,25 @@ class _HomeScreenState extends State<HomeScreen> {
                           icon: const Icon(Icons.calendar_view_week_outlined),
                         ),
                       ],
+                      if (controller.section == ContentSection.guide) ...[
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: () => unawaited(_changeSection(ContentSection.live)),
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          label: const Text('Live TV'),
+                        ),
+                      ],
+                      if ((controller.section == ContentSection.live ||
+                              controller.section == ContentSection.movies ||
+                              controller.section == ContentSection.series) &&
+                          !_showsCategoryLanding(controller.section)) ...[
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: () => setState(() => _categoryLanding.add(controller.section)),
+                          icon: const Icon(Icons.arrow_back_rounded),
+                          label: const Text('Categories'),
+                        ),
+                      ],
                       if (!mobile) ...[
                         const SizedBox(width: 12),
                         _SectionTitle(section: controller.section),
@@ -1091,13 +1110,6 @@ class _Sidebar extends StatelessWidget {
                   collapsed: collapsed,
                   selected: controller.section == ContentSection.live,
                   onTap: () => onSection(ContentSection.live),
-                ),
-                _NavButton(
-                  icon: Icons.calendar_view_week_outlined,
-                  label: 'TV Guide',
-                  collapsed: collapsed,
-                  selected: controller.section == ContentSection.guide,
-                  onTap: () => onSection(ContentSection.guide),
                 ),
                 if (controller.supportsOnDemand) ...[
                   _NavButton(
