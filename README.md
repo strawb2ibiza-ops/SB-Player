@@ -2,16 +2,16 @@
 
 ## Downloads
 
-The links below open the **latest verified build's download page** directly. Choose the artifact for your platform from the Artifacts section.
+Download the latest verified SB Player v0.6.2 builds directly:
 
-- **Windows installer (.exe):** [Download SB Player for Windows](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35760302631#artifacts)
-- **Android / Android TV (.apk):** [Download SB Player APK](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35760302631#artifacts)
-- **Android App Bundle (.aab):** [Download SB Player AAB](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35760302631#artifacts)
-- **iOS unsigned IPA:** [Download SB Player iOS IPA](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35760302631#artifacts)
+- **Windows installer (.exe):** [Download SB Player for Windows](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.2/SB-Player-Setup-v0.6.2.exe)
+- **Android / Android TV (.apk):** [Download SB Player APK](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.2/SB-Player-Android-TV-v0.6.2.apk)
+- **Android App Bundle (.aab):** [Download SB Player AAB](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.2/SB-Player-Android-v0.6.2.aab)
+- **iOS unsigned IPA:** [Download SB Player iOS IPA](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.2/SB-Player-iOS-v0.6.2-unsigned.ipa)
 
-Latest verified build: **v0.6.2 / b2aa573c**. The Android APK includes Android TV launcher support. The iOS IPA is unsigned and must be signed before installation.
+[View the SB Player v0.6.2 release](https://github.com/strawb2ibiza-ops/SB-Player/releases/tag/v0.6.2)
 
-> GitHub's current repository permissions are blocking creation of a GitHub Release, so these links point straight to the verified build's Artifacts download page rather than an older release.
+Latest verified app build: **b2aa573c**. The Android APK includes Android TV launcher support. The iOS IPA is unsigned and must be signed before installation.
 
 Windows-first Flutter IPTV player with two distributions from one codebase:
 
