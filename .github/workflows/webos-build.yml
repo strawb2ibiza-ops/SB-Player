@@ -56,3 +56,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: gh release upload v0.6.3 dist/SB-Player-webOS-v0.6.3.ipk --clobber
+# build-trigger: b61b425
