@@ -12,6 +12,8 @@ permissions:
   contents: write
   actions: read
 
+# Permission refresh: start a new workflow run after repository token settings changed.
+
 jobs:
   publish:
     runs-on: ubuntu-latest
