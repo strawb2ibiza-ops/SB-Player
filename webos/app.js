@@ -28,7 +28,7 @@ async function signin(){
  if(!server||!username||!password)return fail("Enter your server, username and password.");
  auth={server:/^https?:\/\//i.test(server)?server:"http://"+server,username:username,password:password};
  $("signin").disabled=true;$("status").textContent="Connecting…";fail("");
- try{const data=await get(api(""));if(!data.user_info||String(data.user_info.auth)!=="1")throw Error("Login rejected");save();showHome();await loadView("live")}
+ try{const data=await get(api(""));if(!data.user_info||String(data.user_info.auth)!=="1")throw Error("Login rejected");save();showHome()}
  catch(e){fail("Could not sign in: "+e.message);auth=null}
  $("signin").disabled=false;$("status").textContent="";
 }
@@ -84,7 +84,7 @@ async function pollPairing(){
      save();
      await pairPost({action:"consume",pairingId:pairing.pairingId,token:pairing.token});
      $("pairStatus").className="pairStatus ok";$("pairStatus").textContent="Linked successfully";
-     pairing=null;showHome();await loadView("live");
+     pairing=null;showHome();
      return;
    }
    if(d.status==="cancelled"||d.status==="consumed")throw Error("Pairing is no longer available");
@@ -164,16 +164,16 @@ document.addEventListener("keydown",function(e){
  if(k===461||e.key==="Backspace"||e.key==="Escape"){
    if(!$("pairing").classList.contains("hidden")){e.preventDefault();cancelPairing();return}
    if(!$("player").classList.contains("hidden")&&!$("player").classList.contains("mini")){e.preventDefault();minimizeVideo();return}
-   if(view!=="live"){e.preventDefault();loadView("live")}
+   if(!$("home").classList.contains("hidden")){e.preventDefault();showHome()}
  }
 });
-$("signin").addEventListener("click",signin);
+document.addEventListener("click",function(e){const choice=e.target.closest("[data-tv-view]");if(choice){e.preventDefault();loadView(choice.dataset.tvView)}});\n$("signin").addEventListener("click",signin);
 $("phoneSignIn").addEventListener("click",startPairing);
 $("cancelPair").addEventListener("click",cancelPairing);
 $("login").addEventListener("submit",function(e){e.preventDefault();signin()});
 $("search").oninput=function(){if(renderTimer)clearTimeout(renderTimer);renderTimer=setTimeout(function(){renderTimer=null;render()},120)};
 $("back").onclick=minimizeVideo;
 $("nowPlaying").onclick=expandVideo;
-$("logout").onclick=function(){stopVideo();localStorage.removeItem("sb.webos.auth");auth=null;showLogin()};
-try{const s=JSON.parse(localStorage.getItem("sb.webos.auth")||"null");if(s){auth=s;showHome();loadView("live")}else $("server").focus()}catch(_){$("server").focus()}
+function logout(){stopVideo();localStorage.removeItem("sb.webos.auth");auth=null;showLogin()}\n$("logout").onclick=logout;$("tvLogout").onclick=logout;
+try{const s=JSON.parse(localStorage.getItem("sb.webos.auth")||"null");if(s){auth=s;showHome()}else $("server").focus()}catch(_){$("server").focus()}
 })();
