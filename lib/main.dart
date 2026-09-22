@@ -33,5 +33,9 @@ Future<void> main() async {
     accountStore: const SecureAccountStore(),
   );
 
+  if (Platform.environment['SB_PLAYER_UI_CAPTURE'] == '1') {
+    controller.enterUiCaptureMode();
+  }
+
   runApp(SbPlayerApp(controller: controller));
 }
