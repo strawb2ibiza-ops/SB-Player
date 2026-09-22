@@ -1,20 +1,17 @@
-# SB Player v0.5
+# SB Player v0.6.2
 
-## Windows download
+## Downloads
 
-**SB Player v0.5 Windows installer (.exe)**
+The links below open the **latest verified build's download page** directly. Choose the artifact for your platform from the Artifacts section.
 
-[Download SB Player v0.5 for Windows](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35678757451)
+- **Windows installer (.exe):** [Download SB Player for Windows](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35760302631#artifacts)
+- **Android / Android TV (.apk):** [Download SB Player APK](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35760302631#artifacts)
+- **Android App Bundle (.aab):** [Download SB Player AAB](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35760302631#artifacts)
+- **iOS unsigned IPA:** [Download SB Player iOS IPA](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35760302631#artifacts)
 
-> Open the successful build above and download **SB-Player-Setup-v0.5.0** from the Artifacts section. The portable build is also available as **SB-Player-Windows-Open-v0.5**.
+Latest verified build: **v0.6.2 / b2aa573c**. The Android APK includes Android TV launcher support. The iOS IPA is unsigned and must be signed before installation.
 
-## Android download
-
-**SB Player Android v0.6 (.apk)**
-
-[Download SB Player Android v0.6 APK](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35680675545)
-
-> Open the successful Android build above and download **SB-Player-Android-v0.6-APK** from the Artifacts section. The Play Store bundle is also available as **SB-Player-Android-v0.6-AAB**.
+> GitHub's current repository permissions are blocking creation of a GitHub Release, so these links point straight to the verified build's Artifacts download page rather than an older release.
 
 Windows-first Flutter IPTV player with two distributions from one codebase:
 
