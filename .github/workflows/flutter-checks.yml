@@ -39,6 +39,31 @@ jobs:
         run: ./scripts/generate_windows_brand_icon.ps1
       - run: flutter pub get
       - run: flutter build windows --release
+      - name: Capture real Windows UI screenshot
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path screenshots | Out-Null
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          $env:SB_PLAYER_UI_CAPTURE = '1'
+          $exe = Resolve-Path "build/windows/x64/runner/Release/sb_player.exe"
+          $process = Start-Process $exe -PassThru
+          Start-Sleep -Seconds 10
+          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $bitmap.Save((Join-Path $PWD "screenshots/01-home-debug.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+          $graphics.Dispose()
+          $bitmap.Dispose()
+          Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+      - name: Upload real Windows UI screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: SB-Player-Windows-UI-Screenshots
+          path: screenshots/*.png
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload portable Windows release
         uses: actions/upload-artifact@v4
         with:
