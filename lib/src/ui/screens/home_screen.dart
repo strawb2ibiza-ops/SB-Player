@@ -62,10 +62,22 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _onSearchChanged(String _) {
+  void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 120), () {
-      if (mounted) setState(() {});
+      if (!mounted) return;
+      final query = value.trim();
+      final section = widget.controller.section;
+      setState(() {
+        if (query.isNotEmpty &&
+            (section == ContentSection.live ||
+                section == ContentSection.movies ||
+                section == ContentSection.series)) {
+          // Searching should search the actual content, not leave the user on
+          // the category landing page where the query has no visible effect.
+          _categoryLanding.remove(section);
+        }
+      });
     });
   }
 
