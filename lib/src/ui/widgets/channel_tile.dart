@@ -107,12 +107,17 @@ class _ChannelTileState extends State<ChannelTile> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                widget.channel.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
+                              child: Tooltip(
+                                message: widget.channel.name,
+                                waitDuration: const Duration(milliseconds: 350),
+                                child: Text(
+                                  widget.channel.name,
+                                  maxLines: 1,
+                                  softWrap: false,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
                             ),
