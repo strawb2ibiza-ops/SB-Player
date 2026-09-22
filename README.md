@@ -1,4 +1,12 @@
-# SB Player v0.4 development
+# SB Player v0.5
+
+## Windows download
+
+**SB Player v0.5 Windows installer (.exe)**
+
+[Download SB Player v0.5 for Windows](https://github.com/strawb2ibiza-ops/SB-Player/actions/runs/35678757451)
+
+> Open the successful build above and download **SB-Player-Setup-v0.5.0** from the Artifacts section. The portable build is also available as **SB-Player-Windows-Open-v0.5**.
 
 Windows-first Flutter IPTV player with two distributions from one codebase:
 
