@@ -270,7 +270,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void _scheduleReconnect() {
     if (_reconnectAttempts >= 5 || _reconnectTimer?.isActive == true) return;
     const delays = <int>[1, 2, 4, 8, 12];
-    final delaySeconds = delays[_reconnectAttempts.clamp(0, delays.length - 1)];
+    final delaySeconds = delays[_reconnectAttempts.clamp(0, delays.length - 1).toInt()];
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       if (!mounted) return;
       _reconnectAttempts += 1;
@@ -296,8 +296,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return;
     }
 
-    if (mounted) setState(() => _miniMode = false);
     await _restoreWindow();
+    if (mounted) setState(() => _miniMode = false);
   }
 
   Future<void> _toggleMiniLayout() async {
