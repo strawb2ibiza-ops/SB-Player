@@ -859,15 +859,31 @@ class AppController extends ChangeNotifier {
     channels = loadedChannels;
     liveCategoryId = '__all__';
     section = ContentSection.home;
+
+    // Warm the on-demand catalog in the background after sign-in/refresh.
+    // Movies and series are independent requests, so opening those sections
+    // later should normally be instant instead of waiting on the provider.
+    if (resolvedAccount.type == AccountType.xtream) {
+      unawaited(_preloadOnDemandCatalogs());
+    }
   }
 
-  Future<void> _loadMovies() async {
+  Future<void> _preloadOnDemandCatalogs() async {
+    await Future.wait<void>([
+      _loadMovies(showLoading: false),
+      _loadSeries(showLoading: false),
+    ]);
+  }
+
+  Future<void> _loadMovies({bool showLoading = true}) async {
     final current = account;
     if (current == null || current.type != AccountType.xtream) return;
     final generation = _catalogGeneration;
-    contentLoading = true;
-    error = null;
-    notifyListeners();
+    if (showLoading) {
+      contentLoading = true;
+      error = null;
+      notifyListeners();
+    }
     try {
       late List<IptvCategory> categories;
       late List<VodItem> loadedMovies;
@@ -890,19 +906,21 @@ class AppController extends ChangeNotifier {
       }
     } finally {
       if (generation == _catalogGeneration) {
-        contentLoading = false;
+        if (showLoading) contentLoading = false;
         notifyListeners();
       }
     }
   }
 
-  Future<void> _loadSeries() async {
+  Future<void> _loadSeries({bool showLoading = true}) async {
     final current = account;
     if (current == null || current.type != AccountType.xtream) return;
     final generation = _catalogGeneration;
-    contentLoading = true;
-    error = null;
-    notifyListeners();
+    if (showLoading) {
+      contentLoading = true;
+      error = null;
+      notifyListeners();
+    }
     try {
       late List<IptvCategory> categories;
       late List<SeriesItem> loadedSeries;
@@ -925,7 +943,7 @@ class AppController extends ChangeNotifier {
       }
     } finally {
       if (generation == _catalogGeneration) {
-        contentLoading = false;
+        if (showLoading) contentLoading = false;
         notifyListeners();
       }
     }
