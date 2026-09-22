@@ -2,7 +2,7 @@ name: Flutter checks
 
 on:
   push:
-    branches: [main, v0.5-branding-installer]
+    branches: [main, v0.5-branding-installer, v0.6-ios]
   pull_request:
 
 concurrency:
@@ -91,5 +91,33 @@ jobs:
         with:
           name: SB-Player-Setup-v0.5.0
           path: dist/SB-Player-Setup-v0.5.0.exe
+          if-no-files-found: error
+          retention-days: 14
+
+
+  ios-build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create iOS platform
+        run: flutter create --project-name sb_player --platforms=ios .
+      - run: flutter pub get
+      - name: Build unsigned iOS release
+        run: flutter build ios --release --no-codesign
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry SB-Player-iOS-v0.6-unsigned.ipa Payload
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: SB-Player-iOS-v0.6-unsigned-IPA
+          path: SB-Player-iOS-v0.6-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
