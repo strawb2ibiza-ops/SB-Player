@@ -547,6 +547,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _HomeShelf(
             title: 'Pick Up Where You Left Off',
             entries: continueItems.take(10).toList(growable: false),
+            controller: controller,
             onTap: (entry) => _play(entry.toPlaybackItem()),
           ),
         ],
@@ -642,6 +643,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _HomeShelf(
             title: 'Recently Watched',
             entries: recentItems.take(8).toList(growable: false),
+            controller: controller,
             onTap: (entry) => _play(entry.toPlaybackItem()),
           ),
         ],
@@ -676,21 +678,14 @@ class _HomeScreenState extends State<HomeScreen> {
           final category = index == 0 ? null : categories[index - 1];
           final id = category?.id ?? '__all__';
           final name = category?.name ?? 'All';
-          final images = <String>[];
-          if (section == ContentSection.live) {
-            images.addAll(controller.channels.where((x) => id == '__all__' || x.categoryId == id).map((x) => x.logoUrl).whereType<String>().where((x) => x.isNotEmpty).take(4));
-          } else if (section == ContentSection.movies) {
-            images.addAll(controller.movies.where((x) => id == '__all__' || x.categoryId == id).map((x) => x.posterUrl).whereType<String>().where((x) => x.isNotEmpty).take(4));
-          } else {
-            images.addAll(controller.series.where((x) => id == '__all__' || x.categoryId == id).map((x) => x.coverUrl).whereType<String>().where((x) => x.isNotEmpty).take(4));
-          }
+          final images = controller.categoryPreviewImages(section, id);
           return _CategoryCard(
             name: name,
             imageUrls: images,
             fallbackIcon: section == ContentSection.live ? Icons.live_tv_outlined : section == ContentSection.movies ? Icons.movie_outlined : Icons.tv_outlined,
             onTap: () {
+              _categoryLanding.remove(section);
               controller.selectCategory(id);
-              setState(() => _categoryLanding.remove(section));
             },
           );
         },
@@ -932,9 +927,12 @@ class _HomeScreenState extends State<HomeScreen> {
           itemCount: entries.length,
           itemBuilder: (context, index) {
             final entry = entries[index];
+            final item = entry.toPlaybackItem();
             return ResumeCard(
               entry: entry,
-              onTap: () => _play(entry.toPlaybackItem()),
+              favorite: widget.controller.isFavorite(item),
+              onFavorite: () => widget.controller.toggleFavorite(item),
+              onTap: () => _play(item),
             );
           },
         );
@@ -1424,11 +1422,13 @@ class _HomeShelf extends StatelessWidget {
   const _HomeShelf({
     required this.title,
     required this.entries,
+    required this.controller,
     required this.onTap,
   });
 
   final String title;
   final List<LibraryEntry> entries;
+  final AppController controller;
   final ValueChanged<LibraryEntry> onTap;
 
   @override
@@ -1450,6 +1450,9 @@ class _HomeShelf extends StatelessWidget {
                 width: 290,
                 child: ResumeCard(
                   entry: entry,
+                  favorite: controller.isFavorite(entry.toPlaybackItem()),
+                  onFavorite: () =>
+                      controller.toggleFavorite(entry.toPlaybackItem()),
                   onTap: () => onTap(entry),
                 ),
               );
