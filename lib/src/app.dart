@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
+import 'models/content_section.dart';
 import 'state/app_controller.dart';
 import 'ui/app_theme.dart';
 import 'ui/screens/home_screen.dart';
@@ -29,6 +32,12 @@ class _SbPlayerAppState extends State<SbPlayerApp> {
       widget.controller.restoreSession(),
       Future<void>.delayed(const Duration(milliseconds: 900)),
     ]);
+    if (Platform.environment['SB_PLAYER_UI_CAPTURE'] == '1') {
+      widget.controller.enterUiCaptureMode();
+      final section = Platform.environment['SB_PLAYER_CAPTURE_SECTION'];
+      final match = ContentSection.values.where((value) => value.name == section);
+      if (match.isNotEmpty) await widget.controller.selectSection(match.first);
+    }
   }
 
   @override
