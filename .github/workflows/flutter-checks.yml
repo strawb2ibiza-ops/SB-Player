@@ -164,10 +164,12 @@ jobs:
           cache: true
       - name: Create Android platform
         run: flutter create --project-name sb_player --platforms=android .
-      - name: Configure Android PiP
+      - name: Configure Android PiP and TV support
         run: |
           manifest=android/app/src/main/AndroidManifest.xml
           sed -i 's/android:name=".MainActivity"/android:name=".MainActivity" android:supportsPictureInPicture="true"/' "$manifest"
+          sed -i '/<application/i\    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />\n    <uses-feature android:name="android.software.leanback" android:required="false" />' "$manifest"
+          sed -i '/android.intent.category.LAUNCHER/a\                <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>' "$manifest"
           main=$(find android/app/src/main/kotlin -name MainActivity.kt | head -1)
           sed -i 's/import io.flutter.embedding.android.FlutterActivity/import io.flutter.embedding.android.FlutterFragmentActivity/' "$main"
           sed -i 's/: FlutterActivity()/: FlutterFragmentActivity()/' "$main"
