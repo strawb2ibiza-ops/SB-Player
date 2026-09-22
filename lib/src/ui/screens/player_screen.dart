@@ -80,6 +80,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (value.trim().isEmpty) return;
       _handlePlaybackFailure();
     }));
+    _subscriptions.add(_player.stream.completed.listen((value) {
+      if (value && _item.isLive) _handlePlaybackFailure();
+    }));
     _subscriptions.add(_player.stream.tracks.listen((value) {
       if (mounted) setState(() => _tracks = value);
     }));
@@ -261,12 +264,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ? 'The live stream was interrupted.'
           : 'Playback stopped unexpectedly.';
     });
-    if (_item.isLive) _scheduleReconnect();
+    _scheduleReconnect();
   }
 
   void _scheduleReconnect() {
-    if (_reconnectAttempts >= 3 || _reconnectTimer?.isActive == true) return;
-    final delaySeconds = 2 << _reconnectAttempts;
+    if (_reconnectAttempts >= 5 || _reconnectTimer?.isActive == true) return;
+    const delays = <int>[1, 2, 4, 8, 12];
+    final delaySeconds = delays[_reconnectAttempts.clamp(0, delays.length - 1)];
     _reconnectTimer = Timer(Duration(seconds: delaySeconds), () {
       if (!mounted) return;
       _reconnectAttempts += 1;
@@ -281,16 +285,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (!_miniMode) {
       _previousWindowSize = await windowManager.getSize();
       _previousWindowPosition = await windowManager.getPosition();
-      await windowManager.setAlwaysOnTop(true);
       if (!mounted) return;
+      // Switch Flutter to the compact layout before changing native geometry.
+      // Avoid animated native resizing: every animation frame forces the video
+      // texture to resize and was causing a large playback/UI stall.
+      setState(() => _miniMode = true);
+      await windowManager.setAlwaysOnTop(true);
       await _applyMiniChrome();
       await _applyMiniWindowSize();
-      if (mounted) setState(() => _miniMode = true);
       return;
     }
 
-    await _restoreWindow();
     if (mounted) setState(() => _miniMode = false);
+    await _restoreWindow();
   }
 
   Future<void> _toggleMiniLayout() async {
@@ -327,9 +334,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
           );
 
     await windowManager.setMinimumSize(minimum);
-    await windowManager.setSize(size, animate: true);
+    await windowManager.setSize(size, animate: false);
     if (saved != null) {
-      await windowManager.setPosition(saved.position, animate: true);
+      await windowManager.setPosition(saved.position, animate: false);
     }
   }
 
@@ -361,10 +368,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
     await windowManager.setTitleBarStyle(TitleBarStyle.normal);
     await windowManager.setMinimumSize(_normalMinimumSize);
     if (_previousWindowSize != null) {
-      await windowManager.setSize(_previousWindowSize!, animate: true);
+      await windowManager.setSize(_previousWindowSize!, animate: false);
     }
     if (_previousWindowPosition != null) {
-      await windowManager.setPosition(_previousWindowPosition!, animate: true);
+      await windowManager.setPosition(_previousWindowPosition!, animate: false);
     }
   }
 
@@ -732,7 +739,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
             // Keep the entire video surface draggable in borderless mini mode.
             // Controls rendered above this layer still receive their own clicks.
             Positioned.fill(
-              child: DragToMoveArea(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onPanStart: (_) => unawaited(windowManager.startDragging()),
                 child: const ColoredBox(color: Colors.transparent),
               ),
             ),
