@@ -94,6 +94,7 @@ class AppController extends ChangeNotifier {
   String? error;
   List<VodItem> _recentMoviesCache = const [];
   List<SeriesItem> _recentSeriesCache = const [];
+  Set<String> _favoriteIds = const <String>{};
 
   bool debugMode = false;
 
@@ -499,8 +500,7 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  bool isFavorite(PlaybackItem item) =>
-      favorites.any((entry) => entry.id == item.id);
+  bool isFavorite(PlaybackItem item) => _favoriteIds.contains(item.id);
 
   Future<void> toggleFavorite(PlaybackItem item) async {
     final existing = favorites.indexWhere((entry) => entry.id == item.id);
@@ -511,6 +511,7 @@ class AppController extends ChangeNotifier {
       next.insert(0, _entryFromPlayback(item));
     }
     favorites = next;
+    _favoriteIds = favorites.map((entry) => entry.id).toSet();
     notifyListeners();
     await libraryStore.saveFavorites(favorites);
   }
@@ -802,6 +803,7 @@ class AppController extends ChangeNotifier {
 
   Future<void> _loadLibrary() async {
     favorites = await libraryStore.loadFavorites();
+    _favoriteIds = favorites.map((entry) => entry.id).toSet();
     recent = await libraryStore.loadRecent();
   }
 
@@ -1088,7 +1090,10 @@ class AppController extends ChangeNotifier {
           entry,
     ];
 
-    if (favoritesChanged) await libraryStore.saveFavorites(favorites);
+    if (favoritesChanged) {
+      _favoriteIds = favorites.map((entry) => entry.id).toSet();
+      await libraryStore.saveFavorites(favorites);
+    }
     if (recentChanged) await libraryStore.saveRecent(recent);
   }
 
@@ -1107,6 +1112,7 @@ class AppController extends ChangeNotifier {
     final favoritesChanged = nextFavorites.length != favorites.length;
     final recentChanged = nextRecent.length != recent.length;
     favorites = nextFavorites;
+    _favoriteIds = favorites.map((entry) => entry.id).toSet();
     recent = nextRecent;
 
     if (favoritesChanged) await libraryStore.saveFavorites(favorites);
