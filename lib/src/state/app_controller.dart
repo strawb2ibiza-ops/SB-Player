@@ -68,6 +68,10 @@ class AppController extends ChangeNotifier {
   List<IptvCategory> seriesCategories = const [];
   List<SeriesItem> series = const [];
 
+  Map<String, List<IptvChannel>> _channelsByCategory = const {};
+  Map<String, List<VodItem>> _moviesByCategory = const {};
+  Map<String, List<SeriesItem>> _seriesByCategory = const {};
+
   List<LibraryEntry> favorites = const [];
   List<LibraryEntry> recent = const [];
   Map<String, List<EpgProgram>> epg = const {};
@@ -321,29 +325,74 @@ class AppController extends ChangeNotifier {
 
   List<IptvChannel> visibleChannels(String search) {
     final query = search.trim().toLowerCase();
-    return channels.where((channel) {
-      final categoryMatches = liveCategoryId == '__all__' || channel.categoryId == liveCategoryId;
-      final searchMatches = query.isEmpty || channel.name.toLowerCase().contains(query);
-      return categoryMatches && searchMatches;
-    }).toList(growable: false);
+    final source = liveCategoryId == '__all__'
+        ? channels
+        : (_channelsByCategory[liveCategoryId] ?? const <IptvChannel>[]);
+    if (query.isEmpty) return source;
+    return source
+        .where((channel) => channel.name.toLowerCase().contains(query))
+        .toList(growable: false);
   }
 
   List<VodItem> visibleMovies(String search) {
     final query = search.trim().toLowerCase();
-    return movies.where((item) {
-      final categoryMatches = movieCategoryId == '__all__' || item.categoryId == movieCategoryId;
-      final searchMatches = query.isEmpty || item.name.toLowerCase().contains(query);
-      return categoryMatches && searchMatches;
-    }).toList(growable: false);
+    final source = movieCategoryId == '__all__'
+        ? movies
+        : (_moviesByCategory[movieCategoryId] ?? const <VodItem>[]);
+    if (query.isEmpty) return source;
+    return source
+        .where((item) => item.name.toLowerCase().contains(query))
+        .toList(growable: false);
   }
 
   List<SeriesItem> visibleSeries(String search) {
     final query = search.trim().toLowerCase();
-    return series.where((item) {
-      final categoryMatches = seriesCategoryId == '__all__' || item.categoryId == seriesCategoryId;
-      final searchMatches = query.isEmpty || item.name.toLowerCase().contains(query);
-      return categoryMatches && searchMatches;
-    }).toList(growable: false);
+    final source = seriesCategoryId == '__all__'
+        ? series
+        : (_seriesByCategory[seriesCategoryId] ?? const <SeriesItem>[]);
+    if (query.isEmpty) return source;
+    return source
+        .where((item) => item.name.toLowerCase().contains(query))
+        .toList(growable: false);
+  }
+
+  List<String> categoryPreviewImages(
+    ContentSection target,
+    String categoryId, {
+    int limit = 4,
+  }) {
+    Iterable<String?> images;
+    switch (target) {
+      case ContentSection.live:
+      case ContentSection.guide:
+        final source = categoryId == '__all__'
+            ? channels
+            : (_channelsByCategory[categoryId] ?? const <IptvChannel>[]);
+        images = source.map((item) => item.logoUrl);
+        break;
+      case ContentSection.movies:
+        final source = categoryId == '__all__'
+            ? movies
+            : (_moviesByCategory[categoryId] ?? const <VodItem>[]);
+        images = source.map((item) => item.posterUrl);
+        break;
+      case ContentSection.series:
+        final source = categoryId == '__all__'
+            ? series
+            : (_seriesByCategory[categoryId] ?? const <SeriesItem>[]);
+        images = source.map((item) => item.coverUrl);
+        break;
+      case ContentSection.home:
+      case ContentSection.continueWatching:
+      case ContentSection.favorites:
+      case ContentSection.recent:
+        return const [];
+    }
+    return images
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
+        .take(limit)
+        .toList(growable: false);
   }
 
   List<VodItem> get recentlyAddedMovies {
@@ -857,6 +906,7 @@ class AppController extends ChangeNotifier {
     account = resolvedAccount;
     liveCategories = loadedCategories;
     channels = loadedChannels;
+    _channelsByCategory = _groupChannelsByCategory(loadedChannels);
     liveCategoryId = '__all__';
     section = ContentSection.home;
 
@@ -898,6 +948,7 @@ class AppController extends ChangeNotifier {
       if (generation != _catalogGeneration || account != current) return;
       movieCategories = categories;
       movies = loadedMovies;
+      _moviesByCategory = _groupMoviesByCategory(loadedMovies);
       _moviesLoaded = true;
       movieCategoryId = '__all__';
     } catch (exception) {
@@ -935,6 +986,7 @@ class AppController extends ChangeNotifier {
       if (generation != _catalogGeneration || account != current) return;
       seriesCategories = categories;
       series = loadedSeries;
+      _seriesByCategory = _groupSeriesByCategory(loadedSeries);
       _seriesLoaded = true;
       seriesCategoryId = '__all__';
     } catch (exception) {
@@ -1065,6 +1117,34 @@ class AppController extends ChangeNotifier {
     if (recentChanged) await libraryStore.saveRecent(recent);
   }
 
+  Map<String, List<IptvChannel>> _groupChannelsByCategory(
+    List<IptvChannel> items,
+  ) {
+    final grouped = <String, List<IptvChannel>>{};
+    for (final item in items) {
+      (grouped[item.categoryId] ??= <IptvChannel>[]).add(item);
+    }
+    return grouped;
+  }
+
+  Map<String, List<VodItem>> _groupMoviesByCategory(List<VodItem> items) {
+    final grouped = <String, List<VodItem>>{};
+    for (final item in items) {
+      (grouped[item.categoryId] ??= <VodItem>[]).add(item);
+    }
+    return grouped;
+  }
+
+  Map<String, List<SeriesItem>> _groupSeriesByCategory(
+    List<SeriesItem> items,
+  ) {
+    final grouped = <String, List<SeriesItem>>{};
+    for (final item in items) {
+      (grouped[item.categoryId] ??= <SeriesItem>[]).add(item);
+    }
+    return grouped;
+  }
+
   List<IptvCategory> _categoriesFromChannels(List<IptvChannel> loaded) {
     final groups = <String>{};
     for (final channel in loaded) {
@@ -1085,6 +1165,9 @@ class AppController extends ChangeNotifier {
     movies = const [];
     seriesCategories = const [];
     series = const [];
+    _channelsByCategory = const {};
+    _moviesByCategory = const {};
+    _seriesByCategory = const {};
     epg = const {};
     liveCategoryId = '__all__';
     movieCategoryId = '__all__';
