@@ -2,7 +2,8 @@
 const $=id=>document.getElementById(id);
 const PAIR_ENDPOINT="https://ehdvyarueeaetsvzdboo.supabase.co/functions/v1/device-pairing";
 let auth=null,view="live",items=[],categories=[],activeCat="all",lastFocus=null,pairing=null,pairTimer=null,renderTimer=null,focusCache=null,pairPollBusy=false,viewGeneration=0;
-const WEBOS_RENDER_LIMIT=120;
+const WEBOS_RENDER_BATCH=120;
+let filteredItems=[],renderedCount=0;
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function base(){return auth.server.replace(/\/$/,"")}
 function api(action,extra){extra=extra||"";return base()+"/player_api.php?username="+encodeURIComponent(auth.username)+"&password="+encodeURIComponent(auth.password)+(action?"&action="+action:"")+extra}
@@ -35,10 +36,15 @@ async function signin(){
 function fail(s){$("error").textContent=s}
 function showHome(){
  stopPairing(false);
- $("login").classList.add("hidden");$("pairing").classList.add("hidden");$("home").classList.remove("hidden");
+ view="home";items=[];categories=[];activeCat="all";viewGeneration+=1;invalidateFocus();
+ $("login").classList.add("hidden");$("pairing").classList.add("hidden");$("home").classList.add("hidden");$("tvHome").classList.remove("hidden");
+ focusFirst();
+}
+function showContent(){
+ invalidateFocus();$("tvHome").classList.add("hidden");$("home").classList.remove("hidden");
 }
 function showLogin(){
- $("home").classList.add("hidden");$("pairing").classList.add("hidden");$("login").classList.remove("hidden");focusFirst();
+ $("tvHome").classList.add("hidden");$("home").classList.add("hidden");$("pairing").classList.add("hidden");$("login").classList.remove("hidden");invalidateFocus();focusFirst();
 }
 async function startPairing(){
  fail("");$("login").classList.add("hidden");$("pairing").classList.remove("hidden");$("pairStatus").className="pairStatus";$("pairStatus").textContent="Creating secure pairing…";$("qr").innerHTML="";$("pairCode").textContent="--------";
@@ -100,6 +106,7 @@ async function stopPairing(cancelRemote){
 }
 async function cancelPairing(){await stopPairing(true);$("pairing").classList.add("hidden");$("login").classList.remove("hidden");$("phoneSignIn").focus()}
 async function loadView(v){
+ showContent();
  const generation=++viewGeneration;
  view=v;activeCat="all";$("heading").textContent=v==="live"?"Live TV":v==="movies"?"Movies":"Series";
  document.querySelectorAll(".nav[data-view]").forEach(function(b){b.classList.toggle("active",b.dataset.view===v)});
@@ -107,14 +114,27 @@ async function loadView(v){
  try{
   const ca=v==="live"?"get_live_categories":v==="movies"?"get_vod_categories":"get_series_categories";
   const ia=v==="live"?"get_live_streams":v==="movies"?"get_vod_streams":"get_series";
-  const loaded=await Promise.all([get(api(ca)),get(api(ia))]);if(generation!==viewGeneration)return;categories=loaded[0]||[];items=loaded[1]||[];for(let i=0;i<items.length;i++)items[i].__sbIndex=i;renderCats();render();focusFirst()
+  const loaded=await Promise.all([get(api(ca)),get(api(ia))]);if(generation!==viewGeneration)return;categories=loaded[0]||[];items=loaded[1]||[];for(let i=0;i<items.length;i++){items[i].__sbIndex=i;const n=items[i].name!=null?items[i].name:(items[i].title!=null?items[i].title:"");items[i].__sbSearch=String(n).toLowerCase();}renderCats();render();focusFirst()
  }catch(e){if(generation===viewGeneration)$("grid").innerHTML="<p>Unable to load: "+esc(e.message)+"</p>"}
 }
 function renderCats(){invalidateFocus();$("categories").innerHTML='<button class="cat focusable active" data-cat="all">All</button>'+categories.map(function(c){return '<button class="cat focusable" data-cat="'+esc(c.category_id)+'">'+esc(c.category_name)+"</button>"}).join("")}
+function cardHtml(x){
+ const name=x.name!=null?x.name:(x.title!=null?x.title:"Untitled"),img=x.stream_icon!=null?x.stream_icon:(x.cover!=null?x.cover:"");
+ return '<button class="card focusable" data-i="'+x.__sbIndex+'">'+(img?'<img src="'+esc(img)+'" onerror="this.style.display=\'none\'">':"")+"<strong>"+esc(name)+"</strong><small>"+esc(view==="live"?"Live":view==="movies"?"Movie":"Series")+"</small></button>";
+}
+function appendNextBatch(){
+ if(renderedCount>=filteredItems.length)return;
+ const end=Math.min(renderedCount+WEBOS_RENDER_BATCH,filteredItems.length),parts=[];
+ for(let i=renderedCount;i<end;i++)parts.push(cardHtml(filteredItems[i]));
+ $("grid").insertAdjacentHTML("beforeend",parts.join(""));
+ renderedCount=end;invalidateFocus();
+}
 function render(){
  const q=$("search").value.trim().toLowerCase();
- const filtered=items.filter(function(x){const name=x.name!=null?x.name:(x.title!=null?x.title:"");return(activeCat==="all"||String(x.category_id)===activeCat)&&String(name).toLowerCase().indexOf(q)>=0});
- $("grid").innerHTML=filtered.slice(0,WEBOS_RENDER_LIMIT).map(function(x){const name=x.name!=null?x.name:(x.title!=null?x.title:"Untitled"),img=x.stream_icon!=null?x.stream_icon:(x.cover!=null?x.cover:"");return '<button class="card focusable" data-i="'+x.__sbIndex+'">'+(img?'<img src="'+esc(img)+'" onerror="this.style.display=\'none\'">':"")+"<strong>"+esc(name)+"</strong><small>"+esc(view==="live"?"Live":view==="movies"?"Movie":"Series")+"</small></button>"}).join("")||"<p>No results.</p>";
+ filteredItems=items.filter(function(x){return(activeCat==="all"||String(x.category_id)===activeCat)&&x.__sbSearch.indexOf(q)>=0});
+ renderedCount=0;$("grid").innerHTML="";
+ if(!filteredItems.length){$("grid").innerHTML="<p>No results.</p>";invalidateFocus();return}
+ appendNextBatch();
 }
 function play(x){
  if(view==="series")return loadSeries(x);
@@ -164,16 +184,19 @@ document.addEventListener("keydown",function(e){
  if(k===461||e.key==="Backspace"||e.key==="Escape"){
    if(!$("pairing").classList.contains("hidden")){e.preventDefault();cancelPairing();return}
    if(!$("player").classList.contains("hidden")&&!$("player").classList.contains("mini")){e.preventDefault();minimizeVideo();return}
-   if(!$("home").classList.contains("hidden")){e.preventDefault();showHome()}
+   if(!$("home").classList.contains("hidden")){e.preventDefault();showHome();return}
  }
 });
-document.addEventListener("click",function(e){const choice=e.target.closest("[data-tv-view]");if(choice){e.preventDefault();loadView(choice.dataset.tvView)}});\n$("signin").addEventListener("click",signin);
+document.addEventListener("click",function(e){const choice=e.target.closest("[data-tv-view]");if(choice){e.preventDefault();loadView(choice.dataset.tvView)}});
+$("signin").addEventListener("click",signin);
 $("phoneSignIn").addEventListener("click",startPairing);
 $("cancelPair").addEventListener("click",cancelPairing);
 $("login").addEventListener("submit",function(e){e.preventDefault();signin()});
 $("search").oninput=function(){if(renderTimer)clearTimeout(renderTimer);renderTimer=setTimeout(function(){renderTimer=null;render()},120)};
+$("grid").onscroll=function(){const g=$("grid");if(g.scrollTop+g.clientHeight>=g.scrollHeight-240)appendNextBatch()};
 $("back").onclick=minimizeVideo;
 $("nowPlaying").onclick=expandVideo;
-function logout(){stopVideo();localStorage.removeItem("sb.webos.auth");auth=null;showLogin()}\n$("logout").onclick=logout;$("tvLogout").onclick=logout;
+function logout(){stopVideo();localStorage.removeItem("sb.webos.auth");auth=null;showLogin()}
+$("logout").onclick=logout;$("tvLogout").onclick=logout;
 try{const s=JSON.parse(localStorage.getItem("sb.webos.auth")||"null");if(s){auth=s;showHome()}else $("server").focus()}catch(_){$("server").focus()}
 })();
