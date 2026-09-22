@@ -44,6 +44,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   final PlaybackPreferences _playbackPreferences = PlaybackPreferences();
   NativePictureInPicture? _nativePip;
   StreamSubscription<PipEvent>? _pipSubscription;
+  bool _pipReady = false;
+  bool _pipPreparing = false;
+  String? _pipError;
 
   bool _miniMode = false;
   bool _buffering = true;
@@ -115,31 +118,102 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _prepareNativePip() async {
+    if (_pipPreparing) return;
+    if (mounted) {
+      setState(() {
+        _pipPreparing = true;
+        _pipError = null;
+      });
+    }
+
     final pip = NativePictureInPicture();
-    if (!await pip.isPipSupported()) return;
-    await pip.initialize(_item.streamUrl);
-    await pip.setAutoPipEnabled(await _playbackPreferences.readAutoPip());
-    _pipSubscription = pip.onPipEvent.listen((event) async {
-      if (event == PipEvent.willStart) {
-        await pip.seekTo(_player.state.position);
-        if (_player.state.playing) await pip.play();
-        await _player.pause();
-      } else if (event == PipEvent.restoreUI || event == PipEvent.didStop) {
-        final position = await pip.getPosition();
-        await pip.pause();
-        if (!_item.isLive) await _player.seek(position);
-        await _player.play();
+    try {
+      final supported = await pip.isPipSupported();
+      if (!supported) {
+        if (mounted) {
+          setState(() {
+            _pipPreparing = false;
+            _pipReady = false;
+            _pipError = 'Picture-in-Picture is not supported on this device.';
+          });
+        }
+        await pip.dispose();
+        return;
       }
-    });
-    _nativePip = pip;
+
+      await pip.initialize(_item.streamUrl);
+      await pip.setAutoPipEnabled(
+        Platform.isIOS ? await _playbackPreferences.readAutoPip() : false,
+      );
+
+      await _pipSubscription?.cancel();
+      _pipSubscription = pip.onPipEvent.listen((event) async {
+        if (event == PipEvent.willStart) {
+          await pip.seekTo(_player.state.position);
+          if (_player.state.playing) await pip.play();
+          await _player.pause();
+        } else if (event == PipEvent.restoreUI || event == PipEvent.didStop) {
+          final position = await pip.getPosition();
+          await pip.pause();
+          if (!_item.isLive) await _player.seek(position);
+          await _player.play();
+        }
+      });
+
+      await _nativePip?.dispose();
+      _nativePip = pip;
+      if (mounted) {
+        setState(() {
+          _pipPreparing = false;
+          _pipReady = true;
+          _pipError = null;
+        });
+      }
+    } catch (error) {
+      await pip.dispose();
+      if (mounted) {
+        setState(() {
+          _pipPreparing = false;
+          _pipReady = false;
+          _pipError = error.toString();
+        });
+      }
+    }
   }
 
   Future<void> _startNativePip() async {
-    final pip = _nativePip;
-    if (pip == null) return;
-    await pip.seekTo(_player.state.position);
-    if (_player.state.playing) await pip.play();
-    await pip.startPiP();
+    var pip = _nativePip;
+    if (!_pipReady || pip == null) {
+      await _prepareNativePip();
+      pip = _nativePip;
+    }
+    if (!_pipReady || pip == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _pipError == null
+                  ? 'Picture-in-Picture is not ready yet.'
+                  : 'Picture-in-Picture unavailable: $_pipError',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      await pip.seekTo(_player.state.position);
+      if (_player.state.playing) await pip.play();
+      await pip.startPiP();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _pipError = error.toString());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start Picture-in-Picture: $error')),
+        );
+      }
+    }
   }
 
   Future<void> _loadMiniPreference() async {
@@ -551,9 +625,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ),
               if (Platform.isIOS || Platform.isAndroid)
                 IconButton(
-                  tooltip: 'Picture-in-Picture',
-                  onPressed: _nativePip == null ? null : _startNativePip,
-                  icon: const Icon(Icons.picture_in_picture_alt),
+                  tooltip: _pipPreparing
+                      ? 'Preparing Picture-in-Picture…'
+                      : (_pipError == null
+                          ? 'Picture-in-Picture'
+                          : 'Retry Picture-in-Picture'),
+                  onPressed: _pipPreparing ? null : _startNativePip,
+                  icon: Icon(
+                    _pipError == null
+                        ? Icons.picture_in_picture_alt
+                        : Icons.refresh,
+                  ),
                 ),
               if (Platform.isWindows)
                 IconButton(
