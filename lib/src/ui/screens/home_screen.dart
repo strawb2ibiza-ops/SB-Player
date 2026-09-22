@@ -9,7 +9,6 @@ import '../../models/library_entry.dart';
 import '../../models/playback_item.dart';
 import '../../state/app_controller.dart';
 import '../branding/sb_brand.dart';
-import '../widgets/account_manager_dialog.dart';
 import '../widgets/brand_backdrop.dart';
 import '../widgets/channel_tile.dart';
 import '../widgets/epg_timeline.dart';
