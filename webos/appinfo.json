@@ -1,0 +1,12 @@
+{
+  "id": "com.sbplayer.webos",
+  "version": "0.6.2",
+  "vendor": "SB Player",
+  "type": "web",
+  "main": "index.html",
+  "title": "SB Player",
+  "icon": "icon.png",
+  "largeIcon": "icon.png",
+  "bgColor": "#080713",
+  "resolution": "1920x1080"
+}
