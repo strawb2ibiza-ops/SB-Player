@@ -5,10 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
+import 'package:native_picture_in_picture/native_picture_in_picture.dart';
+import 'package:native_picture_in_picture/pip_event.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../models/playback_item.dart';
 import '../../services/mini_player_preferences.dart';
+import '../../services/playback_preferences.dart';
 import '../../state/app_controller.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -38,6 +41,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   DateTime _lastPositionRebuild = DateTime.fromMillisecondsSinceEpoch(0);
   final MiniPlayerPreferences _miniPreferences = const MiniPlayerPreferences();
+  final PlaybackPreferences _playbackPreferences = PlaybackPreferences();
+  NativePictureInPicture? _nativePip;
+  StreamSubscription<PipEvent>? _pipSubscription;
 
   bool _miniMode = false;
   bool _buffering = true;
@@ -105,6 +111,35 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     unawaited(_loadMiniPreference());
     unawaited(_open());
+    if (Platform.isIOS || Platform.isAndroid) unawaited(_prepareNativePip());
+  }
+
+  Future<void> _prepareNativePip() async {
+    final pip = NativePictureInPicture();
+    if (!await pip.isPipSupported()) return;
+    await pip.initialize(_item.streamUrl);
+    await pip.setAutoPipEnabled(await _playbackPreferences.readAutoPip());
+    _pipSubscription = pip.onPipEvent.listen((event) async {
+      if (event == PipEvent.willStart) {
+        await pip.seekTo(_player.state.position);
+        if (_player.state.playing) await pip.play();
+        await _player.pause();
+      } else if (event == PipEvent.restoreUI || event == PipEvent.didStop) {
+        final position = await pip.getPosition();
+        await pip.pause();
+        if (!_item.isLive) await _player.seek(position);
+        await _player.play();
+      }
+    });
+    _nativePip = pip;
+  }
+
+  Future<void> _startNativePip() async {
+    final pip = _nativePip;
+    if (pip == null) return;
+    await pip.seekTo(_player.state.position);
+    if (_player.state.playing) await pip.play();
+    await pip.startPiP();
   }
 
   Future<void> _loadMiniPreference() async {
@@ -432,6 +467,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }
+    unawaited(_pipSubscription?.cancel());
+    unawaited(_nativePip?.dispose());
     _player.dispose();
     super.dispose();
   }
@@ -512,6 +549,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   favorite ? Icons.favorite : Icons.favorite_border,
                 ),
               ),
+              if (Platform.isIOS || Platform.isAndroid)
+                IconButton(
+                  tooltip: 'Picture-in-Picture',
+                  onPressed: _nativePip == null ? null : _startNativePip,
+                  icon: const Icon(Icons.picture_in_picture_alt),
+                ),
               if (Platform.isWindows)
                 IconButton(
                   tooltip: 'Always-on-top mini player',
