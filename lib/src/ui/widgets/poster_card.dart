@@ -149,13 +149,17 @@ class _PosterCardState extends State<PosterCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: SbBrand.textPrimary,
-                            fontWeight: FontWeight.w800,
+                        Tooltip(
+                          message: widget.title,
+                          waitDuration: const Duration(milliseconds: 350),
+                          child: Text(
+                            widget.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: SbBrand.textPrimary,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                         if (widget.subtitle != null ||
