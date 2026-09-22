@@ -22,8 +22,9 @@ import 'series_details_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.controller});
+  const HomeScreen({super.key, required this.controller, this.tvMode = false});
   final AppController controller;
+  final bool tvMode;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -253,6 +254,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
+    if (widget.tvMode && controller.section == ContentSection.home) {
+      return _buildTvHome(controller);
+    }
     return Scaffold(
       appBar: AppBar(
         title: const SbLogo(
@@ -387,6 +391,31 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ]);
         },
+      ),
+    );
+  }
+
+  Widget _buildTvHome(AppController controller) {
+    return Scaffold(
+      appBar: AppBar(title: const SbLogo(symbolSize: 30, compact: true, showTagline: false)),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1500),
+          child: Padding(
+            padding: const EdgeInsets.all(48),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text('What do you want to watch?', style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900)),
+              const SizedBox(height: 42),
+              Expanded(child: Row(children: [
+                Expanded(child: _TvChoice(icon: Icons.live_tv_outlined, label: 'Live TV', autofocus: true, onTap: () => unawaited(_changeSection(ContentSection.live)))),
+                const SizedBox(width: 28),
+                Expanded(child: _TvChoice(icon: Icons.movie_outlined, label: 'Movies', onTap: () => unawaited(_changeSection(ContentSection.movies)))),
+                const SizedBox(width: 28),
+                Expanded(child: _TvChoice(icon: Icons.tv_outlined, label: 'Series', onTap: () => unawaited(_changeSection(ContentSection.series)))),
+              ])),
+            ]),
+          ),
+        ),
       ),
     );
   }
@@ -1471,5 +1500,14 @@ DateTime _roundedGuideTime(DateTime value) {
     value.day,
     value.hour,
     value.minute < 30 ? 0 : 30,
+  );
+}
+
+class _TvChoice extends StatelessWidget {
+  const _TvChoice({required this.icon, required this.label, required this.onTap, this.autofocus = false});
+  final IconData icon; final String label; final VoidCallback onTap; final bool autofocus;
+  @override Widget build(BuildContext context) => Card(
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(autofocus: autofocus, onTap: onTap, child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 72, color: SbBrand.brightBlue), const SizedBox(height: 22), Text(label, style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900))]))),
   );
 }
