@@ -92,6 +92,8 @@ class AppController extends ChangeNotifier {
   String? _cachedSbScopeIdentity;
   String? _cachedSbScope;
   String? error;
+  List<VodItem> _recentMoviesCache = const [];
+  List<SeriesItem> _recentSeriesCache = const [];
 
   bool debugMode = false;
 
@@ -395,28 +397,20 @@ class AppController extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  List<VodItem> get recentlyAddedMovies {
-    if (movies.length <= 1) return movies;
+  List<VodItem> get recentlyAddedMovies => _recentMoviesCache;
+
+  List<SeriesItem> get recentlyAddedSeries => _recentSeriesCache;
+
+  void _rebuildRecentMovies() {
     final items = [...movies];
-    items.sort((a, b) {
-      final dateCompare =
-          _contentDate(b.releaseDate).compareTo(_contentDate(a.releaseDate));
-      if (dateCompare != 0) return dateCompare;
-      return _numericContentId(b.id).compareTo(_numericContentId(a.id));
-    });
-    return items.take(12).toList(growable: false);
+    items.sort((a, b) { final dateCompare = _contentDate(b.releaseDate).compareTo(_contentDate(a.releaseDate)); if (dateCompare != 0) return dateCompare; return _numericContentId(b.id).compareTo(_numericContentId(a.id)); });
+    _recentMoviesCache = items.take(12).toList(growable: false);
   }
 
-  List<SeriesItem> get recentlyAddedSeries {
-    if (series.length <= 1) return series;
+  void _rebuildRecentSeries() {
     final items = [...series];
-    items.sort((a, b) {
-      final dateCompare =
-          _contentDate(b.releaseDate).compareTo(_contentDate(a.releaseDate));
-      if (dateCompare != 0) return dateCompare;
-      return _numericContentId(b.id).compareTo(_numericContentId(a.id));
-    });
-    return items.take(12).toList(growable: false);
+    items.sort((a, b) { final dateCompare = _contentDate(b.releaseDate).compareTo(_contentDate(a.releaseDate)); if (dateCompare != 0) return dateCompare; return _numericContentId(b.id).compareTo(_numericContentId(a.id)); });
+    _recentSeriesCache = items.take(12).toList(growable: false);
   }
 
   DateTime _contentDate(String? value) {
@@ -948,6 +942,7 @@ class AppController extends ChangeNotifier {
       if (generation != _catalogGeneration || account != current) return;
       movieCategories = categories;
       movies = loadedMovies;
+      _rebuildRecentMovies();
       _moviesByCategory = _groupMoviesByCategory(loadedMovies);
       _moviesLoaded = true;
       movieCategoryId = '__all__';
@@ -986,6 +981,7 @@ class AppController extends ChangeNotifier {
       if (generation != _catalogGeneration || account != current) return;
       seriesCategories = categories;
       series = loadedSeries;
+      _rebuildRecentSeries();
       _seriesByCategory = _groupSeriesByCategory(loadedSeries);
       _seriesLoaded = true;
       seriesCategoryId = '__all__';
@@ -1168,6 +1164,8 @@ class AppController extends ChangeNotifier {
     _channelsByCategory = const {};
     _moviesByCategory = const {};
     _seriesByCategory = const {};
+    _recentMoviesCache = const [];
+    _recentSeriesCache = const [];
     epg = const {};
     liveCategoryId = '__all__';
     movieCategoryId = '__all__';
