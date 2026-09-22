@@ -9,6 +9,8 @@ import 'src/config/app_config.dart';
 import 'src/services/secure_account_store.dart';
 import 'src/state/app_controller.dart';
 
+const bool _androidTv = bool.fromEnvironment('SB_ANDROID_TV', defaultValue: false);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
@@ -37,5 +39,5 @@ Future<void> main() async {
     controller.enterUiCaptureMode();
   }
 
-  runApp(SbPlayerApp(controller: controller));
+  runApp(SbPlayerApp(controller: controller, tvMode: _androidTv));
 }
