@@ -977,11 +977,13 @@ class AppController extends ChangeNotifier {
       notifyListeners();
     }
     try {
-      late List<IptvCategory> categories;
+      List<IptvCategory> categories = const [];
       late List<SeriesItem> loadedSeries;
       await Future.wait<void>([
         _xtreamClient.fetchSeriesCategories(current).then((value) {
           categories = value;
+        }).catchError((_) {
+          categories = const [];
         }),
         _xtreamClient.fetchSeries(current).then((value) {
           loadedSeries = value;
