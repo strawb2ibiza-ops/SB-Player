@@ -40,7 +40,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   DateTime _lastPositionRebuild = DateTime.fromMillisecondsSinceEpoch(0);
   static const MethodChannel _iosPipChannel =
-      MethodChannel('sb_player/media_kit_pip');
+      MethodChannel('com.alexmercerind/media_kit_video');
 
   final MiniPlayerPreferences _miniPreferences = const MiniPlayerPreferences();
   NativePictureInPicture? _nativePip;
@@ -77,9 +77,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _player = Player();
     _videoController = VideoController(_player);
     WidgetsBinding.instance.addObserver(this);
-    if (Platform.isIOS) {
-      _iosPipChannel.setMethodCallHandler(_handleIosPipMethodCall);
-    }
     _checkpointTimer = Timer.periodic(
       const Duration(seconds: 8),
       (_) => unawaited(_checkpointPlayback()),
@@ -292,56 +289,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
   }
 
-  Future<dynamic> _handleIosPipMethodCall(MethodCall call) async {
-    if (call.method != 'SBPlayerPiP.Event') return null;
-    final raw = call.arguments;
-    if (raw is! Map) return null;
-    final event = '${raw['event'] ?? ''}';
-
-    switch (event) {
-      case 'setPlaying':
-        final shouldPlay = raw['value'] == true;
-        if (shouldPlay) {
-          await _player.play();
-        } else {
-          await _player.pause();
-        }
-        break;
-      case 'skip':
-        final seconds = (raw['value'] as num?)?.round() ?? 0;
-        if (seconds != 0) await _seekRelative(seconds);
-        break;
-      case 'didStart':
-        if (mounted) {
-          setState(() {
-            _pipPreparing = false;
-            _pipReady = true;
-            _pipError = null;
-          });
-        }
-        break;
-      case 'didStop':
-      case 'restore':
-        if (mounted) setState(() => _pipReady = false);
-        unawaited(_checkpointPlayback(force: true));
-        break;
-      case 'failed':
-        final message = '${raw['value'] ?? 'Picture-in-Picture failed.'}';
-        if (mounted) {
-          setState(() {
-            _pipPreparing = false;
-            _pipReady = false;
-            _pipError = message;
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Picture-in-Picture failed: $message')),
-          );
-        }
-        break;
-    }
-    return null;
-  }
-
   Future<void> _checkpointPlayback({bool force = false}) async {
     if (_item.isLive || _duration.inSeconds <= 0 || _position.inSeconds <= 1) {
       return;
@@ -382,11 +329,42 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       });
     }
 
+    final target = resumeAt ?? _item.startPosition;
+    final shouldResume =
+        !_item.isLive && target > const Duration(seconds: 5);
+
     try {
-      await _player.open(Media(_item.streamUrl), play: true);
-      final target = resumeAt ?? _item.startPosition;
-      if (!_item.isLive && target > const Duration(seconds: 5)) {
+      // Resume VOD while paused. Seeking immediately after a play:true open can
+      // be ignored on iOS while mpv is still establishing the stream.
+      await _player.open(Media(_item.streamUrl), play: !shouldResume);
+
+      if (shouldResume) {
+        try {
+          if (_player.state.duration <= Duration.zero) {
+            await _player.stream.duration
+                .firstWhere((value) => value > Duration.zero)
+                .timeout(const Duration(seconds: 10));
+          }
+        } catch (_) {
+          // Some IPTV VOD streams report duration late. We still attempt the
+          // seek below; mpv can usually accept it once open() has completed.
+        }
+
         await _player.seek(target);
+
+        // A small second seek after the first position event makes resume
+        // reliable on slower Xtream/VOD origins where the first seek is
+        // acknowledged before the demuxer has fully settled.
+        try {
+          await _player.stream.position
+              .firstWhere((value) => value > const Duration(milliseconds: 250))
+              .timeout(const Duration(seconds: 3));
+        } catch (_) {}
+        if ((_player.state.position - target).abs() >
+            const Duration(seconds: 4)) {
+          await _player.seek(target);
+        }
+        await _player.play();
       }
     } catch (_) {
       _handlePlaybackFailure();
@@ -833,7 +811,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
     if (Platform.isIOS) {
       unawaited(_iosPipChannel.invokeMethod<void>('SBPlayerPiP.Stop'));
-      _iosPipChannel.setMethodCallHandler(null);
     }
     unawaited(_restoreWindow());
     for (final subscription in _subscriptions) {

@@ -25,6 +25,7 @@ def find_swift(name: str, marker: str) -> Path:
 plugin = find_swift("MediaKitVideoPlugin.swift", "VideoOutputManager.Create")
 manager = find_swift("VideoOutputManager.swift", "class VideoOutputManager")
 output = find_swift("VideoOutput.swift", "class VideoOutput")
+helpers = find_swift("MPVHelpers.swift", "enum MPVHelpers")
 
 bridge_path = root / "ios/media_kit_video/Sources/media_kit_video/plugin/SBMediaKitPiP.swift"
 bridge_path.parent.mkdir(parents=True, exist_ok=True)
@@ -314,18 +315,12 @@ replace_once(
       name: CHANNEL_NAME,
       binaryMessenger: binaryMessenger
     )
-    let pipChannel = FlutterMethodChannel(
-      name: "sb_player/media_kit_pip",
-      binaryMessenger: binaryMessenger
-    )
     let instance = MediaKitVideoPlugin(
       registry: registry,
       channel: channel,
-      pipChannel: pipChannel,
       utils: utils
     )
     registrar.addMethodCallDelegate(instance, channel: channel)
-    registrar.addMethodCallDelegate(instance, channel: pipChannel)
 ''',
     "plugin register",
 )
@@ -335,7 +330,6 @@ replace_once(
   private let videoOutputManager: VideoOutputManager
 ''',
     '''  private let channel: FlutterMethodChannel
-  private let pipChannel: FlutterMethodChannel
   private let videoOutputManager: VideoOutputManager
 ''',
     "plugin fields",
@@ -350,11 +344,9 @@ replace_once(
 ''',
     '''    registry: FlutterTextureRegistry,
     channel: FlutterMethodChannel,
-    pipChannel: FlutterMethodChannel,
     utils: UtilsProtocol?
   ) {
     self.channel = channel
-    self.pipChannel = pipChannel
 ''',
     "plugin init",
 )
@@ -404,25 +396,7 @@ replace_once(
           result(false)
           return
         }
-
-        let accepted = videoOutputManager.startPictureInPicture(
-          handle: handle,
-          eventCallback: { [weak self] event, value in
-            guard let self = self else { return }
-            var payload: [String: Any] = [
-              "handle": handleStr,
-              "event": event,
-            ]
-            if let value = value {
-              payload["value"] = value
-            }
-            self.pipChannel.invokeMethod(
-              "SBPlayerPiP.Event",
-              arguments: payload
-            )
-          }
-        )
-        result(accepted)
+        result(videoOutputManager.startPictureInPicture(handle: handle))
       } else {
         result(false)
       }
@@ -458,13 +432,11 @@ replace_once(
 
   @available(iOS 15.0, *)
   public func startPictureInPicture(
-    handle: Int64,
-    eventCallback: @escaping (String, Any?) -> Void
+    handle: Int64
   ) -> Bool {
     guard let output = videoOutputs[handle] else {
       return false
     }
-    output.pipEventCallback = eventCallback
     output.startPictureInPicture()
     return true
   }
@@ -499,7 +471,6 @@ replace_once(
     '''  private var disposed: Bool = false
 
   #if os(iOS)
-  public var pipEventCallback: ((String, Any?) -> Void)?
   @available(iOS 15.0, *)
   private var sbPipBridge: SBMediaKitPiPBridge?
   #endif
@@ -541,7 +512,12 @@ replace_once(
       } else {
         bridge = SBMediaKitPiPBridge(
           onEvent: { [weak self] event, value in
-            self?.pipEventCallback?(event, value)
+            guard let self = self else { return }
+            if event == "setPlaying", let playing = value as? Bool {
+              MPVHelpers.setPaused(self.handle, !playing)
+            } else if event == "skip", let seconds = value as? Double {
+              MPVHelpers.seekRelative(self.handle, seconds)
+            }
           }
         )
         self.sbPipBridge = bridge
@@ -586,8 +562,41 @@ replace_once(
     "output frame forwarding",
 )
 
+
+# Add tiny mpv control helpers so PiP play/pause/skip controls operate the
+# exact same media_kit player instead of asking Dart to relay them.
+replace_once(
+    helpers,
+    '''  public static func getVideoOutParams(
+''',
+    '''  public static func setPaused(
+    _ handle: OpaquePointer,
+    _ paused: Bool
+  ) {
+    let value = paused ? "yes" : "no"
+    value.withCString { pointer in
+      _ = mpv_set_property_string(handle, "pause", pointer)
+    }
+  }
+
+  public static func seekRelative(
+    _ handle: OpaquePointer,
+    _ seconds: Double
+  ) {
+    let command = "seek \\(seconds) relative"
+    command.withCString { pointer in
+      _ = mpv_command_string(handle, pointer)
+    }
+  }
+
+  public static func getVideoOutParams(
+''',
+    "mpv PiP controls",
+)
+
 print("Patched media_kit_video iOS PiP:")
 print(" plugin:", plugin)
 print(" manager:", manager)
 print(" output:", output)
+print(" helpers:", helpers)
 print(" bridge:", bridge_path)
