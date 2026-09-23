@@ -328,7 +328,7 @@ class AppController extends ChangeNotifier {
 
   List<IptvChannel> visibleChannels(String search) {
     final query = search.trim().toLowerCase();
-    final source = liveCategoryId == '__all__'
+    final source = query.isNotEmpty || liveCategoryId == '__all__'
         ? channels
         : (_channelsByCategory[liveCategoryId] ?? const <IptvChannel>[]);
     if (query.isEmpty) return source;
@@ -339,7 +339,7 @@ class AppController extends ChangeNotifier {
 
   List<VodItem> visibleMovies(String search) {
     final query = search.trim().toLowerCase();
-    final source = movieCategoryId == '__all__'
+    final source = query.isNotEmpty || movieCategoryId == '__all__'
         ? movies
         : (_moviesByCategory[movieCategoryId] ?? const <VodItem>[]);
     if (query.isEmpty) return source;
@@ -350,7 +350,7 @@ class AppController extends ChangeNotifier {
 
   List<SeriesItem> visibleSeries(String search) {
     final query = search.trim().toLowerCase();
-    final source = seriesCategoryId == '__all__'
+    final source = query.isNotEmpty || seriesCategoryId == '__all__'
         ? series
         : (_seriesByCategory[seriesCategoryId] ?? const <SeriesItem>[]);
     if (query.isEmpty) return source;
