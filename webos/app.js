@@ -210,6 +210,7 @@ function stopVideo(){
 function activate(el){if(!el)return;if(el.tagName==="INPUT"){el.focus();return}el.click()}
 document.addEventListener("click",function(e){
  const choice=e.target.closest("[data-tv-view]");if(choice){e.preventDefault();return loadView(choice.dataset.tvView)}
+ const homeBtn=e.target.closest("[data-tv-home]");if(homeBtn){e.preventDefault();return showHome()}
  const nav=e.target.closest("[data-view]");if(nav){if(nav.id==="nowPlaying")return expandVideo();return loadView(nav.dataset.view)}
  const cat=e.target.closest("[data-cat]");if(cat){activeCat=cat.dataset.cat;document.querySelectorAll(".cat").forEach(function(x){x.classList.toggle("active",x===cat)});render();return}
  const card=e.target.closest("[data-i]");if(card){e.preventDefault();return play(items[parseInt(card.dataset.i,10)])}
