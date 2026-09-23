@@ -25,31 +25,48 @@
       <button id="cancelPair" class="focusable secondary">Cancel</button>
     </section>
     <section id="tvHome" class="hidden">
-      <div class="tvShell">
-        <aside class="tvSidebar">
-          <div class="tvSideBrand"><b>SB</b><span>Player</span></div>
-          <button class="tvNav focusable active" data-tv-home="1">⌂ <span>Home</span></button>
-          <button class="tvNav focusable" data-tv-view="live">▣ <span>Live TV</span></button>
-          <button class="tvNav focusable" data-tv-view="movies">▶ <span>Movies</span></button>
-          <button class="tvNav focusable" data-tv-view="series">▤ <span>Series</span></button>
-          <div class="tvSideSpacer"></div>
-          <button id="tvRefresh" class="tvNav focusable">↻ <span>Refresh</span></button>
-          <button id="tvLogout" class="tvNav focusable">⇥ <span>Sign out</span></button>
-        </aside>
-        <div class="tvDashboard">
-          <div class="tvTop"><div><div class="tvEyebrow">SB PLAYER</div><h1>Home</h1></div><div class="tvTopHint">Choose what you want to watch</div></div>
-          <div class="tvHero"><div><span class="tvPill">YOUR LIBRARY</span><h2>What do you want to watch?</h2><p>Jump straight into live television, movies or series.</p></div></div>
-          <div class="tvChoices">
-            <button class="tvChoice focusable liveChoice" data-tv-view="live"><span class="choiceIcon">▣</span><span><strong>Live TV</strong><small>Browse channels & categories</small></span><span class="choiceArrow">›</span></button>
-            <button class="tvChoice focusable movieChoice" data-tv-view="movies"><span class="choiceIcon">▶</span><span><strong>Movies</strong><small>Explore your movie library</small></span><span class="choiceArrow">›</span></button>
-            <button class="tvChoice focusable seriesChoice" data-tv-view="series"><span class="choiceIcon">▤</span><span><strong>Series</strong><small>Browse shows & episodes</small></span><span class="choiceArrow">›</span></button>
+      <div class="tvDashboard tvDashboardHome">
+        <div class="tvTop">
+          <div>
+            <div class="tvEyebrow">SB PLAYER</div>
+            <h1>Home</h1>
           </div>
+          <div class="tvTopActions">
+            <button id="tvRefresh" class="topAction focusable">↻ Refresh</button>
+            <button id="tvLogout" class="topAction focusable">Sign out</button>
+          </div>
+        </div>
+        <div id="tvHero" class="tvHero">
+          <div>
+            <span class="tvPill">YOUR LIBRARY</span>
+            <h2 id="tvHeroTitle">What do you want to watch?</h2>
+            <p id="tvHeroSubtitle">Live TV, movies and series in one place.</p>
+            <button id="tvHeroPlay" class="heroPlay focusable hidden">▶ Continue watching</button>
+          </div>
+        </div>
+        <div class="tvChoices">
+          <button class="tvChoice focusable liveChoice" data-tv-view="live"><span class="choiceIcon">▣</span><span><strong>Live TV</strong><small>Channels & guide</small></span><span class="choiceArrow">›</span></button>
+          <button class="tvChoice focusable movieChoice" data-tv-view="movies"><span class="choiceIcon">▶</span><span><strong>Movies</strong><small>Browse by category</small></span><span class="choiceArrow">›</span></button>
+          <button class="tvChoice focusable seriesChoice" data-tv-view="series"><span class="choiceIcon">▤</span><span><strong>Series</strong><small>Shows & episodes</small></span><span class="choiceArrow">›</span></button>
+        </div>
+        <div id="tvContinueSection" class="tvContinueSection hidden">
+          <div class="shelfTitle">Continue Watching</div>
+          <div id="tvContinue" class="tvContinue"></div>
         </div>
       </div>
     </section>
     <section id="home" class="hidden">
-      <aside><button data-view="live" class="nav focusable active">Live TV</button><button data-view="movies" class="nav focusable">Movies</button><button data-view="series" class="nav focusable">Series</button><button id="nowPlaying" class="nav focusable hidden">Now Playing</button><button id="logout" class="nav focusable">Sign out</button></aside>
-      <div class="content"><div class="toolbar"><h2 id="heading">Live TV</h2><input id="search" class="focusable" placeholder="Search"></div><div id="categories" class="categories"></div><div id="grid" class="grid"></div></div>
+      <div class="content tvContent">
+        <div class="toolbar">
+          <div>
+            <div class="tvEyebrow">SB PLAYER</div>
+            <h2 id="heading">Live TV</h2>
+          </div>
+          <input id="search" class="focusable" placeholder="Search">
+        </div>
+        <div id="categories" class="categories hidden"></div>
+        <div id="grid" class="grid"></div>
+      </div>
     </section>
   </main>
 </div>
