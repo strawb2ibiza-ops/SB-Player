@@ -456,6 +456,63 @@ class _PlayerScreenState extends State<PlayerScreen> {
     );
   }
 
+  Future<void> _showCastOptions() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.cast_connected_rounded),
+                title: const Text('SB Player TV'),
+                subtitle: const Text(
+                  'Use the linked-TV remote for the full SB Player TV experience.',
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Open TV Remote from Settings to control your linked SB Player TV.',
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  Platform.isIOS
+                      ? Icons.airplay_rounded
+                      : Icons.cast_rounded,
+                ),
+                title: Text(
+                  Platform.isIOS ? 'AirPlay / Screen Mirroring' : 'Cast / Screen share',
+                ),
+                subtitle: const Text(
+                  'Use your phone’s system casting controls for TVs without SB Player installed.',
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'System casting is available from your phone’s device controls. Native in-app receiver discovery is coming next.',
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _seekFromSlider(double value) async {
     if (_duration.inMilliseconds <= 0) return;
     await _player.seek(Duration(milliseconds: value.round()));
@@ -669,6 +726,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   favorite ? Icons.favorite : Icons.favorite_border,
                 ),
               ),
+              if (Platform.isIOS || Platform.isAndroid)
+                IconButton(
+                  tooltip: 'Cast to TV',
+                  onPressed: _showCastOptions,
+                  icon: const Icon(Icons.cast_rounded),
+                ),
               if (Platform.isIOS || Platform.isAndroid)
                 IconButton(
                   tooltip: _pipPreparing
