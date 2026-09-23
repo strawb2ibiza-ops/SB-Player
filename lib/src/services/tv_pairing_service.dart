@@ -58,6 +58,36 @@ class TvPairingRequest {
       );
 }
 
+class TvPairingOffer {
+  const TvPairingOffer({
+    required this.pairingId,
+    required this.token,
+    required this.code,
+    required this.endpoint,
+    required this.qrSvg,
+  });
+
+  final String pairingId;
+  final String token;
+  final String code;
+  final Uri endpoint;
+  final String qrSvg;
+
+  TvRemoteSession toRemoteSession() => TvRemoteSession(
+        pairingId: pairingId,
+        token: token,
+        code: code,
+        endpoint: endpoint,
+      );
+}
+
+class TvRemoteMessage {
+  const TvRemoteMessage({required this.id, required this.command});
+
+  final int id;
+  final String command;
+}
+
 class TvRemoteSession {
   const TvRemoteSession({
     required this.pairingId,
@@ -121,6 +151,172 @@ class TvPairingService {
   final http.Client _client;
   final AesGcm _cipher = AesGcm.with256bits();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
+
+  Future<TvPairingOffer> createOffer() async {
+    final endpoint = Uri.parse(TvPairingRequest.trustedEndpoint);
+    final response = await _client
+        .post(
+          endpoint,
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({'action': 'create'}),
+        )
+        .timeout(const Duration(seconds: 12));
+
+    final decoded = _decode(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(decoded['error'] ?? 'Could not create TV pairing.');
+    }
+
+    final pairingId = '${decoded['pairingId'] ?? ''}'.trim();
+    final token = '${decoded['token'] ?? ''}'.trim();
+    final code = '${decoded['code'] ?? ''}'.trim();
+    final qrSvg = '${decoded['qrSvg'] ?? ''}';
+    if (pairingId.isEmpty || token.isEmpty || qrSvg.isEmpty) {
+      throw Exception('TV pairing response was incomplete.');
+    }
+
+    return TvPairingOffer(
+      pairingId: pairingId,
+      token: token,
+      code: code,
+      endpoint: endpoint,
+      qrSvg: qrSvg,
+    );
+  }
+
+  Future<IptvAccount?> pollOffer(TvPairingOffer offer) async {
+    final response = await _client
+        .post(
+          offer.endpoint,
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'action': 'poll',
+            'pairingId': offer.pairingId,
+            'token': offer.token,
+          }),
+        )
+        .timeout(const Duration(seconds: 8));
+
+    final decoded = _decode(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(decoded['error'] ?? 'Could not check TV pairing.');
+    }
+
+    final status = '${decoded['status'] ?? ''}';
+    if (status == 'pending') return null;
+    if (status != 'approved') {
+      throw Exception('TV pairing is no longer available.');
+    }
+
+    final encrypted = base64Url.decode(
+      base64Url.normalize('${decoded['ciphertext'] ?? ''}'),
+    );
+    final nonce = base64Url.decode(
+      base64Url.normalize('${decoded['nonce'] ?? ''}'),
+    );
+    if (encrypted.length < 17 || nonce.isEmpty) {
+      throw Exception('The linked account payload is invalid.');
+    }
+
+    final keyBytes = base64Url.decode(base64Url.normalize(offer.token));
+    final cipherText = encrypted.sublist(0, encrypted.length - 16);
+    final mac = encrypted.sublist(encrypted.length - 16);
+    final plain = await _cipher.decrypt(
+      SecretBox(cipherText, nonce: nonce, mac: Mac(mac)),
+      secretKey: SecretKey(keyBytes),
+    );
+    final payload = jsonDecode(utf8.decode(plain));
+    if (payload is! Map) {
+      throw Exception('The linked account payload is invalid.');
+    }
+    final value = Map<String, dynamic>.from(payload);
+    if (value['type'] != 'xtream') {
+      throw Exception('Only Xtream TV pairing is supported right now.');
+    }
+
+    return IptvAccount(
+      type: AccountType.xtream,
+      label: '${value['label'] ?? 'SB Player'}',
+      serverUrl: value['serverUrl'] as String?,
+      username: value['username'] as String?,
+      password: value['password'] as String?,
+    );
+  }
+
+  Future<TvRemoteSession> consumeOffer(TvPairingOffer offer) async {
+    final response = await _client
+        .post(
+          offer.endpoint,
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'action': 'consume',
+            'pairingId': offer.pairingId,
+            'token': offer.token,
+          }),
+        )
+        .timeout(const Duration(seconds: 8));
+    final decoded = _decode(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(decoded['error'] ?? 'Could not finish TV pairing.');
+    }
+    final session = offer.toRemoteSession();
+    await saveRemoteSession(session);
+    return session;
+  }
+
+  Future<void> cancelOffer(TvPairingOffer offer) async {
+    try {
+      await _client
+          .post(
+            offer.endpoint,
+            headers: const {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'action': 'cancel',
+              'pairingId': offer.pairingId,
+              'token': offer.token,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      // Pairings expire automatically; cancellation is best effort.
+    }
+  }
+
+  Future<List<TvRemoteMessage>> pollRemoteCommands(
+    TvRemoteSession session, {
+    required int afterId,
+  }) async {
+    final response = await _client
+        .post(
+          session.endpoint,
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'action': 'remote_poll',
+            'pairingId': session.pairingId,
+            'token': session.token,
+            'afterId': afterId,
+          }),
+        )
+        .timeout(const Duration(seconds: 6));
+
+    final decoded = _decode(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(decoded['error'] ?? 'Could not receive TV remote commands.');
+    }
+    final raw = decoded['commands'];
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((entry) {
+          final value = Map<String, dynamic>.from(entry);
+          return TvRemoteMessage(
+            id: int.tryParse('${value['id'] ?? 0}') ?? 0,
+            command: '${value['command'] ?? ''}',
+          );
+        })
+        .where((entry) => entry.id > 0 && entry.command.isNotEmpty)
+        .toList(growable: false);
+  }
 
   Future<TvRemoteSession> approve({
     required TvPairingRequest request,
