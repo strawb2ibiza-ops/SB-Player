@@ -1134,28 +1134,30 @@ class AppController extends ChangeNotifier {
 
   String _cleanCategoryName(String value) {
     var text = value.trim();
-    text = text.replaceAll(
-      RegExp(r'(^|[\\s\\[\\(\\{\\|:;_\\-])(?:en|eng|english)(?=$|[\\s\\]\\)\\}\\|:;_\\-])', caseSensitive: false),
-      ' ',
-    );
-    text = text
-        .replaceAll(RegExp(r'[\\[\\]\\(\\)\\{\\}]'), ' ')
-        .replaceAll(RegExp(r'\\s*[|:;_\\-]+\\s*'), ' • ')
-        .replaceAll(RegExp(r'(?:\\s*•\\s*){2,}'), ' • ')
-        .replaceAll(RegExp(r'\\s+'), ' ')
-        .replaceAll(RegExp(r'^\\s*•\\s*|\\s*•\\s*$'), '')
-        .trim();
-    if (text.isEmpty) return 'Other';
-    return text.split(' • ').map((part) {
-      final p = part.trim();
-      if (p.length <= 3) return p.toUpperCase();
-      return p
-          .split(' ')
-          .map((word) => word.isEmpty
-              ? word
-              : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
-          .join(' ');
-    }).join(' • ');
+    final parts = text
+        .replaceAll('|', ' • ')
+        .replaceAll(':', ' • ')
+        .replaceAll(';', ' • ')
+        .replaceAll('_', ' • ')
+        .split(' • ')
+        .map((part) => part.trim())
+        .where((part) => part.isNotEmpty)
+        .where((part) {
+          final lower = part.toLowerCase();
+          return lower != 'en' && lower != 'eng' && lower != 'english';
+        })
+        .map((part) {
+          if (part.length <= 3) return part.toUpperCase();
+          return part
+              .split(' ')
+              .map((word) => word.isEmpty
+                  ? word
+                  : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+              .join(' ');
+        })
+        .toList();
+    text = parts.join(' • ').trim();
+    return text.isEmpty ? 'Other' : text;
   }
 
   Map<String, List<IptvChannel>> _groupChannelsByCategory(
