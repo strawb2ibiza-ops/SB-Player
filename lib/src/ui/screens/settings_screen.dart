@@ -5,6 +5,7 @@ import '../../services/playback_preferences.dart';
 import '../../state/app_controller.dart';
 import '../widgets/account_manager_dialog.dart';
 import 'link_tv_screen.dart';
+import 'tv_remote_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.controller});
@@ -55,6 +56,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => LinkTvScreen(controller: widget.controller),
+              ),
+            ),
+          ),
+        if (Platform.isAndroid || Platform.isIOS)
+          ListTile(
+            leading: const Icon(Icons.gamepad_rounded),
+            title: const Text('TV Remote'),
+            subtitle: const Text('Control your linked SB Player TV from this device.'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const TvRemoteScreen(),
               ),
             ),
           ),
