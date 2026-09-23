@@ -29,6 +29,7 @@ class SeriesEpisode {
     this.plot,
     this.duration,
     this.imageUrl,
+    this.subtitles = const [],
   });
 
   final String id;
@@ -40,6 +41,7 @@ class SeriesEpisode {
   final String? plot;
   final String? duration;
   final String? imageUrl;
+  final List<SeriesSubtitle> subtitles;
 }
 
 class SeriesDetails {
@@ -50,4 +52,17 @@ class SeriesDetails {
 
   final SeriesItem series;
   final Map<int, List<SeriesEpisode>> seasons;
+}
+
+
+class SeriesSubtitle {
+  const SeriesSubtitle({
+    required this.url,
+    this.title,
+    this.language,
+  });
+
+  final String url;
+  final String? title;
+  final String? language;
 }
