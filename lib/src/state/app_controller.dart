@@ -695,6 +695,8 @@ class AppController extends ChangeNotifier {
     final current = account;
     if (current == null) return;
 
+    xtreamClient.clearCache();
+
     final refreshed = await _guard(() async {
       await _loadAccount(current);
       await accountStore.save(account!);
