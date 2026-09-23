@@ -8,6 +8,16 @@ const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;"
 function base(){return auth.server.replace(/\/$/,"")}
 function api(action,extra){extra=extra||"";return base()+"/player_api.php?username="+encodeURIComponent(auth.username)+"&password="+encodeURIComponent(auth.password)+(action?"&action="+action:"")+extra}
 async function get(url){const r=await fetch(url);if(!r.ok)throw Error("HTTP "+r.status);return r.json()}
+const catalogCache={};
+const CATALOG_CACHE_MS=300000;
+async function getCached(url){var now=Date.now(),hit=catalogCache[url];if(hit&&now-hit.time<CATALOG_CACHE_MS)return hit.value;var value=await get(url);catalogCache[url]={time:now,value:value};return value}
+function cleanCategoryName(value){
+ var text=String(value==null?"":value).trim();
+ text=text.replace(/(^|[\\s\\[\\(\\{\\|:;_\\-])(en|eng|english)(?=$|[\\s\\]\\)\\}\\|:;_\\-])/gi," ");
+ text=text.replace(/[\\[\\]\\(\\)\\{\\}]/g," ").replace(/\\s*[|:;_\\-]+\\s*/g," • ").replace(/(?:\\s*•\\s*){2,}/g," • ").replace(/\\s+/g," ").replace(/^\\s*•\\s*|\\s*•\\s*$/g,"").trim();
+ if(!text)return "Other";
+ return text.split(" • ").map(function(part){part=part.trim();if(part.length<=3)return part.toUpperCase();return part.split(" ").map(function(w){return w?w.charAt(0).toUpperCase()+w.slice(1).toLowerCase():w}).join(" ")}).join(" • ");
+}
 async function pairPost(body){const r=await fetch(PAIR_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let d={};try{d=await r.json()}catch(_){d={}}if(!r.ok)throw Error(d.error||("HTTP "+r.status));return d}
 function save(){localStorage.setItem("sb.webos.auth",JSON.stringify(auth))}
 function invalidateFocus(){focusCache=null}
@@ -114,10 +124,10 @@ async function loadView(v){
  try{
   const ca=v==="live"?"get_live_categories":v==="movies"?"get_vod_categories":"get_series_categories";
   const ia=v==="live"?"get_live_streams":v==="movies"?"get_vod_streams":"get_series";
-  const loaded=await Promise.all([get(api(ca)),get(api(ia))]);if(generation!==viewGeneration)return;categories=loaded[0]||[];items=loaded[1]||[];for(let i=0;i<items.length;i++){items[i].__sbIndex=i;const n=items[i].name!=null?items[i].name:(items[i].title!=null?items[i].title:"");items[i].__sbSearch=String(n).toLowerCase();}renderCats();render();focusFirst()
+  const loaded=await Promise.all([getCached(api(ca)),getCached(api(ia))]);if(generation!==viewGeneration)return;categories=loaded[0]||[];items=loaded[1]||[];for(let i=0;i<items.length;i++){items[i].__sbIndex=i;const n=items[i].name!=null?items[i].name:(items[i].title!=null?items[i].title:"");items[i].__sbSearch=String(n).toLowerCase();}renderCats();render();focusFirst()
  }catch(e){if(generation===viewGeneration)$("grid").innerHTML="<p>Unable to load: "+esc(e.message)+"</p>"}
 }
-function renderCats(){invalidateFocus();$("categories").innerHTML='<button class="cat focusable active" data-cat="all">All</button>'+categories.map(function(c){return '<button class="cat focusable" data-cat="'+esc(c.category_id)+'">'+esc(c.category_name)+"</button>"}).join("")}
+function renderCats(){invalidateFocus();$("categories").innerHTML='<button class="cat focusable active" data-cat="all">All</button>'+categories.map(function(c){return '<button class="cat focusable" data-cat="'+esc(c.category_id)+'">'+esc(cleanCategoryName(c.category_name))+"</button>"}).join("")}
 function cardHtml(x){
  const name=x.name!=null?x.name:(x.title!=null?x.title:"Untitled"),img=x.stream_icon!=null?x.stream_icon:(x.cover!=null?x.cover:"");
  return '<button class="card focusable" data-i="'+x.__sbIndex+'">'+(img?'<img src="'+esc(img)+'" onerror="this.style.display=\'none\'">':"")+"<strong>"+esc(name)+"</strong><small>"+esc(view==="live"?"Live":view==="movies"?"Movie":"Series")+"</small></button>";
