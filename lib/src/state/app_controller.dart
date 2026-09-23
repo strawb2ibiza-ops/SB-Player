@@ -502,6 +502,14 @@ class AppController extends ChangeNotifier {
           '${seriesItem.name} • S${episode.season} E${episode.episodeNumber}',
       startPosition: _savedPosition(id),
       next: next,
+      externalSubtitles: [
+        for (final track in episode.subtitles)
+          PlaybackSubtitle(
+            url: track.url,
+            title: track.title,
+            language: track.language,
+          ),
+      ],
     );
   }
 
