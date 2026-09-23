@@ -103,7 +103,7 @@ class _TvRemoteScreenState extends State<TvRemoteScreen> {
                               Text(
                                 _session!.code.isEmpty
                                     ? 'Linked SB Player TV'
-                                    : 'TV ' + _session!.code,
+                                    : 'TV ${_session!.code}',
                                 style: Theme.of(context)
                                     .textTheme
                                     .titleLarge
@@ -114,7 +114,7 @@ class _TvRemoteScreenState extends State<TvRemoteScreen> {
                                 _error ??
                                     (_lastCommand == null
                                         ? 'Use your phone like the TV remote.'
-                                        : 'Sent: ' + _lastCommand!),
+                                        : 'Sent: ${_lastCommand!}'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: _error == null
@@ -155,7 +155,7 @@ class _TvRemoteScreenState extends State<TvRemoteScreen> {
                                 children: [
                                   Expanded(
                                     child: _RemoteAction(
-                                      icon: Icons.play_pause_rounded,
+                                      icon: Icons.play_circle_fill_rounded,
                                       label: 'Play / Pause',
                                       onPressed: () => _send(
                                         TvRemoteCommand.playPause,
