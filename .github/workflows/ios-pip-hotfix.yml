@@ -1,0 +1,43 @@
+name: iOS PiP hotfix build
+
+on:
+  push:
+    branches: [ios-pip-hotfix]
+
+jobs:
+  ios-build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Create iOS platform
+        run: flutter create --project-name sb_player --platforms=ios .
+      - name: Configure iOS
+        run: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName SB Player" ios/Runner/Info.plist || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'SB Player'" ios/Runner/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes array" ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :UIBackgroundModes:0 string audio" ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity dict" ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" ios/Runner/Info.plist || /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsArbitraryLoads true" ios/Runner/Info.plist
+      - run: flutter pub get
+      - name: Patch media_kit iOS same-player PiP
+        run: python3 scripts/patch_ios_media_kit_pip.py
+      - name: Analyze
+        run: flutter analyze
+      - name: Build unsigned iOS release
+        run: flutter build ios --release --no-codesign
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry SB-Player-iOS-v0.6.5-pip2-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SB-Player-iOS-v0.6.5-pip2-unsigned-IPA
+          path: SB-Player-iOS-v0.6.5-pip2-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
