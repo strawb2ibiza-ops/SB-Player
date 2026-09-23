@@ -9,6 +9,7 @@ class PlaybackItem {
     this.subtitle,
     this.artworkUrl,
     this.startPosition = Duration.zero,
+    this.next,
   });
 
   final String id;
@@ -18,6 +19,7 @@ class PlaybackItem {
   final String? subtitle;
   final String? artworkUrl;
   final Duration startPosition;
+  final PlaybackItem? next;
 
   bool get isLive => kind == PlaybackKind.live;
 }
