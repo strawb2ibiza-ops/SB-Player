@@ -397,7 +397,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildTvHome(AppController controller) {
     return Scaffold(
-      appBar: AppBar(title: const SbLogo(symbolSize: 30, compact: true, showTagline: false)),
+      appBar: AppBar(
+        title: const SbLogo(symbolSize: 30, compact: true, showTagline: false),
+        actions: [
+          if (controller.loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 18),
+              child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
+            )
+          else
+            IconButton(
+              autofocus: false,
+              tooltip: 'Refresh provider data',
+              onPressed: controller.refresh,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          const SizedBox(width: 18),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1500),
