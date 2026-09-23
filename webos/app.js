@@ -15,8 +15,11 @@ const CATALOG_CACHE_MS=300000;
 async function getCached(url){var now=Date.now(),hit=catalogCache[url];if(hit&&now-hit.time<CATALOG_CACHE_MS)return hit.value;var value=await get(url);catalogCache[url]={time:now,value:value};return value}
 function cleanCategoryName(value){
  var text=String(value==null?"":value).trim();
- text=text.replace(/(^|[\\s\\[\\(\\{\\|:;_\\-])(en|eng|english)(?=$|[\\s\\]\\)\\}\\|:;_\\-])/gi," ");
- text=text.replace(/[\\[\\]\\(\\)\\{\\}]/g," ").replace(/\\s*[|:;_\\-]+\\s*/g," • ").replace(/(?:\\s*•\\s*){2,}/g," • ").replace(/\\s+/g," ").replace(/^\\s*•\\s*|\\s*•\\s*$/g,"").trim();
+ text=text.replace(/\b(?:en|eng|english)\b/gi," ");
+ text=text.replace(/[\[\](){}]/g," ");
+ text=text.replace(/\s*[|:;_-]+\s*/g," • ");
+ text=text.replace(/(?:\s*•\s*){2,}/g," • ");
+ text=text.replace(/\s+/g," ").replace(/^\s*•\s*|\s*•\s*$/g,"").trim();
  if(!text)return "Other";
  return text.split(" • ").map(function(part){part=part.trim();if(part.length<=3)return part.toUpperCase();return part.split(" ").map(function(w){return w?w.charAt(0).toUpperCase()+w.slice(1).toLowerCase():w}).join(" ")}).join(" • ");
 }
