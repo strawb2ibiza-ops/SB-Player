@@ -391,8 +391,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ListTile(
                   leading: const Icon(Icons.subtitles_off_outlined),
                   title: const Text('Off'),
-                  selected: _selectedTracks.subtitle.id == 'no' ||
-                      _selectedTracks.subtitle.id.isEmpty,
+                  selected: _selectedTracks.subtitle.id == 'no',
                   onTap: () async {
                     await _player.setSubtitleTrack(SubtitleTrack.no());
                     if (context.mounted) Navigator.of(context).pop();
