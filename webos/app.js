@@ -233,6 +233,14 @@ $("grid").onscroll=function(){const g=$("grid");if(g.scrollTop+g.clientHeight>=g
 $("back").onclick=minimizeVideo;
 $("nowPlaying").onclick=expandVideo;
 function logout(){stopVideo();localStorage.removeItem("sb.webos.auth");auth=null;showLogin()}
-$("logout").onclick=logout;$("tvLogout").onclick=logout;
+async function refreshProvider(){
+ var b=$("tvRefresh");if(b){b.disabled=true;b.textContent="Refreshing…"}
+ for(var key in catalogCache){if(Object.prototype.hasOwnProperty.call(catalogCache,key))delete catalogCache[key]}
+ items=[];categories=[];filteredItems=[];renderedCount=0;viewGeneration+=1;
+ try{await get(api(""));if(b)b.textContent="✓ Refreshed"}
+ catch(e){if(b)b.textContent="Refresh failed"}
+ setTimeout(function(){if(b){b.disabled=false;b.textContent="↻ Refresh";b.focus()}},1200);
+}
+$("logout").onclick=logout;$("tvLogout").onclick=logout;$("tvRefresh").onclick=refreshProvider;
 try{const s=JSON.parse(localStorage.getItem("sb.webos.auth")||"null");if(s){auth=s;showHome()}else $("server").focus()}catch(_){$("server").focus()}
 })();
