@@ -1,7 +1,7 @@
 (()=>{"use strict";
 const $=id=>document.getElementById(id);
 const PAIR_ENDPOINT="https://ehdvyarueeaetsvzdboo.supabase.co/functions/v1/device-pairing";
-let auth=null,view="live",items=[],categories=[],activeCat="all",lastFocus=null,pairing=null,pairTimer=null,renderTimer=null,focusCache=null,pairPollBusy=false,viewGeneration=0,playAttempt=0,categoryMode=true,remoteSession=null,remoteTimer=null,remotePollBusy=false,remoteAfterId=0,currentPlayback=null,continueWriteAt=0,episodeSeries=null;
+let auth=null,view="live",items=[],categories=[],activeCat="all",lastFocus=null,pairing=null,pairTimer=null,renderTimer=null,focusCache=null,pairPollBusy=false,viewGeneration=0,playAttempt=0,categoryMode=true,remoteSession=null,remoteTimer=null,remotePollBusy=false,remoteAfterId=0,currentPlayback=null,continueWriteAt=0,episodeSeries=null,episodeQueue=[],episodeIndex=-1;
 const WEBOS_RENDER_BATCH=120;
 const REMOTE_KEY="sb.webos.remote.v1";
 const CONTINUE_KEY="sb.webos.continue.v1";
