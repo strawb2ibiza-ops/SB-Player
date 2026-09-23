@@ -302,11 +302,7 @@ document.addEventListener("keydown",function(e){
  const k=e.keyCode||e.which;
  if(k===37||k===38||k===39||k===40){e.preventDefault();moveFocus(k);return}
  if(k===13){e.preventDefault();activate(document.activeElement);return}
- if(k===461||e.key==="Backspace"||e.key==="Escape"){
-   if(!$("pairing").classList.contains("hidden")){e.preventDefault();cancelPairing();return}
-   if(!$("player").classList.contains("hidden")&&!$("player").classList.contains("mini")){e.preventDefault();minimizeVideo();return}
-   if(!$("home").classList.contains("hidden")){e.preventDefault();showHome();return}
- }
+ if(k===461||e.key==="Backspace"||e.key==="Escape"){e.preventDefault();goBack();return}
 });
 $("signin").addEventListener("click",signin);
 $("phoneSignIn").addEventListener("click",startPairing);
@@ -326,5 +322,5 @@ async function refreshProvider(){
  setTimeout(function(){if(b){b.disabled=false;b.textContent="↻ Refresh";b.focus()}},1200);
 }
 $("logout").onclick=logout;$("tvLogout").onclick=logout;$("tvRefresh").onclick=refreshProvider;
-try{const s=JSON.parse(localStorage.getItem("sb.webos.auth")||"null");if(s){auth=s;showHome()}else $("server").focus()}catch(_){$("server").focus()}
+try{const s=JSON.parse(localStorage.getItem("sb.webos.auth")||"null");loadRemoteSession();if(s){auth=s;showHome()}else $("server").focus()}catch(_){$("server").focus()}
 })();
