@@ -396,41 +396,207 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildTvHome(AppController controller) {
+    final continueItems = controller.continueWatching.take(8).toList(growable: false);
+    final recentItems = controller.visibleLibrary(controller.recent, '');
+    final hero = continueItems.isNotEmpty
+        ? continueItems.first
+        : (recentItems.isNotEmpty ? recentItems.first : null);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const SbLogo(symbolSize: 30, compact: true, showTagline: false),
-        actions: [
-          if (controller.loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 18),
-              child: Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))),
-            )
-          else
-            IconButton(
-              autofocus: false,
-              tooltip: 'Refresh provider data',
-              onPressed: controller.refresh,
-              icon: const Icon(Icons.refresh_rounded),
-            ),
-          const SizedBox(width: 18),
-        ],
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1500),
+      body: BrandBackdrop(
+        dense: true,
+        child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(48),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text('What do you want to watch?', style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900)),
-              const SizedBox(height: 42),
-              Expanded(child: Row(children: [
-                Expanded(child: _TvChoice(icon: Icons.live_tv_outlined, label: 'Live TV', autofocus: true, onTap: () => unawaited(_changeSection(ContentSection.live)))),
-                const SizedBox(width: 28),
-                Expanded(child: _TvChoice(icon: Icons.movie_outlined, label: 'Movies', onTap: () => unawaited(_changeSection(ContentSection.movies)))),
-                const SizedBox(width: 28),
-                Expanded(child: _TvChoice(icon: Icons.tv_outlined, label: 'Series', onTap: () => unawaited(_changeSection(ContentSection.series)))),
-              ])),
-            ]),
+            padding: const EdgeInsets.fromLTRB(42, 26, 42, 34),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const SbLogo(
+                      symbolSize: 34,
+                      compact: true,
+                      showTagline: false,
+                    ),
+                    const SizedBox(width: 24),
+                    Text(
+                      'Home',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                    ),
+                    const Spacer(),
+                    if (controller.loading)
+                      const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      IconButton.filledTonal(
+                        tooltip: 'Refresh provider data',
+                        onPressed: controller.refresh,
+                        icon: const Icon(Icons.refresh_rounded),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                Container(
+                  height: 210,
+                  width: double.infinity,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: SbBrand.elevated,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: SbBrand.electricBlue.withValues(alpha: .18),
+                    ),
+                  ),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (hero?.artworkUrl != null)
+                        Image.network(
+                          hero!.artworkUrl!,
+                          fit: BoxFit.cover,
+                          alignment: Alignment.centerRight,
+                          errorBuilder: (_, _, _) =>
+                              const BrandBackdrop(child: SizedBox.expand()),
+                        ),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Color(0xF7040509),
+                              Color(0xC0040509),
+                              Color(0x30040509),
+                            ],
+                            stops: [0, .55, 1],
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            const Text(
+                              'SB PLAYER HOME',
+                              style: TextStyle(
+                                color: SbBrand.brightBlue,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              hero?.title ?? 'What do you want to watch?',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineMedium
+                                  ?.copyWith(fontWeight: FontWeight.w900),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              hero?.subtitle?.trim().isNotEmpty == true
+                                  ? hero!.subtitle!
+                                  : 'Live TV, movies and series in one place.',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: SbBrand.textMuted),
+                            ),
+                            if (hero != null) ...[
+                              const SizedBox(height: 14),
+                              FilledButton.icon(
+                                onPressed: () => _play(hero.toPlaybackItem()),
+                                icon: const Icon(Icons.play_arrow_rounded),
+                                label: const Text('Continue watching'),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  height: 170,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _TvChoice(
+                          icon: Icons.live_tv_outlined,
+                          label: 'Live TV',
+                          subtitle: 'Channels & guide',
+                          autofocus: true,
+                          onTap: () =>
+                              unawaited(_changeSection(ContentSection.live)),
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: _TvChoice(
+                          icon: Icons.movie_outlined,
+                          label: 'Movies',
+                          subtitle: 'Browse by category',
+                          onTap: () =>
+                              unawaited(_changeSection(ContentSection.movies)),
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: _TvChoice(
+                          icon: Icons.tv_outlined,
+                          label: 'Series',
+                          subtitle: 'Shows & episodes',
+                          onTap: () =>
+                              unawaited(_changeSection(ContentSection.series)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (continueItems.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    'Continue Watching',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: continueItems.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 14),
+                      itemBuilder: (context, index) {
+                        final entry = continueItems[index];
+                        return SizedBox(
+                          width: 390,
+                          child: ResumeCard(
+                            entry: entry,
+                            favorite: controller.isFavorite(entry.toPlaybackItem()),
+                            onFavorite: () => controller.toggleFavorite(
+                              entry.toPlaybackItem(),
+                            ),
+                            onTap: () => _play(entry.toPlaybackItem()),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ] else
+                  const Spacer(),
+              ],
+            ),
           ),
         ),
       ),
@@ -711,13 +877,21 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
     return LayoutBuilder(builder: (context, constraints) {
-      final columns = constraints.maxWidth > 1400 ? 4 : constraints.maxWidth > 900 ? 3 : constraints.maxWidth > 560 ? 2 : 1;
+      final columns = constraints.maxWidth > 1500
+          ? 6
+          : constraints.maxWidth > 1220
+              ? 5
+              : constraints.maxWidth > 940
+                  ? 4
+                  : constraints.maxWidth > 680
+                      ? 3
+                      : 2;
       return GridView.builder(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
-          childAspectRatio: 1.65,
+          childAspectRatio: columns >= 5 ? 0.82 : columns == 4 ? 0.9 : 1.05,
         ),
         itemCount: categories.length + 1,
         itemBuilder: (context, index) {
@@ -1521,10 +1695,61 @@ DateTime _roundedGuideTime(DateTime value) {
 }
 
 class _TvChoice extends StatelessWidget {
-  const _TvChoice({required this.icon, required this.label, required this.onTap, this.autofocus = false});
-  final IconData icon; final String label; final VoidCallback onTap; final bool autofocus;
-  @override Widget build(BuildContext context) => Card(
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(autofocus: autofocus, onTap: onTap, child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 72, color: SbBrand.brightBlue), const SizedBox(height: 22), Text(label, style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w900))]))),
-  );
+  const _TvChoice({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.subtitle,
+    this.autofocus = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final VoidCallback onTap;
+  final bool autofocus;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          autofocus: autofocus,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+            child: Row(
+              children: [
+                Icon(icon, size: 54, color: SbBrand.brightBlue),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                      ),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          subtitle!,
+                          style: const TextStyle(color: SbBrand.textMuted),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: SbBrand.brightBlue,
+                  size: 34,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 }
