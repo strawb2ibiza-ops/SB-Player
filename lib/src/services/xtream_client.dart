@@ -352,6 +352,14 @@ class XtreamClient {
     final direct = '${raw['direct_source'] ?? ''}'.trim();
     final fallback = '$server/series/${_segment(username)}/${_segment(password)}/${_segment(id)}.$extension';
 
+    final subtitles = _subtitleList(
+      raw['subtitles'] ??
+          raw['subtitle'] ??
+          info['subtitles'] ??
+          info['subtitle'] ??
+          info['external_subtitles'],
+    );
+
     return SeriesEpisode(
       id: id,
       title: '${raw['title'] ?? raw['name'] ?? 'Episode $episodeNumber'}',
@@ -362,6 +370,7 @@ class XtreamClient {
       plot: _nullableString(info['plot'] ?? raw['plot']),
       duration: _nullableString(info['duration'] ?? raw['duration']),
       imageUrl: _nullableString(info['movie_image'] ?? info['cover_big'] ?? raw['cover']),
+      subtitles: subtitles,
     );
   }
 
@@ -423,6 +432,59 @@ class XtreamClient {
     } catch (_) {
       throw XtreamException('Provider returned invalid data.');
     }
+  }
+
+  List<SeriesSubtitle> _subtitleList(dynamic value) {
+    if (value == null) return const [];
+    final result = <SeriesSubtitle>[];
+
+    void add(dynamic raw, {String? fallbackLanguage}) {
+      if (raw is String) {
+        final url = _httpSource(raw.trim());
+        if (url != null) {
+          result.add(SeriesSubtitle(
+            url: url,
+            language: fallbackLanguage,
+            title: fallbackLanguage,
+          ));
+        }
+        return;
+      }
+      if (raw is Map) {
+        final candidate = _nullableString(
+          raw['url'] ?? raw['file'] ?? raw['src'] ?? raw['path'],
+        );
+        final url = candidate == null ? null : _httpSource(candidate);
+        if (url == null) return;
+        result.add(SeriesSubtitle(
+          url: url,
+          language: _nullableString(raw['language'] ?? raw['lang']) ??
+              fallbackLanguage,
+          title: _nullableString(raw['title'] ?? raw['label'] ?? raw['name']),
+        ));
+      }
+    }
+
+    if (value is List) {
+      for (final raw in value) {
+        add(raw);
+      }
+    } else if (value is Map) {
+      for (final entry in value.entries) {
+        if (entry.value is List) {
+          for (final raw in entry.value as List) {
+            add(raw, fallbackLanguage: '${entry.key}');
+          }
+        } else {
+          add(entry.value, fallbackLanguage: '${entry.key}');
+        }
+      }
+    } else {
+      add(value);
+    }
+
+    final seen = <String>{};
+    return result.where((item) => seen.add(item.url)).toList(growable: false);
   }
 
   String? _httpSource(String value) {
