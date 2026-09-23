@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/iptv_account.dart';
@@ -48,15 +49,80 @@ class TvPairingRequest {
       endpoint: endpoint,
     );
   }
+
+  TvRemoteSession toRemoteSession() => TvRemoteSession(
+        pairingId: pairingId,
+        token: token,
+        code: code,
+        endpoint: endpoint,
+      );
+}
+
+class TvRemoteSession {
+  const TvRemoteSession({
+    required this.pairingId,
+    required this.token,
+    required this.code,
+    required this.endpoint,
+  });
+
+  final String pairingId;
+  final String token;
+  final String code;
+  final Uri endpoint;
+
+  Map<String, dynamic> toJson() => {
+        'pairingId': pairingId,
+        'token': token,
+        'code': code,
+        'endpoint': endpoint.toString(),
+      };
+
+  factory TvRemoteSession.fromJson(Map<String, dynamic> json) {
+    final endpoint = Uri.parse('${json['endpoint'] ?? ''}');
+    if (endpoint.toString() != TvPairingRequest.trustedEndpoint) {
+      throw const FormatException('Stored TV remote endpoint is invalid.');
+    }
+    final pairingId = '${json['pairingId'] ?? ''}'.trim();
+    final token = '${json['token'] ?? ''}'.trim();
+    if (pairingId.isEmpty || token.isEmpty) {
+      throw const FormatException('Stored TV remote is incomplete.');
+    }
+    return TvRemoteSession(
+      pairingId: pairingId,
+      token: token,
+      code: '${json['code'] ?? ''}',
+      endpoint: endpoint,
+    );
+  }
+}
+
+class TvRemoteCommand {
+  const TvRemoteCommand._(this.value);
+
+  final String value;
+
+  static const up = TvRemoteCommand._('up');
+  static const down = TvRemoteCommand._('down');
+  static const left = TvRemoteCommand._('left');
+  static const right = TvRemoteCommand._('right');
+  static const select = TvRemoteCommand._('select');
+  static const back = TvRemoteCommand._('back');
+  static const home = TvRemoteCommand._('home');
+  static const playPause = TvRemoteCommand._('play_pause');
+  static const refresh = TvRemoteCommand._('refresh');
 }
 
 class TvPairingService {
   TvPairingService({http.Client? client}) : _client = client ?? http.Client();
 
+  static const _remoteStorageKey = 'sb_player.tv_remote.v1';
+
   final http.Client _client;
   final AesGcm _cipher = AesGcm.with256bits();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  Future<void> approve({
+  Future<TvRemoteSession> approve({
     required TvPairingRequest request,
     required IptvAccount account,
   }) async {
@@ -121,7 +187,59 @@ class TvPairingService {
     if (decoded['ok'] != true) {
       throw Exception(decoded['error'] ?? 'The TV could not be linked.');
     }
+
+    final session = request.toRemoteSession();
+    await saveRemoteSession(session);
+    return session;
   }
+
+  Future<void> sendRemoteCommand(
+    TvRemoteSession session,
+    TvRemoteCommand command,
+  ) async {
+    final response = await _client
+        .post(
+          session.endpoint,
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'action': 'remote_command',
+            'pairingId': session.pairingId,
+            'token': session.token,
+            'command': command.value,
+          }),
+        )
+        .timeout(const Duration(seconds: 6));
+
+    final decoded = _decode(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception(decoded['error'] ?? 'The TV did not accept the remote command.');
+    }
+    if (decoded['ok'] != true) {
+      throw Exception(decoded['error'] ?? 'The TV did not accept the remote command.');
+    }
+  }
+
+  Future<void> saveRemoteSession(TvRemoteSession session) =>
+      _storage.write(
+        key: _remoteStorageKey,
+        value: jsonEncode(session.toJson()),
+      );
+
+  Future<TvRemoteSession?> loadRemoteSession() async {
+    try {
+      final raw = await _storage.read(key: _remoteStorageKey);
+      if (raw == null || raw.isEmpty) return null;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      return TvRemoteSession.fromJson(Map<String, dynamic>.from(decoded));
+    } catch (_) {
+      await forgetRemoteSession();
+      return null;
+    }
+  }
+
+  Future<void> forgetRemoteSession() =>
+      _storage.delete(key: _remoteStorageKey);
 
   Map<String, dynamic> _decode(http.Response response) {
     try {
