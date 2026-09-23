@@ -250,13 +250,13 @@ function mediaType(url){
  return "video/mp4";
 }
 function resetVideo(video){
- try{rememberPlayback(true)}catch(_){}
  try{video.pause()}catch(_){}
  video.onerror=null;video.onplaying=null;video.oncanplay=null;video.onended=null;video.ontimeupdate=null;
  while(video.firstChild)video.removeChild(video.firstChild);
  video.removeAttribute("src");video.load();
 }
 function openVideoCandidates(urls,title,autoNext,meta){
+ try{rememberPlayback(true)}catch(_){}
  lastFocus=document.activeElement;playAttempt+=1;var attempt=playAttempt,index=0,video=$("video"),timer=null;
  currentPlayback=meta||null;continueWriteAt=0;
  $("player").classList.remove("hidden","mini");$("playingTitle").textContent=(title||"")+" — Loading…";
