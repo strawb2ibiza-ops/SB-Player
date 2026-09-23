@@ -22,6 +22,9 @@ class XtreamClient {
       RegExp(r'^https?://', caseSensitive: false);
   static final RegExp _extensionPattern = RegExp(r'^[a-z0-9]{1,8}$');
   final http.Client _client;
+  final Map<String, Future<dynamic>> _inFlight = <String, Future<dynamic>>{};
+  final Map<String, _XtreamCacheEntry> _cache = <String, _XtreamCacheEntry>{};
+  static const Duration _catalogCacheTtl = Duration(minutes: 5);
 
   String normalizeBase(String value) {
     var result = value.trim();
@@ -199,7 +202,7 @@ class XtreamClient {
     IptvAccount account,
     String action,
   ) async {
-    final data = await _getAction(account, action);
+    final data = await _getAction(account, action, cache: true);
     if (data is! List) return const [];
 
     return data.whereType<Map>().map((item) {
@@ -211,7 +214,7 @@ class XtreamClient {
   }
 
   Future<List<IptvChannel>> fetchLiveChannels(IptvAccount account) async {
-    final data = await _getAction(account, 'get_live_streams');
+    final data = await _getAction(account, 'get_live_streams', cache: true);
     if (data is! List) return const [];
 
     final server = account.serverUrl!;
@@ -235,7 +238,7 @@ class XtreamClient {
   }
 
   Future<List<VodItem>> fetchVodStreams(IptvAccount account) async {
-    final data = await _getAction(account, 'get_vod_streams');
+    final data = await _getAction(account, 'get_vod_streams', cache: true);
     if (data is! List) return const [];
 
     final server = account.serverUrl!;
@@ -264,7 +267,7 @@ class XtreamClient {
   }
 
   Future<List<SeriesItem>> fetchSeries(IptvAccount account) async {
-    final data = await _getAction(account, 'get_series');
+    final data = await _getAction(account, 'get_series', cache: true);
     if (data is! List) return const [];
 
     return data.whereType<Map>().map((item) {
@@ -360,6 +363,7 @@ class XtreamClient {
     IptvAccount account,
     String action, {
     Map<String, String> extra = const {},
+    bool cache = false,
   }) async {
     if (account.type != AccountType.xtream ||
         account.serverUrl == null ||
@@ -377,6 +381,28 @@ class XtreamClient {
       },
     );
 
+    final key = uri.toString();
+    if (cache) {
+      final cached = _cache[key];
+      if (cached != null && DateTime.now().difference(cached.createdAt) < _catalogCacheTtl) {
+        return cached.value;
+      }
+      final pending = _inFlight[key];
+      if (pending != null) return pending;
+    }
+
+    final request = _requestJson(uri);
+    if (cache) _inFlight[key] = request;
+    try {
+      final value = await request;
+      if (cache) _cache[key] = _XtreamCacheEntry(value, DateTime.now());
+      return value;
+    } finally {
+      if (cache) _inFlight.remove(key);
+    }
+  }
+
+  Future<dynamic> _requestJson(Uri uri) async {
     late http.Response response;
     try {
       response = await _client.get(uri).timeout(const Duration(seconds: 25));
@@ -422,5 +448,15 @@ class XtreamClient {
     return text.isEmpty || text == 'null' ? null : text;
   }
 
-  void dispose() => _client.close();
+  void dispose() {
+    _cache.clear();
+    _inFlight.clear();
+    _client.close();
+  }
+}
+
+class _XtreamCacheEntry {
+  const _XtreamCacheEntry(this.value, this.createdAt);
+  final dynamic value;
+  final DateTime createdAt;
 }
