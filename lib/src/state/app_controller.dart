@@ -485,9 +485,13 @@ class AppController extends ChangeNotifier {
 
   PlaybackItem playbackForEpisode(
     SeriesItem seriesItem,
-    SeriesEpisode episode,
-  ) {
+    SeriesEpisode episode, {
+    SeriesEpisode? nextEpisode,
+  }) {
     final id = _scopedContentId('episode', episode.id);
+    final next = nextEpisode == null
+        ? null
+        : playbackForEpisode(seriesItem, nextEpisode);
     return PlaybackItem(
       id: id,
       title: episode.title,
@@ -497,6 +501,7 @@ class AppController extends ChangeNotifier {
       subtitle:
           '${seriesItem.name} • S${episode.season} E${episode.episodeNumber}',
       startPosition: _savedPosition(id),
+      next: next,
     );
   }
 
