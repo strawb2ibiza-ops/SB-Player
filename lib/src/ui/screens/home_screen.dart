@@ -973,17 +973,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryLanding(AppController controller, ContentSection section) {
-    final query = _search.text.trim().toLowerCase();
-    final categories = controller.activeCategories
-        .where((category) =>
-            query.isEmpty || category.name.toLowerCase().contains(query))
-        .toList(growable: false);
+    final query = _search.text.trim();
+    if (query.isNotEmpty) {
+      // Search always searches the actual catalogue, even while the category
+      // landing screen is visible. Previously it only filtered category names,
+      // which made searches such as "Moana" appear broken.
+      switch (section) {
+        case ContentSection.live:
+          return _buildLive(controller);
+        case ContentSection.movies:
+          return _buildMovies(controller);
+        case ContentSection.series:
+          return _buildSeries(controller);
+        default:
+          break;
+      }
+    }
+    final categories = controller.activeCategories;
     if (categories.isEmpty) {
-      return Center(
-        child: Text(query.isEmpty
-            ? 'No categories found.'
-            : 'No categories match "${_search.text.trim()}".'),
-      );
+      return const Center(child: Text('No categories found.'));
     }
     return LayoutBuilder(builder: (context, constraints) {
       final columns = constraints.maxWidth > 1500
