@@ -182,19 +182,33 @@ jobs:
           sed -i 's/import io.flutter.embedding.android.FlutterActivity/import io.flutter.embedding.android.FlutterFragmentActivity/' "$main"
           sed -i 's/: FlutterActivity()/: FlutterFragmentActivity()/' "$main"
       - run: flutter pub get
-      - name: Build Android APK
-        run: flutter build apk --release --dart-define=SB_ANDROID_TV=true
-      - name: Build Android App Bundle
-        run: flutter build appbundle --release
+      - name: Build Android Mobile APK
+        run: |
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk SB-Player-Android-Mobile-v0.6.3.apk
+      - name: Build Android Mobile App Bundle
+        run: |
+          flutter build appbundle --release
+          cp build/app/outputs/bundle/release/app-release.aab SB-Player-Android-Mobile-v0.6.3.aab
+      - name: Build Android TV APK
+        run: |
+          flutter build apk --release --dart-define=SB_ANDROID_TV=true
+          cp build/app/outputs/flutter-apk/app-release.apk SB-Player-Android-TV-v0.6.3.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Android-v0.6-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: SB-Player-Android-Mobile-v0.6.3
+          path: SB-Player-Android-Mobile-v0.6.3.apk
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Android-v0.6-AAB
-          path: build/app/outputs/bundle/release/app-release.aab
+          name: SB-Player-Android-Mobile-AAB-v0.6.3
+          path: SB-Player-Android-Mobile-v0.6.3.aab
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SB-Player-Android-TV-v0.6.3
+          path: SB-Player-Android-TV-v0.6.3.apk
           if-no-files-found: error
           retention-days: 14
