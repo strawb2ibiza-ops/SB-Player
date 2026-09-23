@@ -1,8 +1,10 @@
 (()=>{"use strict";
 const $=id=>document.getElementById(id);
 const PAIR_ENDPOINT="https://ehdvyarueeaetsvzdboo.supabase.co/functions/v1/device-pairing";
-let auth=null,view="live",items=[],categories=[],activeCat="all",lastFocus=null,pairing=null,pairTimer=null,renderTimer=null,focusCache=null,pairPollBusy=false,viewGeneration=0,playAttempt=0;
+let auth=null,view="live",items=[],categories=[],activeCat="all",lastFocus=null,pairing=null,pairTimer=null,renderTimer=null,focusCache=null,pairPollBusy=false,viewGeneration=0,playAttempt=0,categoryMode=true,remoteSession=null,remoteTimer=null,remotePollBusy=false,remoteAfterId=0,currentPlayback=null,continueWriteAt=0,episodeSeries=null;
 const WEBOS_RENDER_BATCH=120;
+const REMOTE_KEY="sb.webos.remote.v1";
+const CONTINUE_KEY="sb.webos.continue.v1";
 let filteredItems=[],renderedCount=0;
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function base(){return auth.server.replace(/\/$/,"")}
@@ -19,6 +21,49 @@ function cleanCategoryName(value){
  return text.split(" • ").map(function(part){part=part.trim();if(part.length<=3)return part.toUpperCase();return part.split(" ").map(function(w){return w?w.charAt(0).toUpperCase()+w.slice(1).toLowerCase():w}).join(" ")}).join(" • ");
 }
 async function pairPost(body){const r=await fetch(PAIR_ENDPOINT,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let d={};try{d=await r.json()}catch(_){d={}}if(!r.ok)throw Error(d.error||("HTTP "+r.status));return d}
+function loadContinue(){
+ try{const value=JSON.parse(localStorage.getItem(CONTINUE_KEY)||"[]");return Array.isArray(value)?value:[]}catch(_){return[]}
+}
+function saveContinue(value){try{localStorage.setItem(CONTINUE_KEY,JSON.stringify(value.slice(0,12)))}catch(_){}}
+function removeContinue(id){if(!id)return;saveContinue(loadContinue().filter(function(x){return x&&x.id!==id}));renderTvHome()}
+function rememberPlayback(force){
+ const video=$("video"),meta=currentPlayback;if(!meta||meta.live||!video||!isFinite(video.duration)||video.duration<=0)return;
+ const now=Date.now();if(!force&&now-continueWriteAt<4000)return;continueWriteAt=now;
+ const position=Math.floor(video.currentTime||0),duration=Math.floor(video.duration||0);if(position<8||duration<20)return;
+ if(position/duration>=.95){removeContinue(meta.id);return}
+ const list=loadContinue().filter(function(x){return x&&x.id!==meta.id});
+ list.unshift({id:meta.id,title:meta.title||"Untitled",subtitle:meta.subtitle||"",artwork:meta.artwork||"",url:meta.url||video.currentSrc||video.src,position:position,duration:duration,updatedAt:Date.now()});
+ saveContinue(list);renderTvHome();
+}
+function renderTvHome(){
+ const list=loadContinue(),hero=list.length?list[0]:null,wrap=$("tvContinue"),section=$("tvContinueSection"),heroButton=$("tvHeroPlay");
+ if(hero){$("tvHeroTitle").textContent=hero.title||"Continue watching";$("tvHeroSubtitle").textContent=hero.subtitle||"Pick up where you left off.";heroButton.classList.remove("hidden");heroButton.onclick=function(){resumeHistory(0)}}
+ else{$("tvHeroTitle").textContent="What do you want to watch?";$("tvHeroSubtitle").textContent="Live TV, movies and series in one place.";heroButton.classList.add("hidden")}
+ if(!list.length){section.classList.add("hidden");wrap.innerHTML="";return}
+ section.classList.remove("hidden");
+ wrap.innerHTML=list.slice(0,8).map(function(x,i){const pct=x.duration>0?Math.max(0,Math.min(100,(x.position/x.duration)*100)):0;return '<button class="resumeCard focusable" data-resume="'+i+'">'+(x.artwork?'<img class="resumeArt" src="'+esc(x.artwork)+'" onerror="this.style.display=\'none\'">':"")+'<span class="resumeShade"></span><span class="resumeText"><strong>'+esc(x.title||"Continue watching")+'</strong><small>'+esc(x.subtitle||"Resume")+'</small><span class="resumeProgress"><span style="width:'+pct+'%"></span></span></span></button>'}).join("");
+ invalidateFocus();
+}
+function resumeHistory(index){const item=loadContinue()[index];if(!item||!item.url)return;openVideo(item.url,item.title||"Continue watching",false,{id:item.id,title:item.title,subtitle:item.subtitle,artwork:item.artwork,url:item.url,live:false});setTimeout(function(){try{$("video").currentTime=Number(item.position||0)}catch(_){}},800)}
+function loadRemoteSession(){if(remoteSession)return remoteSession;try{const value=JSON.parse(localStorage.getItem(REMOTE_KEY)||"null");if(value&&value.pairingId&&value.token)remoteSession=value}catch(_){}return remoteSession}
+function clearRemoteSession(){remoteSession=null;remoteAfterId=0;try{localStorage.removeItem(REMOTE_KEY)}catch(_){}if(remoteTimer){clearInterval(remoteTimer);remoteTimer=null}}
+function startRemotePolling(){if(!loadRemoteSession()||remoteTimer)return;remoteTimer=setInterval(function(){pollRemote()},300);pollRemote()}
+async function pollRemote(){
+ const session=loadRemoteSession();if(!session||remotePollBusy)return;remotePollBusy=true;
+ try{const d=await pairPost({action:"remote_poll",pairingId:session.pairingId,token:session.token,afterId:remoteAfterId});const commands=d.commands||[];for(let i=0;i<commands.length;i++){const row=commands[i];handleRemoteCommand(row.command);remoteAfterId=Math.max(remoteAfterId,Number(row.id||0))}}
+ catch(e){const msg=String(e&&e.message||e);if(/expired|not found|invalid pairing|not active/i.test(msg))clearRemoteSession()}
+ finally{remotePollBusy=false}
+}
+function goBack(){
+ if(!$("pairing").classList.contains("hidden")){cancelPairing();return}
+ if(!$("player").classList.contains("hidden")&&!$("player").classList.contains("mini")){minimizeVideo();return}
+ if(!$("home").classList.contains("hidden")){if(!categoryMode){categoryMode=true;activeCat="all";renderCategoryGrid();focusFirst();return}showHome();return}
+}
+function handleRemoteCommand(command){
+ if(command==="up")return moveFocus(38);if(command==="down")return moveFocus(40);if(command==="left")return moveFocus(37);if(command==="right")return moveFocus(39);
+ if(command==="select")return activate(document.activeElement);if(command==="back")return goBack();if(command==="home")return showHome();if(command==="refresh")return refreshProvider();
+ if(command==="play_pause"){const video=$("video");if(!video||$("player").classList.contains("hidden"))return;if(video.paused){const p=video.play();if(p&&p.catch)p.catch(function(){})}else video.pause()}
+}
 function save(){localStorage.setItem("sb.webos.auth",JSON.stringify(auth))}
 function invalidateFocus(){focusCache=null}
 function focusables(){if(focusCache)return focusCache;focusCache=Array.prototype.slice.call(document.querySelectorAll("button:not([disabled]),input,.card,.cat")).filter(function(x){return x.offsetParent!==null});return focusCache}
@@ -45,10 +90,9 @@ async function signin(){
 }
 function fail(s){$("error").textContent=s}
 function showHome(){
- stopPairing(false);
- view="home";items=[];categories=[];activeCat="all";viewGeneration+=1;invalidateFocus();
+ stopPairing(false);view="home";items=[];categories=[];activeCat="all";categoryMode=true;viewGeneration+=1;invalidateFocus();
  $("login").classList.add("hidden");$("pairing").classList.add("hidden");$("home").classList.add("hidden");$("tvHome").classList.remove("hidden");
- focusFirst();
+ renderTvHome();startRemotePolling();focusFirst();
 }
 function showContent(){
  invalidateFocus();$("tvHome").classList.add("hidden");$("home").classList.remove("hidden");
