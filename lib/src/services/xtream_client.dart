@@ -448,8 +448,13 @@ class XtreamClient {
     return text.isEmpty || text == 'null' ? null : text;
   }
 
-  void dispose() {
+  void clearCache() {
     _cache.clear();
+    _inFlight.clear();
+  }
+
+  void dispose() {
+    clearCache();
     _inFlight.clear();
     _client.close();
   }
