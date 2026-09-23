@@ -7,6 +7,7 @@ import '../../models/epg_program.dart';
 import '../../models/iptv_channel.dart';
 import '../../models/library_entry.dart';
 import '../../models/playback_item.dart';
+import '../../services/tv_pairing_service.dart';
 import '../../state/app_controller.dart';
 import '../branding/sb_brand.dart';
 import '../widgets/brand_backdrop.dart';
@@ -35,6 +36,11 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime _guideAnchor = _roundedGuideTime(DateTime.now());
   Timer? _guideClock;
   Timer? _searchDebounce;
+  Timer? _tvRemoteTimer;
+  final TvPairingService _tvRemoteService = TvPairingService();
+  TvRemoteSession? _tvRemoteSession;
+  int _tvRemoteAfterId = 0;
+  bool _tvRemotePollBusy = false;
   bool _sidebarCollapsed = false;
   final Set<ContentSection> _categoryLanding = <ContentSection>{};
 
@@ -47,6 +53,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(widget.controller.loadEpg());
+      if (widget.tvMode) {
+        unawaited(_startTvRemote());
+      }
     });
     _guideClock = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted && widget.controller.section == ContentSection.guide) {
@@ -59,8 +68,99 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _guideClock?.cancel();
     _searchDebounce?.cancel();
+    _tvRemoteTimer?.cancel();
+    _tvRemoteService.dispose();
     _search.dispose();
     super.dispose();
+  }
+
+  Future<void> _startTvRemote() async {
+    _tvRemoteSession = await _tvRemoteService.loadRemoteSession();
+    if (_tvRemoteSession == null || !mounted) return;
+    _tvRemoteTimer?.cancel();
+    _tvRemoteTimer = Timer.periodic(
+      const Duration(milliseconds: 300),
+      (_) => unawaited(_pollTvRemote()),
+    );
+    unawaited(_pollTvRemote());
+  }
+
+  Future<void> _pollTvRemote() async {
+    final session = _tvRemoteSession;
+    if (session == null || _tvRemotePollBusy || !mounted) return;
+    _tvRemotePollBusy = true;
+    try {
+      final messages = await _tvRemoteService.pollRemoteCommands(
+        session,
+        afterId: _tvRemoteAfterId,
+      );
+      for (final message in messages) {
+        if (!mounted) return;
+        _handleTvRemoteCommand(message.command);
+        if (message.id > _tvRemoteAfterId) {
+          _tvRemoteAfterId = message.id;
+        }
+      }
+    } catch (_) {
+      // Keep the TV usable if the phone or network disappears.
+    } finally {
+      _tvRemotePollBusy = false;
+    }
+  }
+
+  void _moveTvFocus(TraversalDirection direction) {
+    FocusManager.instance.primaryFocus?.focusInDirection(direction);
+  }
+
+  void _handleTvRemoteCommand(String command) {
+    switch (command) {
+      case 'up':
+        _moveTvFocus(TraversalDirection.up);
+      case 'down':
+        _moveTvFocus(TraversalDirection.down);
+      case 'left':
+        _moveTvFocus(TraversalDirection.left);
+      case 'right':
+        _moveTvFocus(TraversalDirection.right);
+      case 'select':
+        final focusContext = FocusManager.instance.primaryFocus?.context;
+        if (focusContext != null) {
+          Actions.invoke(focusContext, const ActivateIntent());
+        }
+      case 'back':
+        unawaited(_handleTvBack());
+      case 'home':
+        unawaited(_changeSection(ContentSection.home));
+      case 'refresh':
+        unawaited(widget.controller.refresh());
+      case 'play_pause':
+        final focusContext = FocusManager.instance.primaryFocus?.context;
+        if (focusContext != null) {
+          Actions.invoke(focusContext, const ActivateIntent());
+        }
+    }
+  }
+
+  Future<void> _handleTvBack() async {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      await navigator.maybePop();
+      return;
+    }
+
+    final section = widget.controller.section;
+    if (section == ContentSection.live ||
+        section == ContentSection.movies ||
+        section == ContentSection.series) {
+      if (!_showsCategoryLanding(section)) {
+        setState(() => _categoryLanding.add(section));
+        return;
+      }
+    }
+
+    if (section != ContentSection.home) {
+      await _changeSection(ContentSection.home);
+    }
   }
 
   void _onSearchChanged(String _) {
