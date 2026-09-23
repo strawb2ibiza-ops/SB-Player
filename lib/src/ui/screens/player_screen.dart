@@ -727,6 +727,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
               ],
             ),
             actions: [
+              if (Platform.isIOS || Platform.isAndroid)
+                IconButton(
+                  tooltip: _pipPreparing
+                      ? 'Preparing Picture-in-Picture…'
+                      : (_pipError == null
+                          ? 'Picture-in-Picture'
+                          : 'Retry Picture-in-Picture'),
+                  onPressed: _pipPreparing ? null : _startNativePip,
+                  icon: Icon(
+                    _pipError == null
+                        ? Icons.picture_in_picture_alt
+                        : Icons.refresh,
+                  ),
+                ),
+              if (Platform.isIOS || Platform.isAndroid)
+                IconButton(
+                  tooltip: 'Cast / mirror to TV',
+                  onPressed: _showCastOptions,
+                  icon: const Icon(Icons.cast_rounded),
+                ),
               if (_item.isLive)
                 IconButton(
                   tooltip: 'Previous channel (Page Up)',
@@ -775,26 +795,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   favorite ? Icons.favorite : Icons.favorite_border,
                 ),
               ),
-              if (Platform.isIOS || Platform.isAndroid)
-                IconButton(
-                  tooltip: 'Cast to TV',
-                  onPressed: _showCastOptions,
-                  icon: const Icon(Icons.cast_rounded),
-                ),
-              if (Platform.isIOS || Platform.isAndroid)
-                IconButton(
-                  tooltip: _pipPreparing
-                      ? 'Preparing Picture-in-Picture…'
-                      : (_pipError == null
-                          ? 'Picture-in-Picture'
-                          : 'Retry Picture-in-Picture'),
-                  onPressed: _pipPreparing ? null : _startNativePip,
-                  icon: Icon(
-                    _pipError == null
-                        ? Icons.picture_in_picture_alt
-                        : Icons.refresh,
-                  ),
-                ),
               if (Platform.isWindows)
                 IconButton(
                   tooltip: 'Always-on-top mini player',
