@@ -69,6 +69,9 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 
           final details = snapshot.data!;
           final seasons = details.seasons.keys.toList()..sort();
+          final orderedEpisodes = <SeriesEpisode>[
+            for (final season in seasons) ...details.seasons[season]!,
+          ];
           if (seasons.isEmpty) {
             return const Center(child: Text('No episodes were returned by the provider.'));
           }
@@ -104,7 +107,17 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                               MaterialPageRoute(
                                 builder: (_) => PlayerScreen(
                                   controller: controller,
-                                  item: controller.playbackForEpisode(series, episode),
+                                  item: controller.playbackForEpisode(
+                                    series,
+                                    episode,
+                                    nextEpisode: (() {
+                                      final index = orderedEpisodes.indexOf(episode);
+                                      return index >= 0 &&
+                                              index + 1 < orderedEpisodes.length
+                                          ? orderedEpisodes[index + 1]
+                                          : null;
+                                    })(),
+                                  ),
                                 ),
                               ),
                             );
