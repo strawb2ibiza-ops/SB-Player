@@ -900,7 +900,7 @@ class AppController extends ChangeNotifier {
 
     _resetCatalogs();
     account = resolvedAccount;
-    liveCategories = loadedCategories;
+    liveCategories = _cleanCategories(loadedCategories);
     channels = loadedChannels;
     _channelsByCategory = _groupChannelsByCategory(loadedChannels);
     liveCategoryId = '__all__';
@@ -942,7 +942,7 @@ class AppController extends ChangeNotifier {
         }),
       ]);
       if (generation != _catalogGeneration || account != current) return;
-      movieCategories = categories;
+      movieCategories = _cleanCategories(categories);
       movies = loadedMovies;
       _rebuildRecentMovies();
       _moviesByCategory = _groupMoviesByCategory(loadedMovies);
@@ -981,7 +981,7 @@ class AppController extends ChangeNotifier {
         }),
       ]);
       if (generation != _catalogGeneration || account != current) return;
-      seriesCategories = categories;
+      seriesCategories = _cleanCategories(categories);
       series = loadedSeries;
       _rebuildRecentSeries();
       _seriesByCategory = _groupSeriesByCategory(loadedSeries);
@@ -1117,6 +1117,45 @@ class AppController extends ChangeNotifier {
 
     if (favoritesChanged) await libraryStore.saveFavorites(favorites);
     if (recentChanged) await libraryStore.saveRecent(recent);
+  }
+
+  List<IptvCategory> _cleanCategories(List<IptvCategory> source) {
+    final seen = <String>{};
+    final result = <IptvCategory>[];
+    for (final category in source) {
+      final name = _cleanCategoryName(category.name);
+      final key = name.toLowerCase();
+      if (name.isEmpty || !seen.add(key)) continue;
+      result.add(IptvCategory(id: category.id, name: name));
+    }
+    result.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return result;
+  }
+
+  String _cleanCategoryName(String value) {
+    var text = value.trim();
+    text = text.replaceAll(
+      RegExp(r'(^|[\\s\\[\\(\\{\\|:;_\\-])(?:en|eng|english)(?=$|[\\s\\]\\)\\}\\|:;_\\-])', caseSensitive: false),
+      ' ',
+    );
+    text = text
+        .replaceAll(RegExp(r'[\\[\\]\\(\\)\\{\\}]'), ' ')
+        .replaceAll(RegExp(r'\\s*[|:;_\\-]+\\s*'), ' • ')
+        .replaceAll(RegExp(r'(?:\\s*•\\s*){2,}'), ' • ')
+        .replaceAll(RegExp(r'\\s+'), ' ')
+        .replaceAll(RegExp(r'^\\s*•\\s*|\\s*•\\s*$'), '')
+        .trim();
+    if (text.isEmpty) return 'Other';
+    return text.split(' • ').map((part) {
+      final p = part.trim();
+      if (p.length <= 3) return p.toUpperCase();
+      return p
+          .split(' ')
+          .map((word) => word.isEmpty
+              ? word
+              : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+          .join(' ');
+    }).join(' • ');
   }
 
   Map<String, List<IptvChannel>> _groupChannelsByCategory(
