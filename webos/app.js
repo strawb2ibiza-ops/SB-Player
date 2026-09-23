@@ -143,14 +143,15 @@ async function pollPairing(){
      if(!check.user_info||String(check.user_info.auth)!=="1")throw Error("Provider rejected the linked account");
      save();
      await pairPost({action:"consume",pairingId:pairing.pairingId,token:pairing.token});
+     remoteSession={pairingId:pairing.pairingId,token:pairing.token,code:pairing.code||""};
+     localStorage.setItem(REMOTE_KEY,JSON.stringify(remoteSession));remoteAfterId=0;startRemotePolling();
      $("pairStatus").className="pairStatus ok";$("pairStatus").textContent="Linked successfully";
-     pairing=null;showHome();
-     return;
+     pairing=null;showHome();return;
    }
    if(d.status==="cancelled"||d.status==="consumed")throw Error("Pairing is no longer available");
- }catch(e){
+ }catch(err){
    if(pairTimer){clearInterval(pairTimer);pairTimer=null}
-   $("pairStatus").className="pairStatus err";$("pairStatus").textContent="Pairing failed: "+e.message;
+   $("pairStatus").className="pairStatus err";$("pairStatus").textContent="Pairing failed: "+err.message;
  }finally{pairPollBusy=false}
 }
 async function stopPairing(cancelRemote){
@@ -210,10 +211,14 @@ function play(x){
  const id=x.stream_id||x.num;if(!id)return;
  const root=base()+"/"+(view==="live"?"live":"movie")+"/"+encodeURIComponent(auth.username)+"/"+encodeURIComponent(auth.password)+"/"+id;
  const title=x.name!=null?x.name:x.title;
- if(view==="live")openVideoCandidates([root+".m3u8",root+".ts"],title);
- else openVideoCandidates([root+"."+(x.container_extension||"mp4")],title);
+ if(view==="live")openVideoCandidates([root+".m3u8",root+".ts"],title,false,{id:"live:"+id,title:title,live:true});
+ else{
+   const url=root+"."+(x.container_extension||"mp4");
+   openVideoCandidates([url],title,false,{id:"movie:"+id,title:title,subtitle:"Movie",artwork:x.stream_icon||x.cover||"",url:url,live:false});
+ }
 }
 async function loadSeries(x){
+ episodeSeries=x;
  $("grid").innerHTML="<p>Loading episodes…</p>";
  try{
   const d=await get(api("get_series_info","&series_id="+encodeURIComponent(x.series_id))),eps=[],groups=d.episodes||{},keys=Object.keys(groups);
@@ -228,7 +233,9 @@ function playEpisode(index){
  if(index<0||index>=episodeQueue.length)return;
  episodeIndex=index;
  const e=episodeQueue[index],ext=e.container_extension||"mp4";
- openVideo(base()+"/series/"+encodeURIComponent(auth.username)+"/"+encodeURIComponent(auth.password)+"/"+e.id+"."+ext,e.title||("Episode "+e.episode_num),true);
+ const url=base()+"/series/"+encodeURIComponent(auth.username)+"/"+encodeURIComponent(auth.password)+"/"+e.id+"."+ext;
+ const title=e.title||("Episode "+e.episode_num);
+ openVideo(url,title,true,{id:"episode:"+e.id,title:title,subtitle:episodeSeries&&episodeSeries.name?episodeSeries.name:"Series",artwork:episodeSeries&&(episodeSeries.cover||episodeSeries.stream_icon)||"",url:url,live:false});
 }
 function playNextEpisode(){
  if(episodeIndex>=0&&episodeIndex+1<episodeQueue.length)playEpisode(episodeIndex+1);
@@ -240,31 +247,34 @@ function mediaType(url){
  return "video/mp4";
 }
 function resetVideo(video){
+ try{rememberPlayback(true)}catch(_){}
  try{video.pause()}catch(_){}
- video.onerror=null;video.onplaying=null;video.oncanplay=null;video.onended=null;
+ video.onerror=null;video.onplaying=null;video.oncanplay=null;video.onended=null;video.ontimeupdate=null;
  while(video.firstChild)video.removeChild(video.firstChild);
  video.removeAttribute("src");video.load();
 }
-function openVideoCandidates(urls,title,autoNext){
+function openVideoCandidates(urls,title,autoNext,meta){
  lastFocus=document.activeElement;playAttempt+=1;var attempt=playAttempt,index=0,video=$("video"),timer=null;
+ currentPlayback=meta||null;continueWriteAt=0;
  $("player").classList.remove("hidden","mini");$("playingTitle").textContent=(title||"")+" — Loading…";
  function clearTimer(){if(timer){clearTimeout(timer);timer=null}}
  function next(){
   clearTimer();if(attempt!==playAttempt)return;
   if(index>=urls.length){$("playingTitle").textContent=(title||"")+" — Playback failed";return}
   var url=urls[index++],settled=false;resetVideo(video);
+  if(currentPlayback&&!currentPlayback.url)currentPlayback.url=url;
   video.onerror=function(){if(!settled){settled=true;next()}};
   video.onplaying=function(){settled=true;clearTimer();$("playingTitle").textContent=title||""};
-  video.onended=function(){clearTimer();if(autoNext)playNextEpisode()};
+  video.ontimeupdate=function(){rememberPlayback(false)};
+  video.onended=function(){clearTimer();rememberPlayback(true);if(currentPlayback&&!currentPlayback.live)removeContinue(currentPlayback.id);if(autoNext)playNextEpisode()};
   video.oncanplay=function(){var p=video.play();if(p&&p.catch)p.catch(function(){})};
   var source=document.createElement("source");source.setAttribute("src",url);source.setAttribute("type",mediaType(url));video.appendChild(source);
-  video.load();
-  var p=video.play();if(p&&p.catch)p.catch(function(){});
+  video.load();var p=video.play();if(p&&p.catch)p.catch(function(){});
   timer=setTimeout(function(){if(!settled){settled=true;next()}},10000);
  }
  next();$("nowPlaying").classList.remove("hidden");$("back").focus();
 }
-function openVideo(url,title,autoNext){openVideoCandidates([url],title,!!autoNext)}
+function openVideo(url,title,autoNext,meta){openVideoCandidates([url],title,!!autoNext,meta)}
 function minimizeVideo(){
  if(!$("video").src)return;
  $("player").classList.add("mini");
@@ -275,7 +285,8 @@ function expandVideo(){
  $("player").classList.remove("mini","hidden");$("back").focus();
 }
 function stopVideo(){
- playAttempt+=1;resetVideo($("video"));$("player").classList.add("hidden");$("player").classList.remove("mini");$("nowPlaying").classList.add("hidden");focusFirst();
+ try{rememberPlayback(true)}catch(_){}
+ playAttempt+=1;currentPlayback=null;resetVideo($("video"));$("player").classList.add("hidden");$("player").classList.remove("mini");$("nowPlaying").classList.add("hidden");focusFirst();
 }
 function activate(el){if(!el)return;if(el.tagName==="INPUT"){el.focus();return}el.click()}
 document.addEventListener("click",function(e){
