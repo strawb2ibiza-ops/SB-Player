@@ -81,7 +81,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _handlePlaybackFailure();
     }));
     _subscriptions.add(_player.stream.completed.listen((value) {
-      if (value && _item.isLive) _handlePlaybackFailure();
+      if (!value) return;
+      if (_item.isLive) {
+        _handlePlaybackFailure();
+        return;
+      }
+      final next = _item.next;
+      if (next != null) unawaited(_playNext(next));
     }));
     _subscriptions.add(_player.stream.tracks.listen((value) {
       if (mounted) setState(() => _tracks = value);
@@ -240,6 +246,28 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
     } catch (_) {
       _handlePlaybackFailure();
+    }
+  }
+
+  Future<void> _playNext(PlaybackItem next) async {
+    await widget.controller.recordPlayback(
+      _item,
+      position: _duration,
+      duration: _duration,
+    );
+    if (!mounted) return;
+    setState(() {
+      _item = next;
+      _position = Duration.zero;
+      _duration = Duration.zero;
+      _playbackError = null;
+    });
+    await _nativePip?.dispose();
+    _nativePip = null;
+    _pipReady = false;
+    await _open();
+    if (Platform.isIOS || Platform.isAndroid) {
+      unawaited(_prepareNativePip());
     }
   }
 
