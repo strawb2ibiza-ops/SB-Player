@@ -44,21 +44,21 @@ jobs:
         run: |
           mkdir -p dist
           ares-package -o dist webos
-          mv dist/*.ipk dist/SB-Player-webOS-v0.6.3.ipk
+          mv dist/*.ipk dist/SB-Player-LG-v4.ipk
       - name: Upload IPK
         uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-webOS-v0.6.3-IPK
-          path: dist/SB-Player-webOS-v0.6.3.ipk
+          name: SB-Player-LG-v4-IPK
+          path: dist/SB-Player-LG-v4.ipk
           if-no-files-found: error
 
-      - name: Add IPK to v0.6.3 release if it exists
+      - name: Add IPK to v0.6.4 release if it exists
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          if gh release view v0.6.3 >/dev/null 2>&1; then
-            gh release upload v0.6.3 dist/SB-Player-webOS-v0.6.3.ipk --clobber
+          if gh release view v0.6.4 >/dev/null 2>&1; then
+            gh release upload v0.6.4 dist/SB-Player-LG-v4.ipk --clobber
           else
-            echo "v0.6.3 release does not exist yet; keeping the successful Actions artifact."
+            echo "v0.6.4 release does not exist yet; keeping the successful Actions artifact."
           fi
 # build-trigger: b61b425
