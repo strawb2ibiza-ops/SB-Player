@@ -10,6 +10,7 @@ class PlaybackItem {
     this.artworkUrl,
     this.startPosition = Duration.zero,
     this.next,
+    this.externalSubtitles = const [],
   });
 
   final String id;
@@ -20,6 +21,20 @@ class PlaybackItem {
   final String? artworkUrl;
   final Duration startPosition;
   final PlaybackItem? next;
+  final List<PlaybackSubtitle> externalSubtitles;
 
   bool get isLive => kind == PlaybackKind.live;
+}
+
+
+class PlaybackSubtitle {
+  const PlaybackSubtitle({
+    required this.url,
+    this.title,
+    this.language,
+  });
+
+  final String url;
+  final String? title;
+  final String? language;
 }
