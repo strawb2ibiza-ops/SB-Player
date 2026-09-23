@@ -425,11 +425,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     if (context.mounted) Navigator.of(context).pop();
                   },
                 ),
-                if (_tracks.subtitle.isEmpty)
+                if (_tracks.subtitle.isEmpty &&
+                    _item.externalSubtitles.isEmpty)
                   const ListTile(
                     title: Text('No subtitle tracks were supplied with this stream.'),
-                  )
-                else
+                  ),
+                for (var i = 0; i < _item.externalSubtitles.length; i++)
+                  ListTile(
+                    leading: const Icon(Icons.closed_caption_rounded),
+                    title: Text(
+                      _item.externalSubtitles[i].title ??
+                          _item.externalSubtitles[i].language ??
+                          'Subtitle ${i + 1}',
+                    ),
+                    subtitle: const Text('Provider subtitle'),
+                    onTap: () async {
+                      final track = _item.externalSubtitles[i];
+                      await _player.setSubtitleTrack(
+                        SubtitleTrack.uri(
+                          track.url,
+                          title: track.title,
+                          language: track.language,
+                        ),
+                      );
+                      if (context.mounted) Navigator.of(context).pop();
+                    },
+                  ),
+                if (_tracks.subtitle.isNotEmpty)
                   for (var i = 0; i < _tracks.subtitle.length; i++)
                     _SubtitleTrackTile(
                       track: _tracks.subtitle[i],
@@ -734,7 +756,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 tooltip: 'Subtitles',
                 onPressed: _showSubtitlePicker,
                 icon: Icon(
-                  _tracks.subtitle.isEmpty
+                  _tracks.subtitle.isEmpty && _item.externalSubtitles.isEmpty
                       ? Icons.closed_caption_disabled_outlined
                       : Icons.closed_caption_rounded,
                 ),
