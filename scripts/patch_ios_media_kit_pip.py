@@ -482,11 +482,12 @@ replace_once(
     "manager PiP methods",
 )
 manager_text = manager.read_text(encoding="utf-8")
-if "#if os(iOS)
-import AVKit
-#endif" not in manager_text:
+if "import AVKit" not in manager_text:
     manager.write_text(
-        "#if os(iOS)\nimport AVKit\n#endif\n" + manager_text,
+        """#if os(iOS)
+import AVKit
+#endif
+""" + manager_text,
         encoding="utf-8",
     )
 
