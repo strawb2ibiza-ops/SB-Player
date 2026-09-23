@@ -116,28 +116,37 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (command) {
       case 'up':
         _moveTvFocus(TraversalDirection.up);
+        return;
       case 'down':
         _moveTvFocus(TraversalDirection.down);
+        return;
       case 'left':
         _moveTvFocus(TraversalDirection.left);
+        return;
       case 'right':
         _moveTvFocus(TraversalDirection.right);
+        return;
       case 'select':
         final focusContext = FocusManager.instance.primaryFocus?.context;
         if (focusContext != null) {
           Actions.invoke(focusContext, const ActivateIntent());
         }
+        return;
       case 'back':
         unawaited(_handleTvBack());
+        return;
       case 'home':
         unawaited(_changeSection(ContentSection.home));
+        return;
       case 'refresh':
         unawaited(widget.controller.refresh());
+        return;
       case 'play_pause':
         final focusContext = FocusManager.instance.primaryFocus?.context;
         if (focusContext != null) {
           Actions.invoke(focusContext, const ActivateIntent());
         }
+        return;
     }
   }
 
