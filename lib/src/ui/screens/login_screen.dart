@@ -5,10 +5,12 @@ import '../../state/app_controller.dart';
 import '../branding/sb_brand.dart';
 import '../widgets/brand_backdrop.dart';
 import '../widgets/sb_logo.dart';
+import 'tv_pairing_receiver_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.controller});
+  const LoginScreen({super.key, required this.controller, this.tvMode = false});
   final AppController controller;
+  final bool tvMode;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -286,6 +288,23 @@ class _LoginScreenState extends State<LoginScreen> {
                           controller.loading ? 'Connecting…' : 'Continue',
                         ),
                       ),
+                      if (widget.tvMode) ...[
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          autofocus: true,
+                          onPressed: controller.loading
+                              ? null
+                              : () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => TvPairingReceiverScreen(
+                                        controller: controller,
+                                      ),
+                                    ),
+                                  ),
+                          icon: const Icon(Icons.qr_code_2_rounded),
+                          label: const Text('Sign in with phone'),
+                        ),
+                      ],
                       const SizedBox(height: 16),
                       Align(
                         alignment: Alignment.center,
