@@ -21,6 +21,7 @@ import 'movie_details_screen.dart';
 import 'player_screen.dart';
 import 'series_details_screen.dart';
 import 'settings_screen.dart';
+import 'tv_remote_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.controller, this.tvMode = false});
@@ -384,6 +385,16 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: controller.loading ? null : controller.refresh,
             icon: const Icon(Icons.refresh),
           ),
+          if ((Platform.isAndroid || Platform.isIOS) && !widget.tvMode)
+            IconButton(
+              tooltip: 'TV Remote',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const TvRemoteScreen(),
+                ),
+              ),
+              icon: const Icon(Icons.gamepad_rounded),
+            ),
           IconButton(
             tooltip: 'Settings',
             onPressed: () => Navigator.of(context).push(
