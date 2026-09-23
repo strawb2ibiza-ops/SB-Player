@@ -52,8 +52,13 @@ jobs:
           path: dist/SB-Player-webOS-v0.6.3.ipk
           if-no-files-found: error
 
-      - name: Add IPK to v0.6.3 release
+      - name: Add IPK to v0.6.3 release if it exists
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-        run: gh release upload v0.6.3 dist/SB-Player-webOS-v0.6.3.ipk --clobber
+        run: |
+          if gh release view v0.6.3 >/dev/null 2>&1; then
+            gh release upload v0.6.3 dist/SB-Player-webOS-v0.6.3.ipk --clobber
+          else
+            echo "v0.6.3 release does not exist yet; keeping the successful Actions artifact."
+          fi
 # build-trigger: b61b425
