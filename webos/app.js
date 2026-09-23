@@ -162,16 +162,29 @@ async function cancelPairing(){await stopPairing(true);$("pairing").classList.ad
 async function loadView(v){
  showContent();
  const generation=++viewGeneration;
- view=v;activeCat="all";$("heading").textContent=v==="live"?"Live TV":v==="movies"?"Movies":"Series";
- document.querySelectorAll(".nav[data-view]").forEach(function(b){b.classList.toggle("active",b.dataset.view===v)});
- $("grid").innerHTML="<p>Loading…</p>";
+ view=v;activeCat="all";categoryMode=true;$("heading").textContent=v==="live"?"Live TV":v==="movies"?"Movies":"Series";
+ $("grid").onclick=null;$("grid").innerHTML="<p>Loading…</p>";
  try{
   const ca=v==="live"?"get_live_categories":v==="movies"?"get_vod_categories":"get_series_categories";
   const ia=v==="live"?"get_live_streams":v==="movies"?"get_vod_streams":"get_series";
-  const loaded=await Promise.all([getCached(api(ca)),getCached(api(ia))]);if(generation!==viewGeneration)return;categories=loaded[0]||[];items=loaded[1]||[];for(let i=0;i<items.length;i++){items[i].__sbIndex=i;const n=items[i].name!=null?items[i].name:(items[i].title!=null?items[i].title:"");items[i].__sbSearch=String(n).toLowerCase();}renderCats();render();focusFirst()
- }catch(e){if(generation===viewGeneration)$("grid").innerHTML="<p>Unable to load: "+esc(e.message)+"</p>"}
+  const loaded=await Promise.all([getCached(api(ca)),getCached(api(ia))]);if(generation!==viewGeneration)return;
+  categories=loaded[0]||[];items=loaded[1]||[];
+  for(let i=0;i<items.length;i++){items[i].__sbIndex=i;const n=items[i].name!=null?items[i].name:(items[i].title!=null?items[i].title:"");items[i].__sbSearch=String(n).toLowerCase()}
+  renderCategoryGrid();focusFirst();
+ }catch(err){if(generation===viewGeneration)$("grid").innerHTML="<p>Unable to load: "+esc(err.message)+"</p>"}
 }
-function renderCats(){invalidateFocus();$("categories").innerHTML='<button class="cat focusable active" data-cat="all">All</button>'+categories.map(function(c){return '<button class="cat focusable" data-cat="'+esc(c.category_id)+'">'+esc(cleanCategoryName(c.category_name))+"</button>"}).join("")}
+function renderCategoryGrid(){
+ categoryMode=true;invalidateFocus();$("grid").classList.add("categoryMode");
+ const q=$("search").value.trim().toLowerCase();
+ const visible=categories.filter(function(x){return !q||String(x.category_name||"").toLowerCase().indexOf(q)>=0});
+ const list=[{category_id:"all",category_name:"All"}].concat(visible);
+ $("grid").innerHTML=list.map(function(cat){
+   const id=String(cat.category_id||"all"),name=cleanCategoryName(cat.category_name||"All");
+   let sample=null;for(let i=0;i<items.length;i++){if(id==="all"||String(items[i].category_id)===id){sample=items[i];break}}
+   const img=sample?(sample.stream_icon||sample.cover||""):"";
+   return '<button class="categoryCard focusable" data-category="'+esc(id)+'">'+(img?'<img class="categoryArt" src="'+esc(img)+'" onerror="this.style.display=\'none\'">':"")+'<span class="categoryShade"></span><span class="categoryName">'+esc(name)+'</span></button>';
+ }).join("");
+}
 function cardHtml(x){
  const name=x.name!=null?x.name:(x.title!=null?x.title:"Untitled"),img=x.stream_icon!=null?x.stream_icon:(x.cover!=null?x.cover:"");
  return '<button class="card focusable" data-i="'+x.__sbIndex+'">'+(img?'<img src="'+esc(img)+'" onerror="this.style.display=\'none\'">':"")+"<strong>"+esc(name)+"</strong><small>"+esc(view==="live"?"Live":view==="movies"?"Movie":"Series")+"</small></button>";
@@ -184,6 +197,8 @@ function appendNextBatch(){
  renderedCount=end;invalidateFocus();
 }
 function render(){
+ if(categoryMode)return renderCategoryGrid();
+ $("grid").classList.remove("categoryMode");
  const q=$("search").value.trim().toLowerCase();
  filteredItems=items.filter(function(x){return(activeCat==="all"||String(x.category_id)===activeCat)&&x.__sbSearch.indexOf(q)>=0});
  renderedCount=0;$("grid").innerHTML="";
@@ -267,7 +282,9 @@ document.addEventListener("click",function(e){
  const choice=e.target.closest("[data-tv-view]");if(choice){e.preventDefault();return loadView(choice.dataset.tvView)}
  const homeBtn=e.target.closest("[data-tv-home]");if(homeBtn){e.preventDefault();return showHome()}
  const nav=e.target.closest("[data-view]");if(nav){if(nav.id==="nowPlaying")return expandVideo();return loadView(nav.dataset.view)}
- const cat=e.target.closest("[data-cat]");if(cat){activeCat=cat.dataset.cat;document.querySelectorAll(".cat").forEach(function(x){x.classList.toggle("active",x===cat)});render();return}
+ const category=e.target.closest("[data-category]");if(category){activeCat=category.dataset.category;categoryMode=false;const match=categories.find(function(x){return String(x.category_id)===activeCat});$("heading").textContent=(view==="live"?"Live TV":view==="movies"?"Movies":"Series")+" • "+(activeCat==="all"?"All":cleanCategoryName(match&&match.category_name||"Category"));render();focusFirst();return}
+ const resume=e.target.closest("[data-resume]");if(resume){e.preventDefault();return resumeHistory(parseInt(resume.dataset.resume,10))}
+ const cat=e.target.closest("[data-cat]");if(cat){activeCat=cat.dataset.cat;categoryMode=false;render();return}
  const card=e.target.closest("[data-i]");if(card){e.preventDefault();return play(items[parseInt(card.dataset.i,10)])}
 });
 document.addEventListener("keydown",function(e){
@@ -284,7 +301,7 @@ $("signin").addEventListener("click",signin);
 $("phoneSignIn").addEventListener("click",startPairing);
 $("cancelPair").addEventListener("click",cancelPairing);
 $("login").addEventListener("submit",function(e){e.preventDefault();signin()});
-$("search").oninput=function(){if(renderTimer)clearTimeout(renderTimer);renderTimer=setTimeout(function(){renderTimer=null;render()},120)};
+$("search").oninput=function(){if(renderTimer)clearTimeout(renderTimer);renderTimer=setTimeout(function(){renderTimer=null;if(categoryMode)renderCategoryGrid();else render()},120)};
 $("grid").onscroll=function(){const g=$("grid");if(g.scrollTop+g.clientHeight>=g.scrollHeight-240)appendNextBatch()};
 $("back").onclick=minimizeVideo;
 $("nowPlaying").onclick=expandVideo;
