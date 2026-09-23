@@ -268,9 +268,15 @@ class XtreamClient {
 
   Future<List<SeriesItem>> fetchSeries(IptvAccount account) async {
     final data = await _getAction(account, 'get_series', cache: true);
-    if (data is! List) return const [];
+    final rawItems = data is List
+        ? data
+        : data is Map && data['series'] is List
+            ? data['series'] as List
+            : data is Map && data['data'] is List
+                ? data['data'] as List
+                : const <dynamic>[];
 
-    return data.whereType<Map>().map((item) {
+    return rawItems.whereType<Map>().map((item) {
       return SeriesItem(
         id: '${item['series_id'] ?? ''}',
         name: '${item['name'] ?? 'Untitled series'}',
