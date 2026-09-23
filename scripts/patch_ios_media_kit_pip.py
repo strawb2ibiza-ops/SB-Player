@@ -26,7 +26,7 @@ else:
 # Patch the exact iOS source tree CocoaPods compiles. Pub archives may contain
 # concrete copies here, so patching only common/darwin can succeed in CI while
 # leaving the shipped framework untouched.
-platform_root = root / "ios/media_kit_video/Sources/media_kit_video/plugin"
+platform_root = root / "ios/Classes/plugin"
 plugin = platform_root / "common/MediaKitVideoPlugin.swift"
 manager = platform_root / "common/VideoOutputManager.swift"
 output = platform_root / "common/VideoOutput.swift"

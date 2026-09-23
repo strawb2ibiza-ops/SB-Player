@@ -40,7 +40,7 @@ jobs:
           print(unquote(urlparse(uri).path) if uri.startswith("file:") else (Path(".dart_tool") / uri).resolve())
           PY
           )"
-          PLUGIN="$PACKAGE_ROOT/ios/media_kit_video/Sources/media_kit_video/plugin/common/MediaKitVideoPlugin.swift"
+          PLUGIN="$PACKAGE_ROOT/ios/Classes/plugin/common/MediaKitVideoPlugin.swift"
           grep -F 'sb_player/media_kit_pip' "$PLUGIN"
           grep -F 'SBPlayerPiP.IsSupported' "$PLUGIN"
       - name: Analyze
