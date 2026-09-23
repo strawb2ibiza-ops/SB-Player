@@ -7,3 +7,40 @@
 .tvDashboard{flex:1;padding:38px 48px 44px;overflow:hidden}.tvTop{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px}.tvTop h1{font-size:38px;margin:3px 0 0}.tvEyebrow{font-size:12px;letter-spacing:3px;color:#7d73a0;font-weight:bold}.tvTopHint{color:#8f87a3;font-size:16px;padding-bottom:6px}
 .tvHero{height:190px;border:1px solid #30284b;border-radius:22px;background:linear-gradient(115deg,#171329 0%,#211542 56%,#13223c 100%);padding:30px 36px;display:flex;align-items:center;margin-bottom:26px;box-shadow:0 18px 50px rgba(0,0,0,.2)}.tvHero h2{font-size:34px;margin:10px 0 8px}.tvHero p{margin:0;color:#a9a1ba;font-size:17px}.tvPill{display:inline-block;padding:7px 11px;border-radius:20px;background:rgba(55,167,255,.12);color:#63b7ff;font-size:11px;letter-spacing:1.5px;font-weight:bold}
 .tvChoices{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}.tvChoice{height:190px;padding:24px;border:1px solid #30284b;border-radius:20px;background:#151124;color:#fff;text-align:left;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:18px}.tvChoice .choiceIcon{width:58px;height:58px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:#211a35;font-size:27px;color:#63b7ff}.tvChoice strong{display:block;font-size:24px;margin-bottom:8px}.tvChoice small{display:block;color:#9189a4;font-size:14px}.tvChoice .choiceArrow{font-size:38px;color:#625a75}.tvChoice:focus{outline:5px solid #63b7ff;outline-offset:3px;transform:translateY(-3px);background:#1c1730}.tvChoice:focus .choiceArrow{color:#fff}
+
+/* v0.6.4 TV home + category browser */
+#tvHome{height:calc(100vh - 78px);background:radial-gradient(circle at 72% 18%,rgba(89,57,180,.22),transparent 35%),#080713}
+.tvDashboardHome{width:100%;height:100%;padding:30px 42px 34px;overflow-y:auto}
+.tvTopActions{display:flex;gap:12px;align-items:center}
+.topAction{padding:12px 18px;border:1px solid #3b3155;border-radius:12px;background:#171329;color:#fff}
+.topAction:focus,.heroPlay:focus{outline:4px solid #63b7ff;outline-offset:2px}
+.tvDashboardHome .tvHero{height:190px;margin-bottom:20px}
+.heroPlay{margin-top:18px;padding:12px 18px;border:0;border-radius:11px;background:linear-gradient(90deg,#238cff,#9147ff);color:#fff;font-weight:bold}
+.tvDashboardHome .tvChoices{grid-template-columns:repeat(3,1fr);gap:18px}
+.tvDashboardHome .tvChoice{height:150px}
+.tvContinueSection{margin-top:24px}
+.shelfTitle{font-size:24px;font-weight:800;margin-bottom:12px}
+.tvContinue{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(280px,340px);gap:14px;overflow-x:auto;padding:4px 4px 10px}
+.resumeCard{height:126px;position:relative;padding:0;border:1px solid #30284b;border-radius:16px;background:#151124;color:#fff;overflow:hidden;text-align:left}
+.resumeCard .resumeArt{position:absolute;inset:0;background-size:cover;background-position:center}
+.resumeCard .resumeShade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(5,5,10,.95),rgba(5,5,10,.62),rgba(5,5,10,.16))}
+.resumeCard .resumeText{position:absolute;left:16px;right:16px;bottom:14px}
+.resumeCard strong{display:block;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.resumeCard small{display:block;margin-top:6px;color:#b6aec7}
+.resumeProgress{height:4px;background:#332b49;border-radius:20px;margin-top:9px;overflow:hidden}
+.resumeProgress span{display:block;height:100%;background:#63b7ff}
+#home{display:block;height:calc(100vh - 78px)}
+.tvContent{width:100%;height:100%;padding:28px 36px}
+.toolbar{justify-content:space-between}
+.toolbar>div{min-width:220px}
+.toolbar h2{margin:4px 0 0;min-width:0}
+.categories{display:none!important}
+.grid{height:calc(100vh - 180px);grid-template-columns:repeat(6,minmax(0,1fr));gap:15px;padding:8px 8px 52px 4px}
+.grid.categoryMode{grid-template-columns:repeat(6,minmax(0,1fr));}
+.categoryCard{height:250px;position:relative;padding:0;border:1px solid #30284b;border-radius:16px;background:#151124;color:#fff;overflow:hidden;text-align:left}
+.categoryCard .categoryArt{position:absolute;inset:0;background-size:cover;background-position:center}
+.categoryCard .categoryShade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(4,5,9,.04) 20%,rgba(4,5,9,.94) 100%)}
+.categoryCard .categoryName{position:absolute;left:15px;right:15px;bottom:16px;font-size:19px;font-weight:800;line-height:1.15}
+.categoryCard:focus,.resumeCard:focus{outline:5px solid #63b7ff;outline-offset:3px;transform:scale(1.025)}
+.grid:not(.categoryMode) .card{height:146px}
+@media(max-width:1400px){.grid,.grid.categoryMode{grid-template-columns:repeat(5,minmax(0,1fr))}.categoryCard{height:230px}}
