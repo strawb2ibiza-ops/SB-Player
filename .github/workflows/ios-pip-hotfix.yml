@@ -15,7 +15,9 @@ jobs:
           channel: stable
           cache: true
       - name: Create iOS platform
-        run: flutter create --project-name sb_player --platforms=ios .
+        run: |
+          flutter create --project-name sb_player --platforms=ios .
+          rm -f test/widget_test.dart
       - name: Configure iOS
         run: |
           /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName SB Player" ios/Runner/Info.plist || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'SB Player'" ios/Runner/Info.plist
