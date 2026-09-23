@@ -375,6 +375,53 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
+  Future<void> _showSubtitlePicker() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 520),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+              children: [
+                Text('Subtitles', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 6),
+                ListTile(
+                  leading: const Icon(Icons.subtitles_off_outlined),
+                  title: const Text('Off'),
+                  selected: _selectedTracks.subtitle.id == 'no' ||
+                      _selectedTracks.subtitle.id.isEmpty,
+                  onTap: () async {
+                    await _player.setSubtitleTrack(SubtitleTrack.no());
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                ),
+                if (_tracks.subtitle.isEmpty)
+                  const ListTile(
+                    title: Text('No subtitle tracks were supplied with this stream.'),
+                  )
+                else
+                  for (var i = 0; i < _tracks.subtitle.length; i++)
+                    _SubtitleTrackTile(
+                      track: _tracks.subtitle[i],
+                      index: i,
+                      selected:
+                          _tracks.subtitle[i].id == _selectedTracks.subtitle.id,
+                      onTap: () async {
+                        await _player.setSubtitleTrack(_tracks.subtitle[i]);
+                        if (context.mounted) Navigator.of(context).pop();
+                      },
+                    ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _showTrackPicker() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -398,23 +445,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       selected: _tracks.audio[i].id == _selectedTracks.audio.id,
                       onTap: () async {
                         await _player.setAudioTrack(_tracks.audio[i]);
-                        if (context.mounted) Navigator.of(context).pop();
-                      },
-                    ),
-                const Divider(height: 30),
-                Text('Subtitles', style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 6),
-                if (_tracks.subtitle.isEmpty)
-                  const ListTile(title: Text('No selectable subtitle tracks'))
-                else
-                  for (var i = 0; i < _tracks.subtitle.length; i++)
-                    _SubtitleTrackTile(
-                      track: _tracks.subtitle[i],
-                      index: i,
-                      selected:
-                          _tracks.subtitle[i].id == _selectedTracks.subtitle.id,
-                      onTap: () async {
-                        await _player.setSubtitleTrack(_tracks.subtitle[i]);
                         if (context.mounted) Navigator.of(context).pop();
                       },
                     ),
@@ -617,9 +647,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 icon: const Icon(Icons.aspect_ratio),
               ),
               IconButton(
-                tooltip: 'Audio and subtitles',
+                tooltip: 'Subtitles',
+                onPressed: _showSubtitlePicker,
+                icon: Icon(
+                  _tracks.subtitle.isEmpty
+                      ? Icons.closed_caption_disabled_outlined
+                      : Icons.closed_caption_rounded,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Audio tracks',
                 onPressed: _showTrackPicker,
-                icon: const Icon(Icons.tune),
+                icon: const Icon(Icons.graphic_eq_rounded),
               ),
               IconButton(
                 tooltip:
