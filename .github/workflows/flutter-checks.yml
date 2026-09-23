@@ -153,28 +153,32 @@ jobs:
               raise SystemExit('native_picture_in_picture iOS source not found')
           path = paths[-1]
           source = open(path, encoding='utf-8').read()
-          old = '''        let playerItem = AVPlayerItem(url: url)
-        let player = AVPlayer(playerItem: playerItem)
-        self.player = player
-'''
-          new = '''        // Some IPTV origins reject AVPlayer's default request while
-        // media_kit/mpv succeeds. Match a normal streaming-client request and
-        // keep the native PiP handoff compatible with Xtream endpoints.
-        let asset = AVURLAsset(
-            url: url,
-            options: [
-                "AVURLAssetHTTPHeaderFieldsKey": [
-                    "User-Agent": "VLC/3.0.21 LibVLC/3.0.21",
-                    "Accept": "*/*",
-                    "Accept-Language": "en-US,en;q=0.9"
-                ]
-            ]
-        )
-        let playerItem = AVPlayerItem(asset: asset)
-        let player = AVPlayer(playerItem: playerItem)
-        player.automaticallyWaitsToMinimizeStalling = true
-        self.player = player
-'''
+          old = "\n".join([
+              "        let playerItem = AVPlayerItem(url: url)",
+              "        let player = AVPlayer(playerItem: playerItem)",
+              "        self.player = player",
+              "",
+          ])
+          new = "\n".join([
+              "        // Some IPTV origins reject AVPlayer's default request while",
+              "        // media_kit/mpv succeeds. Match a normal streaming-client request and",
+              "        // keep the native PiP handoff compatible with Xtream endpoints.",
+              "        let asset = AVURLAsset(",
+              "            url: url,",
+              "            options: [",
+              "                \"AVURLAssetHTTPHeaderFieldsKey\": [",
+              "                    \"User-Agent\": \"VLC/3.0.21 LibVLC/3.0.21\",",
+              "                    \"Accept\": \"*/*\",",
+              "                    \"Accept-Language\": \"en-US,en;q=0.9\"",
+              "                ]",
+              "            ]",
+              "        )",
+              "        let playerItem = AVPlayerItem(asset: asset)",
+              "        let player = AVPlayer(playerItem: playerItem)",
+              "        player.automaticallyWaitsToMinimizeStalling = true",
+              "        self.player = player",
+              "",
+          ])
           if old not in source:
               raise SystemExit('Expected AVPlayer construction block not found')
           open(path, 'w', encoding='utf-8').write(source.replace(old, new, 1))
