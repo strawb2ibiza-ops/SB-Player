@@ -50,7 +50,7 @@ function renderTvHome(){
 function resumeHistory(index){const item=loadContinue()[index];if(!item||!item.url)return;openVideo(item.url,item.title||"Continue watching",false,{id:item.id,title:item.title,subtitle:item.subtitle,artwork:item.artwork,url:item.url,live:false});setTimeout(function(){try{$("video").currentTime=Number(item.position||0)}catch(_){}},800)}
 function loadRemoteSession(){if(remoteSession)return remoteSession;try{const value=JSON.parse(localStorage.getItem(REMOTE_KEY)||"null");if(value&&value.pairingId&&value.token)remoteSession=value}catch(_){}return remoteSession}
 function clearRemoteSession(){remoteSession=null;remoteAfterId=0;try{localStorage.removeItem(REMOTE_KEY)}catch(_){}if(remoteTimer){clearInterval(remoteTimer);remoteTimer=null}}
-function startRemotePolling(){if(!loadRemoteSession()||remoteTimer)return;remoteTimer=setInterval(function(){pollRemote()},300);pollRemote()}
+function startRemotePolling(){if(!loadRemoteSession()||remoteTimer)return;remoteTimer=setInterval(function(){pollRemote()},100);pollRemote()}
 async function pollRemote(){
  const session=loadRemoteSession();if(!session||remotePollBusy)return;remotePollBusy=true;
  try{const d=await pairPost({action:"remote_poll",pairingId:session.pairingId,token:session.token,afterId:remoteAfterId});const commands=d.commands||[];for(let i=0;i<commands.length;i++){const row=commands[i];handleRemoteCommand(row.command);remoteAfterId=Math.max(remoteAfterId,Number(row.id||0))}}
