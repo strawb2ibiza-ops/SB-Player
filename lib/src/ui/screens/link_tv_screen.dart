@@ -8,6 +8,7 @@ import '../../models/iptv_profile.dart';
 import '../../services/tv_pairing_service.dart';
 import '../../state/app_controller.dart';
 import '../branding/sb_brand.dart';
+import 'tv_remote_screen.dart';
 
 class LinkTvScreen extends StatefulWidget {
   const LinkTvScreen({super.key, required this.controller});
@@ -25,6 +26,7 @@ class _LinkTvScreenState extends State<LinkTvScreen> {
   final _pairingService = TvPairingService();
 
   TvPairingRequest? _request;
+  TvRemoteSession? _remoteSession;
   bool _busy = false;
   bool _done = false;
   String? _error;
@@ -105,12 +107,13 @@ class _LinkTvScreenState extends State<LinkTvScreen> {
     });
 
     try {
-      await _pairingService.approve(
+      final remoteSession = await _pairingService.approve(
         request: request,
         account: account,
       );
       if (!mounted) return;
       setState(() {
+        _remoteSession = remoteSession;
         _done = true;
         _busy = false;
       });
@@ -143,6 +146,15 @@ class _LinkTvScreenState extends State<LinkTvScreen> {
         child: _done
             ? _SuccessView(
                 onDone: () => Navigator.of(context).pop(),
+                onRemote: _remoteSession == null
+                    ? null
+                    : () => Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => TvRemoteScreen(
+                              session: _remoteSession,
+                            ),
+                          ),
+                        ),
               )
             : _request == null
                 ? Column(
@@ -304,9 +316,10 @@ class _LinkTvScreenState extends State<LinkTvScreen> {
 }
 
 class _SuccessView extends StatelessWidget {
-  const _SuccessView({required this.onDone});
+  const _SuccessView({required this.onDone, this.onRemote});
 
   final VoidCallback onDone;
+  final VoidCallback? onRemote;
 
   @override
   Widget build(BuildContext context) {
@@ -339,7 +352,15 @@ class _SuccessView extends StatelessWidget {
               style: TextStyle(color: SbBrand.textMuted),
             ),
             const SizedBox(height: 24),
-            FilledButton(
+            if (onRemote != null) ...[
+              FilledButton.icon(
+                onPressed: onRemote,
+                icon: const Icon(Icons.gamepad_rounded),
+                label: const Text('Open TV Remote'),
+              ),
+              const SizedBox(height: 10),
+            ],
+            OutlinedButton(
               onPressed: onDone,
               child: const Text('Done'),
             ),
