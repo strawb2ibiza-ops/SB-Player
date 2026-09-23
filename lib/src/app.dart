@@ -60,7 +60,7 @@ class _SbPlayerAppState extends State<SbPlayerApp> {
               if (widget.controller.signedIn) {
                 return HomeScreen(controller: widget.controller, tvMode: widget.tvMode);
               }
-              return LoginScreen(controller: widget.controller);
+              return LoginScreen(controller: widget.controller, tvMode: widget.tvMode);
             },
           );
         },
