@@ -534,17 +534,41 @@ class AppController extends ChangeNotifier {
     Duration position = Duration.zero,
     Duration duration = Duration.zero,
   }) async {
+    LibraryEntry? previous;
+    for (final value in recent) {
+      if (value.id == item.id) {
+        previous = value;
+        break;
+      }
+    }
+
     var savedPosition = position;
-    if (!item.isLive &&
+    var savedDuration = duration;
+
+    // A player can briefly report 0/0 while opening, being backgrounded, or
+    // tearing down. Never let that transient state wipe a valid resume point.
+    if (!item.isLive && previous != null) {
+      if (savedDuration.inSeconds <= 0 && previous.durationSeconds > 0) {
+        savedDuration = Duration(seconds: previous.durationSeconds);
+      }
+      if (savedPosition.inSeconds <= 0 && previous.positionSeconds > 0) {
+        savedPosition = Duration(seconds: previous.positionSeconds);
+      }
+    }
+
+    final completed = !item.isLive &&
         duration.inSeconds > 0 &&
-        position.inSeconds / duration.inSeconds > 0.95) {
+        position.inSeconds > 0 &&
+        position.inSeconds / duration.inSeconds >= 0.95;
+    if (completed) {
       savedPosition = Duration.zero;
+      if (savedDuration.inSeconds <= 0) savedDuration = duration;
     }
 
     final entry = _entryFromPlayback(
       item,
       position: savedPosition,
-      duration: duration,
+      duration: savedDuration,
     );
 
     final prefix = '$_libraryScope|';

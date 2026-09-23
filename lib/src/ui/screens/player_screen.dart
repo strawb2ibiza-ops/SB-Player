@@ -11,7 +11,6 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../models/playback_item.dart';
 import '../../services/mini_player_preferences.dart';
-import '../../services/playback_preferences.dart';
 import '../../state/app_controller.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -28,7 +27,7 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> {
+class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver {
   static const _normalMinimumSize = Size(900, 600);
   static const _detailedMiniSize = Size(620, 420);
   static const _detailedMiniMinimumSize = Size(460, 310);
@@ -40,16 +39,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
   late final VideoController _videoController;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   DateTime _lastPositionRebuild = DateTime.fromMillisecondsSinceEpoch(0);
+  static const MethodChannel _iosPipChannel =
+      MethodChannel('sb_player/media_kit_pip');
+
   final MiniPlayerPreferences _miniPreferences = const MiniPlayerPreferences();
-  final PlaybackPreferences _playbackPreferences = PlaybackPreferences();
   NativePictureInPicture? _nativePip;
   StreamSubscription<PipEvent>? _pipSubscription;
   bool _pipReady = false;
   bool _pipPreparing = false;
-  bool _pipRestoring = false;
   String? _pipError;
-  Duration _pipHandoffPosition = Duration.zero;
-  bool _pipHandoffWasPlaying = true;
+  Timer? _checkpointTimer;
+  Duration _lastCheckpointPosition = Duration.zero;
 
   bool _miniMode = false;
   bool _buffering = true;
@@ -76,6 +76,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _item = widget.item;
     _player = Player();
     _videoController = VideoController(_player);
+    WidgetsBinding.instance.addObserver(this);
+    if (Platform.isIOS) {
+      _iosPipChannel.setMethodCallHandler(_handleIosPipMethodCall);
+    }
+    _checkpointTimer = Timer.periodic(
+      const Duration(seconds: 8),
+      (_) => unawaited(_checkpointPlayback()),
+    );
     _subscriptions.add(_player.stream.buffering.listen((value) {
       if (mounted) setState(() => _buffering = value);
     }));
@@ -235,94 +243,42 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _startIosNativePip() async {
-    if (_pipPreparing || _pipRestoring) return;
-
-    _pipHandoffPosition = _player.state.position;
-    _pipHandoffWasPlaying = _player.state.playing;
+    if (_pipPreparing) return;
     if (mounted) {
       setState(() {
         _pipPreparing = true;
-        _pipReady = false;
         _pipError = null;
       });
     }
 
-    NativePictureInPicture? supportProbe;
     try {
-      supportProbe = NativePictureInPicture();
-      final supported = await supportProbe.isPipSupported();
-      await supportProbe.dispose();
-      supportProbe = null;
+      final supported =
+          await _iosPipChannel.invokeMethod<bool>('SBPlayerPiP.IsSupported') ??
+              false;
       if (!supported) {
-        throw StateError('Picture-in-Picture is not supported on this device.');
+        throw StateError(
+          'Picture-in-Picture is not available on this iPhone/iOS version.',
+        );
       }
 
-      // The iOS plugin uses AVPlayer while normal playback uses media_kit.
-      // Stop media_kit first so IPTV providers that allow a single stream
-      // connection do not reject the PiP player as a duplicate session.
-      await _pipSubscription?.cancel();
-      _pipSubscription = null;
-      await _nativePip?.dispose();
-      _nativePip = null;
-      await _player.pause();
-      await _player.stop();
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      final handle = await _player.handle;
+      final accepted = await _iosPipChannel.invokeMethod<bool>(
+            'SBPlayerPiP.Start',
+            <String, dynamic>{'handle': handle.toString()},
+          ) ??
+          false;
+      if (!accepted) {
+        throw StateError('The active video surface could not enter PiP.');
+      }
 
-      Object? lastError;
-      for (final candidate in _pipStreamCandidates(_item.streamUrl)) {
-        final pip = NativePictureInPicture();
-        try {
-          await pip
-              .initialize(candidate)
-              .timeout(const Duration(seconds: 10));
-          await pip.setAutoPipEnabled(
-            await _playbackPreferences.readAutoPip(),
-          );
-
-          _nativePip = pip;
-          await _pipSubscription?.cancel();
-          _pipSubscription = pip.onPipEvent.listen((event) {
-            if (event == PipEvent.restoreUI || event == PipEvent.didStop) {
-              unawaited(_restoreFromIosPip(pip));
-            }
-          });
-
-          if (!_item.isLive &&
-              _pipHandoffPosition > const Duration(milliseconds: 250)) {
-            await pip.seekTo(_pipHandoffPosition);
-          }
-          await pip.play();
-          await pip.startPiP();
-
+      if (mounted) {
+        setState(() {
+          _pipPreparing = false;
           _pipReady = true;
-          if (mounted) {
-            setState(() {
-              _pipPreparing = false;
-              _pipError = null;
-            });
-          }
-          return;
-        } catch (error) {
-          lastError = error;
-          if (identical(_nativePip, pip)) {
-            await _pipSubscription?.cancel();
-            _pipSubscription = null;
-            _nativePip = null;
-          }
-          await pip.dispose();
-        }
+          _pipError = null;
+        });
       }
-
-      throw StateError(
-        'The iOS PiP player could not open this stream. '
-        '${lastError ?? 'No compatible stream variant was accepted.'}',
-      );
     } catch (error) {
-      await supportProbe?.dispose();
-      await _resumeFlutterAfterPip(
-        _pipHandoffPosition,
-        _pipHandoffWasPlaying,
-      );
       if (mounted) {
         setState(() {
           _pipPreparing = false;
@@ -330,83 +286,87 @@ class _PlayerScreenState extends State<PlayerScreen> {
           _pipError = error.toString();
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Picture-in-Picture unavailable. Playback was restored. $error',
-            ),
-          ),
+          SnackBar(content: Text('Picture-in-Picture unavailable: $error')),
         );
       }
     }
   }
 
-  Future<void> _restoreFromIosPip(NativePictureInPicture pip) async {
-    if (_pipRestoring || !identical(_nativePip, pip)) return;
-    _pipRestoring = true;
+  Future<dynamic> _handleIosPipMethodCall(MethodCall call) async {
+    if (call.method != 'SBPlayerPiP.Event') return null;
+    final raw = call.arguments;
+    if (raw is! Map) return null;
+    final event = '${raw['event'] ?? ''}';
 
-    var position = _pipHandoffPosition;
-    try {
-      position = await pip.getPosition();
-    } catch (_) {}
-    try {
-      await pip.pause();
-    } catch (_) {}
-
-    await _pipSubscription?.cancel();
-    _pipSubscription = null;
-    if (identical(_nativePip, pip)) {
-      _nativePip = null;
-      _pipReady = false;
+    switch (event) {
+      case 'setPlaying':
+        final shouldPlay = raw['value'] == true;
+        if (shouldPlay) {
+          await _player.play();
+        } else {
+          await _player.pause();
+        }
+        break;
+      case 'skip':
+        final seconds = (raw['value'] as num?)?.round() ?? 0;
+        if (seconds != 0) await _seekRelative(seconds);
+        break;
+      case 'didStart':
+        if (mounted) {
+          setState(() {
+            _pipPreparing = false;
+            _pipReady = true;
+            _pipError = null;
+          });
+        }
+        break;
+      case 'didStop':
+      case 'restore':
+        if (mounted) setState(() => _pipReady = false);
+        unawaited(_checkpointPlayback(force: true));
+        break;
+      case 'failed':
+        final message = '${raw['value'] ?? 'Picture-in-Picture failed.'}';
+        if (mounted) {
+          setState(() {
+            _pipPreparing = false;
+            _pipReady = false;
+            _pipError = message;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Picture-in-Picture failed: $message')),
+          );
+        }
+        break;
     }
-    try {
-      await pip.dispose();
-    } catch (_) {}
-
-    try {
-      await _resumeFlutterAfterPip(position, _pipHandoffWasPlaying);
-    } finally {
-      _pipRestoring = false;
-      if (mounted) setState(() {});
-    }
+    return null;
   }
 
-  Future<void> _resumeFlutterAfterPip(
-    Duration position,
-    bool wasPlaying,
-  ) async {
-    await _open(resumeAt: _item.isLive ? null : position);
-    if (!wasPlaying) {
-      await _player.pause();
+  Future<void> _checkpointPlayback({bool force = false}) async {
+    if (_item.isLive || _duration.inSeconds <= 0 || _position.inSeconds <= 1) {
+      return;
     }
+    if (!force &&
+        (_position - _lastCheckpointPosition).abs() <
+            const Duration(seconds: 5)) {
+      return;
+    }
+    _lastCheckpointPosition = _position;
+    await widget.controller.recordPlayback(
+      _item,
+      position: _position,
+      duration: _duration,
+    );
   }
 
-  List<String> _pipStreamCandidates(String source) {
-    final result = <String>[source];
-    if (!Platform.isIOS) return result;
-
-    final uri = Uri.tryParse(source);
-    if (uri == null) return result;
-    final path = uri.path;
-    final lowerPath = path.toLowerCase();
-    final isLive = lowerPath.contains('/live/');
-    final isVod =
-        lowerPath.contains('/movie/') || lowerPath.contains('/series/');
-    if (!isLive && !isVod) return result;
-
-    final slash = path.lastIndexOf('/');
-    final dot = path.lastIndexOf('.');
-    if (dot <= slash) return result;
-
-    final currentExtension = path.substring(dot + 1).toLowerCase();
-    final extensions =
-        isLive ? const <String>['m3u8', 'ts'] : const <String>['mp4', 'm3u8', 'ts'];
-    final basePath = path.substring(0, dot);
-    for (final extension in extensions) {
-      if (extension == currentExtension) continue;
-      final candidate = uri.replace(path: '$basePath.$extension').toString();
-      if (!result.contains(candidate)) result.add(candidate);
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      unawaited(_checkpointPlayback(force: true));
     }
-    return result;
   }
 
   Future<void> _loadMiniPreference() async {
@@ -444,6 +404,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _item = next;
       _position = Duration.zero;
       _duration = Duration.zero;
+      _lastCheckpointPosition = Duration.zero;
       _playbackError = null;
     });
     await _nativePip?.dispose();
@@ -854,16 +815,26 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   @override
   void dispose() {
-    final position = _player.state.position;
-    final duration = _player.state.duration;
-    unawaited(
-      widget.controller.recordPlayback(
-        _item,
-        position: position,
-        duration: duration,
-      ),
-    );
+    WidgetsBinding.instance.removeObserver(this);
+    _checkpointTimer?.cancel();
     _reconnectTimer?.cancel();
+
+    // Use the last values emitted by media_kit instead of Player.state here.
+    // Native teardown can zero Player.state before dispose runs on iOS.
+    if (!_item.isLive && _duration.inSeconds > 0 && _position.inSeconds > 0) {
+      unawaited(
+        widget.controller.recordPlayback(
+          _item,
+          position: _position,
+          duration: _duration,
+        ),
+      );
+    }
+
+    if (Platform.isIOS) {
+      unawaited(_iosPipChannel.invokeMethod<void>('SBPlayerPiP.Stop'));
+      _iosPipChannel.setMethodCallHandler(null);
+    }
     unawaited(_restoreWindow());
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
