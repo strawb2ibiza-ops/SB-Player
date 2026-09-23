@@ -28,18 +28,39 @@ jobs:
       - run: flutter pub get
       - name: Patch media_kit iOS same-player PiP
         run: python3 scripts/patch_ios_media_kit_pip.py
+      - name: Verify patched iOS plugin source
+        run: |
+          PACKAGE_ROOT="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from urllib.parse import unquote, urlparse
+          cfg = json.loads(Path(".dart_tool/package_config.json").read_text())
+          entry = next(x for x in cfg["packages"] if x["name"] == "media_kit_video")
+          uri = entry["rootUri"]
+          print(unquote(urlparse(uri).path) if uri.startswith("file:") else (Path(".dart_tool") / uri).resolve())
+          PY
+          )"
+          PLUGIN="$PACKAGE_ROOT/ios/media_kit_video/Sources/media_kit_video/plugin/common/MediaKitVideoPlugin.swift"
+          grep -F 'sb_player/media_kit_pip' "$PLUGIN"
+          grep -F 'SBPlayerPiP.IsSupported' "$PLUGIN"
       - name: Analyze
         run: flutter analyze
       - name: Build unsigned iOS release
         run: flutter build ios --release --no-codesign
+      - name: Verify PiP bridge is compiled into native framework
+        run: |
+          BIN="build/ios/iphoneos/Runner.app/Frameworks/media_kit_video.framework/media_kit_video"
+          test -f "$BIN"
+          strings "$BIN" | grep -F 'sb_player/media_kit_pip'
+          strings "$BIN" | grep -F 'SBPlayerPiP.IsSupported'
       - name: Package unsigned IPA
         run: |
           mkdir -p Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -qry SB-Player-iOS-v0.6.5-pip2-unsigned.ipa Payload
+          zip -qry SB-Player-iOS-v0.6.6-pip3-unsigned.ipa Payload
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-iOS-v0.6.5-pip2-unsigned-IPA
-          path: SB-Player-iOS-v0.6.5-pip2-unsigned.ipa
+          name: SB-Player-iOS-v0.6.6-pip3-unsigned-IPA
+          path: SB-Player-iOS-v0.6.6-pip3-unsigned.ipa
           if-no-files-found: error
           retention-days: 14

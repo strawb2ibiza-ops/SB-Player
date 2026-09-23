@@ -81,7 +81,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _iosPipChannel.setMethodCallHandler(_handleIosPipMethodCall);
     }
     _checkpointTimer = Timer.periodic(
-      const Duration(seconds: 8),
+      const Duration(seconds: 5),
       (_) => unawaited(_checkpointPlayback()),
     );
     _subscriptions.add(_player.stream.buffering.listen((value) {
@@ -383,13 +383,61 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
 
     try {
-      await _player.open(Media(_item.streamUrl), play: true);
       final target = resumeAt ?? _item.startPosition;
-      if (!_item.isLive && target > const Duration(seconds: 5)) {
-        await _player.seek(target);
+      final shouldResume =
+          !_item.isLive && target > const Duration(seconds: 5);
+
+      // On iOS, some IPTV VOD sources ignore a seek issued immediately after
+      // open(play: true). Open paused, wait until metadata is available, seek,
+      // verify the position, and only then start playback.
+      await _player.open(
+        Media(_item.streamUrl),
+        play: !shouldResume,
+      );
+
+      if (shouldResume) {
+        await _seekToResumePoint(target);
+        await _player.play();
+
+        // A few providers only become fully seekable after playback begins.
+        // Correct once more if the first decoded frame still came from 0.
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+        if (_player.state.position < target - const Duration(seconds: 3)) {
+          await _player.seek(target);
+        }
       }
     } catch (_) {
       _handlePlaybackFailure();
+    }
+  }
+
+  Future<void> _seekToResumePoint(Duration requested) async {
+    var target = requested;
+    var knownDuration = _player.state.duration;
+
+    if (knownDuration.inSeconds <= 0) {
+      try {
+        knownDuration = await _player.stream.duration
+            .firstWhere((value) => value.inSeconds > 0)
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {
+        // Some providers report duration late. Still try the saved seek point.
+      }
+    }
+
+    if (knownDuration > const Duration(seconds: 1) &&
+        target >= knownDuration) {
+      target = knownDuration - const Duration(seconds: 1);
+    }
+
+    for (var attempt = 0; attempt < 4; attempt++) {
+      await _player.seek(target);
+      await Future<void>.delayed(
+        Duration(milliseconds: attempt == 0 ? 250 : 450),
+      );
+      if (_player.state.position >= target - const Duration(seconds: 3)) {
+        return;
+      }
     }
   }
 

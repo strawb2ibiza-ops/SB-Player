@@ -1,32 +1,41 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import glob
-import os
+import json
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 
-roots = [Path(p) for p in glob.glob(os.path.expanduser("~/.pub-cache/hosted/pub.dev/media_kit_video-*"))]
-if not roots:
-    raise SystemExit("media_kit_video package not found in pub cache")
-root = sorted(roots)[-1]
+package_config_path = Path(".dart_tool/package_config.json")
+if not package_config_path.exists():
+    raise SystemExit("Run flutter pub get before patching media_kit_video")
 
+package_config = json.loads(package_config_path.read_text(encoding="utf-8"))
+package = next(
+    (entry for entry in package_config.get("packages", []) if entry.get("name") == "media_kit_video"),
+    None,
+)
+if package is None:
+    raise SystemExit("media_kit_video is missing from .dart_tool/package_config.json")
 
-def find_swift(name: str, marker: str) -> Path:
-    for path in root.rglob(name):
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        if marker in text:
-            return path.resolve()
-    raise SystemExit(f"Could not find {name} containing {marker!r}")
+root_uri = str(package.get("rootUri", ""))
+if root_uri.startswith("file:"):
+    root = Path(unquote(urlparse(root_uri).path))
+else:
+    root = (package_config_path.parent / root_uri).resolve()
 
+# Patch the exact iOS source tree CocoaPods compiles. Pub archives may contain
+# concrete copies here, so patching only common/darwin can succeed in CI while
+# leaving the shipped framework untouched.
+platform_root = root / "ios/media_kit_video/Sources/media_kit_video/plugin"
+plugin = platform_root / "common/MediaKitVideoPlugin.swift"
+manager = platform_root / "common/VideoOutputManager.swift"
+output = platform_root / "common/VideoOutput.swift"
 
-plugin = find_swift("MediaKitVideoPlugin.swift", "VideoOutputManager.Create")
-manager = find_swift("VideoOutputManager.swift", "class VideoOutputManager")
-output = find_swift("VideoOutput.swift", "class VideoOutput")
+for path in (plugin, manager, output):
+    if not path.exists():
+        raise SystemExit(f"Required iOS media_kit_video source not found: {path}")
 
-bridge_path = root / "ios/media_kit_video/Sources/media_kit_video/plugin/SBMediaKitPiP.swift"
+bridge_path = platform_root / "SBMediaKitPiP.swift"
 bridge_path.parent.mkdir(parents=True, exist_ok=True)
 bridge_path.write_text(r'''#if os(iOS)
 import AVFoundation
@@ -586,7 +595,19 @@ replace_once(
     "output frame forwarding",
 )
 
+checks = (
+    (plugin, 'sb_player/media_kit_pip'),
+    (plugin, 'SBPlayerPiP.IsSupported'),
+    (manager, 'startPictureInPicture'),
+    (output, 'SBMediaKitPiPBridge'),
+    (bridge_path, 'AVPictureInPictureController'),
+)
+for path, marker in checks:
+    if marker not in path.read_text(encoding="utf-8"):
+        raise SystemExit(f"PiP patch verification failed: {marker!r} missing from {path}")
+
 print("Patched media_kit_video iOS PiP:")
+print(" root:", root)
 print(" plugin:", plugin)
 print(" manager:", manager)
 print(" output:", output)
