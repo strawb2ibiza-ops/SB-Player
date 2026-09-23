@@ -46,7 +46,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
   StreamSubscription<PipEvent>? _pipSubscription;
   bool _pipReady = false;
   bool _pipPreparing = false;
+  bool _pipRestoring = false;
   String? _pipError;
+  Duration _pipHandoffPosition = Duration.zero;
+  bool _pipHandoffWasPlaying = true;
 
   bool _miniMode = false;
   bool _buffering = true;
@@ -123,7 +126,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
     unawaited(_loadMiniPreference());
     unawaited(_open());
-    if (Platform.isIOS || Platform.isAndroid) unawaited(_prepareNativePip());
+    // Android PiP can share the app's playback lifecycle. On iOS the
+    // native PiP package creates a second AVPlayer, so preloading it here
+    // can open a second IPTV connection and fail even while media_kit plays.
+    if (Platform.isAndroid) unawaited(_prepareNativePip());
   }
 
   Future<void> _prepareNativePip() async {
@@ -151,9 +157,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
 
       await pip.initialize(_item.streamUrl);
-      await pip.setAutoPipEnabled(
-        Platform.isIOS ? await _playbackPreferences.readAutoPip() : false,
-      );
+      await pip.setAutoPipEnabled(false);
 
       await _pipSubscription?.cancel();
       _pipSubscription = pip.onPipEvent.listen((event) async {
@@ -191,6 +195,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   Future<void> _startNativePip() async {
+    if (Platform.isIOS) {
+      await _startIosNativePip();
+      return;
+    }
+
     var pip = _nativePip;
     if (!_pipReady || pip == null) {
       await _prepareNativePip();
@@ -223,6 +232,181 @@ class _PlayerScreenState extends State<PlayerScreen> {
         );
       }
     }
+  }
+
+  Future<void> _startIosNativePip() async {
+    if (_pipPreparing || _pipRestoring) return;
+
+    _pipHandoffPosition = _player.state.position;
+    _pipHandoffWasPlaying = _player.state.playing;
+    if (mounted) {
+      setState(() {
+        _pipPreparing = true;
+        _pipReady = false;
+        _pipError = null;
+      });
+    }
+
+    NativePictureInPicture? supportProbe;
+    try {
+      supportProbe = NativePictureInPicture();
+      final supported = await supportProbe.isPipSupported();
+      await supportProbe.dispose();
+      supportProbe = null;
+      if (!supported) {
+        throw StateError('Picture-in-Picture is not supported on this device.');
+      }
+
+      // The iOS plugin uses AVPlayer while normal playback uses media_kit.
+      // Stop media_kit first so IPTV providers that allow a single stream
+      // connection do not reject the PiP player as a duplicate session.
+      await _pipSubscription?.cancel();
+      _pipSubscription = null;
+      await _nativePip?.dispose();
+      _nativePip = null;
+      await _player.pause();
+      await _player.stop();
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+
+      Object? lastError;
+      for (final candidate in _pipStreamCandidates(_item.streamUrl)) {
+        final pip = NativePictureInPicture();
+        try {
+          await pip
+              .initialize(candidate)
+              .timeout(const Duration(seconds: 10));
+          await pip.setAutoPipEnabled(
+            await _playbackPreferences.readAutoPip(),
+          );
+
+          _nativePip = pip;
+          await _pipSubscription?.cancel();
+          _pipSubscription = pip.onPipEvent.listen((event) {
+            if (event == PipEvent.restoreUI || event == PipEvent.didStop) {
+              unawaited(_restoreFromIosPip(pip));
+            }
+          });
+
+          if (!_item.isLive &&
+              _pipHandoffPosition > const Duration(milliseconds: 250)) {
+            await pip.seekTo(_pipHandoffPosition);
+          }
+          await pip.play();
+          await pip.startPiP();
+
+          _pipReady = true;
+          if (mounted) {
+            setState(() {
+              _pipPreparing = false;
+              _pipError = null;
+            });
+          }
+          return;
+        } catch (error) {
+          lastError = error;
+          if (identical(_nativePip, pip)) {
+            await _pipSubscription?.cancel();
+            _pipSubscription = null;
+            _nativePip = null;
+          }
+          await pip.dispose();
+        }
+      }
+
+      throw StateError(
+        'The iOS PiP player could not open this stream. '
+        '${lastError ?? 'No compatible stream variant was accepted.'}',
+      );
+    } catch (error) {
+      await supportProbe?.dispose();
+      await _resumeFlutterAfterPip(
+        _pipHandoffPosition,
+        _pipHandoffWasPlaying,
+      );
+      if (mounted) {
+        setState(() {
+          _pipPreparing = false;
+          _pipReady = false;
+          _pipError = error.toString();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Picture-in-Picture unavailable. Playback was restored. $error',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _restoreFromIosPip(NativePictureInPicture pip) async {
+    if (_pipRestoring || !identical(_nativePip, pip)) return;
+    _pipRestoring = true;
+
+    var position = _pipHandoffPosition;
+    try {
+      position = await pip.getPosition();
+    } catch (_) {}
+    try {
+      await pip.pause();
+    } catch (_) {}
+
+    await _pipSubscription?.cancel();
+    _pipSubscription = null;
+    if (identical(_nativePip, pip)) {
+      _nativePip = null;
+      _pipReady = false;
+    }
+    try {
+      await pip.dispose();
+    } catch (_) {}
+
+    try {
+      await _resumeFlutterAfterPip(position, _pipHandoffWasPlaying);
+    } finally {
+      _pipRestoring = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _resumeFlutterAfterPip(
+    Duration position,
+    bool wasPlaying,
+  ) async {
+    await _open(resumeAt: _item.isLive ? null : position);
+    if (!wasPlaying) {
+      await _player.pause();
+    }
+  }
+
+  List<String> _pipStreamCandidates(String source) {
+    final result = <String>[source];
+    if (!Platform.isIOS) return result;
+
+    final uri = Uri.tryParse(source);
+    if (uri == null) return result;
+    final path = uri.path;
+    final lowerPath = path.toLowerCase();
+    final isLive = lowerPath.contains('/live/');
+    final isVod =
+        lowerPath.contains('/movie/') || lowerPath.contains('/series/');
+    if (!isLive && !isVod) return result;
+
+    final slash = path.lastIndexOf('/');
+    final dot = path.lastIndexOf('.');
+    if (dot <= slash) return result;
+
+    final currentExtension = path.substring(dot + 1).toLowerCase();
+    final extensions =
+        isLive ? const <String>['m3u8', 'ts'] : const <String>['mp4', 'm3u8', 'ts'];
+    final basePath = path.substring(0, dot);
+    for (final extension in extensions) {
+      if (extension == currentExtension) continue;
+      final candidate = uri.replace(path: '$basePath.$extension').toString();
+      if (!result.contains(candidate)) result.add(candidate);
+    }
+    return result;
   }
 
   Future<void> _loadMiniPreference() async {
@@ -266,7 +450,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     _nativePip = null;
     _pipReady = false;
     await _open();
-    if (Platform.isIOS || Platform.isAndroid) {
+    if (Platform.isAndroid) {
       unawaited(_prepareNativePip());
     }
   }
