@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.10
+
+- Hotfixed Series loading so category lists remain usable even when a provider's full Series catalogue request fails.
+- Added category-scoped Series fetching and on-demand category loading to avoid oversized provider responses.
+- Added an All-categories fallback that loads Series in small batches instead of one huge request.
+- Added recovery when a provider returns Series without a working categories endpoint.
+- Added release-behaviour coverage for the exact failure mode where full Series retrieval fails but category retrieval succeeds.
+
 ## 0.6.9
 
 - Fixed Series catalogue compatibility for providers that return alternate/nested Xtream response shapes.
