@@ -116,6 +116,15 @@ class _ResumeCardState extends State<ResumeCard> {
         child: Card(
           clipBehavior: Clip.antiAlias,
           child: InkWell(
+            onFocusChange: (focused) {
+              if (!focused) return;
+              Scrollable.ensureVisible(
+                context,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                alignment: 0.5,
+              );
+            },
             onTap: widget.onTap,
             child: Padding(
               padding: const EdgeInsets.all(10),
