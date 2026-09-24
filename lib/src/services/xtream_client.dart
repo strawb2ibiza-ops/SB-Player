@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:http/http.dart' as http;
 
@@ -538,7 +539,11 @@ class XtreamClient {
       throw XtreamException('Provider returned HTTP ${response.statusCode}.');
     }
     try {
-      return jsonDecode(response.body);
+      final body = response.body;
+      return await Isolate.run(
+        () => jsonDecode(body),
+        debugName: 'sb-player-xtream-json',
+      );
     } catch (_) {
       throw XtreamException('Provider returned invalid data.');
     }
