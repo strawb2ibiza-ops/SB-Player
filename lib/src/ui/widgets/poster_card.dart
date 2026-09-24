@@ -55,6 +55,15 @@ class _PosterCardState extends State<PosterCard> {
           child: Card(
             child: InkWell(
               borderRadius: BorderRadius.circular(11),
+              onFocusChange: (focused) {
+                if (!focused) return;
+                Scrollable.ensureVisible(
+                  context,
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  alignment: 0.5,
+                );
+              },
               onTap: widget.onTap,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
