@@ -366,7 +366,7 @@ class AppController extends ChangeNotifier {
   List<String> categoryPreviewImages(
     ContentSection target,
     String categoryId, {
-    int limit = 4,
+    int limit = 16,
   }) {
     Iterable<String?> images;
     switch (target) {
