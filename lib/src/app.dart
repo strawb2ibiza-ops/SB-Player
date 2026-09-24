@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'models/content_section.dart';
 import 'state/app_controller.dart';
+import 'services/playback_preferences.dart';
 import 'ui/app_theme.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/login_screen.dart';
@@ -26,6 +27,7 @@ class _SbPlayerAppState extends State<SbPlayerApp> {
   void initState() {
     super.initState();
     _startup = _restoreWithMinimumSplash();
+    const PlaybackPreferences().readUiScale();
   }
 
   Future<void> _restoreWithMinimumSplash() async {
@@ -43,10 +45,27 @@ class _SbPlayerAppState extends State<SbPlayerApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ValueListenableBuilder<double>(
+      valueListenable: PlaybackPreferences.uiScaleNotifier,
+      builder: (context, uiScale, _) => MaterialApp(
       title: widget.controller.config.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
+      builder: (context, child) {
+        if (child == null || (uiScale - 1.0).abs() < 0.001) return child ?? const SizedBox.shrink();
+        final size = MediaQuery.sizeOf(context);
+        return ClipRect(
+          child: Transform.scale(
+            alignment: Alignment.topLeft,
+            scale: uiScale,
+            child: SizedBox(
+              width: size.width / uiScale,
+              height: size.height / uiScale,
+              child: child,
+            ),
+          ),
+        );
+      },
       home: FutureBuilder<void>(
         future: _startup,
         builder: (context, snapshot) {
@@ -65,6 +84,6 @@ class _SbPlayerAppState extends State<SbPlayerApp> {
           );
         },
       ),
-    );
+    ));
   }
 }
