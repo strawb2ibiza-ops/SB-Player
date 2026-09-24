@@ -107,6 +107,40 @@ void main() {
     controller.dispose();
   });
 
+  test('provider labels are simplified before playback is shown', () {
+    final library = _MemoryLibraryStore();
+    final controller = _controller(library);
+
+    const movie = VodItem(
+      id: '80',
+      name: 'EN - Example Movie (2026) 4K',
+      categoryId: '1',
+      streamUrl: 'https://example.test/movie/80.mp4',
+    );
+    expect(controller.displayMovieTitle(movie), 'Example Movie (2026)');
+    expect(controller.playbackForMovie(movie).title, 'Example Movie (2026)');
+
+    const series = SeriesItem(
+      id: '100',
+      name: 'EN - South Park (1997) 4K',
+      categoryId: '9',
+    );
+    const episode = SeriesEpisode(
+      id: '501',
+      title: 'EN - South Park (1997) 4K - S11E03',
+      season: 11,
+      episodeNumber: 3,
+      streamUrl: 'https://example.test/series/501.mp4',
+    );
+
+    expect(controller.displaySeriesTitle(series), 'South Park (1997)');
+    final playback = controller.playbackForEpisode(series, episode);
+    expect(playback.title, 'South Park (1997)');
+    expect(playback.subtitle, 'Season 11 • Episode 3');
+
+    controller.dispose();
+  });
+
   test('episode autoplay queue preserves the full following order', () {
     final library = _MemoryLibraryStore();
     final controller = _controller(library);
