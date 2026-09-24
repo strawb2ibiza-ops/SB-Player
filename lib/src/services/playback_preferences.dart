@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SubtitlePreference {
@@ -39,6 +40,8 @@ class PlaybackPreferences {
   static const _subtitleModeKey = 'playback.subtitle.mode';
   static const _subtitleLanguageKey = 'playback.subtitle.language';
   static const _subtitleTitleKey = 'playback.subtitle.title';
+  static const _uiScaleKey = 'ui.scale';
+  static final ValueNotifier<double> uiScaleNotifier = ValueNotifier<double>(1.0);
 
   Future<bool> readAutoPip() async {
     final prefs = await SharedPreferences.getInstance();
@@ -48,6 +51,20 @@ class PlaybackPreferences {
   Future<void> saveAutoPip(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_autoPipKey, value);
+  }
+
+  Future<double> readUiScale() async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = (prefs.getDouble(_uiScaleKey) ?? 1.0).clamp(0.80, 1.25);
+    uiScaleNotifier.value = value;
+    return value;
+  }
+
+  Future<void> saveUiScale(double value) async {
+    final clamped = value.clamp(0.80, 1.25);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_uiScaleKey, clamped);
+    uiScaleNotifier.value = clamped;
   }
 
   Future<SubtitlePreference> readSubtitlePreference() async {
