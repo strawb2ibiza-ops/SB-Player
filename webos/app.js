@@ -214,7 +214,7 @@ function play(x){
  const id=x.stream_id||x.num;if(!id)return;
  const root=base()+"/"+(view==="live"?"live":"movie")+"/"+encodeURIComponent(auth.username)+"/"+encodeURIComponent(auth.password)+"/"+id;
  const title=x.name!=null?x.name:x.title;
- if(view==="live")openVideoCandidates([root+".m3u8",root+".ts"],title,false,{id:"live:"+id,title:title,live:true});
+ if(view==="live")openVideoCandidates([root+".m3u8",root+".ts"],title,false,{id:"live:"+id,title:title,live:true,streamKind:"live"});
  else{
    const url=root+"."+(x.container_extension||"mp4");
    openVideoCandidates([url],title,false,{id:"movie:"+id,title:title,subtitle:"Movie",artwork:x.stream_icon||x.cover||"",url:url,live:false});
@@ -249,12 +249,27 @@ function mediaType(url){
  if(/\.mkv(?:\?|$)/i.test(url))return "video/x-matroska";
  return "video/mp4";
 }
+function isAudioOnly(video){
+ return video.readyState>=2&&video.videoWidth===0&&video.videoHeight===0;
+}
+function lgPlaybackCandidates(urls,meta){
+ var out=[];
+ function add(u){if(u&&out.indexOf(u)<0)out.push(u)}
+ for(var i=0;i<urls.length;i++)add(urls[i]);
+ if(meta&&meta.streamKind==="live"){
+  var baseUrl=urls[0]||"";
+  baseUrl=baseUrl.replace(/\.(?:m3u8|ts)(?:\?.*)?$/i,"");
+  add(baseUrl+".m3u8");add(baseUrl+".ts");
+ }
+ return out;
+}
 function resetVideo(video){
  try{video.pause()}catch(_){}
  video.onerror=null;video.onplaying=null;video.onloadedmetadata=null;video.oncanplay=null;video.onended=null;video.ontimeupdate=null;
  video.removeAttribute("src");while(video.firstChild)video.removeChild(video.firstChild);video.load();
 }
 function openVideoCandidates(urls,title,autoNext,meta){
+ urls=lgPlaybackCandidates(urls,meta);
  try{rememberPlayback(true)}catch(_){}
  lastFocus=document.activeElement;playAttempt+=1;var attempt=playAttempt,index=0,video=$("video"),timer=null;
  currentPlayback=meta||null;continueWriteAt=0;
@@ -280,7 +295,7 @@ function openVideoCandidates(urls,title,autoNext,meta){
   video.oncanplay=function(){applyResume();var p=video.play();if(p&&p.catch)p.catch(function(){})};
   var source=document.createElement("source");source.src=url;source.type=mediaType(url);video.appendChild(source);
   video.load();var p=video.play();if(p&&p.catch)p.catch(function(){});
-  timer=setTimeout(function(){if(!settled){settled=true;next()}},10000);
+  timer=setTimeout(function(){if(!settled){settled=true;next()}},12000);
  }
  next();$("nowPlaying").classList.remove("hidden");$("back").focus();
 }
