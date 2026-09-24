@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.9
+
+- Fixed Series catalogue compatibility for providers that return alternate/nested Xtream response shapes.
+- Expanded provider artwork parsing and added resilient artwork URL retries/fallbacks.
+- Centralized movie/series title simplification across catalogues, playback and Continue Watching.
+- Fixed next-episode autoplay when episodes are launched from Continue Watching.
+- Preserved the working iOS/Android Picture-in-Picture path from the previous test build.
+- Added/updated mobile release behaviour tests for simplified titles and episode queues.
+
 ## 0.4.0 (in progress)
 
 - Added the premium SB Player visual identity with black surfaces and electric-blue → purple gradients.
