@@ -1,6 +1,6 @@
 {
   "id": "com.sbplayer.webos",
-  "version": "0.6.10",
+  "version": "0.6.11",
   "vendor": "SB Player",
   "type": "web",
   "main": "index.html",
