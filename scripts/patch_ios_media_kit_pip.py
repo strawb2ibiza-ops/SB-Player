@@ -55,6 +55,9 @@ final class SBMediaKitPiPBridge: NSObject,
     private var possibleObservation: NSKeyValueObservation?
     private var wantsStart = false
     private var paused = false
+    private var frameIndex: Int64 = 0
+    private var firstFrameReady = false
+    private let frameDuration = CMTime(value: 1, timescale: 30)
     private let onEvent: (String, Any?) -> Void
 
     init(onEvent: @escaping (String, Any?) -> Void) {
@@ -83,7 +86,8 @@ final class SBMediaKitPiPBridge: NSObject,
         )
         if timebaseStatus == noErr, let timebase {
             displayLayer.controlTimebase = timebase
-            CMTimebaseSetTime(timebase, time: .zero)
+            let now = CMClockGetTime(CMClockGetHostTimeClock())
+            CMTimebaseSetTime(timebase, time: now)
             CMTimebaseSetRate(timebase, rate: 1.0)
         }
 
@@ -137,6 +141,8 @@ final class SBMediaKitPiPBridge: NSObject,
         }
         controller = nil
         displayLayer.flushAndRemoveImage()
+        firstFrameReady = false
+        frameIndex = 0
         displayLayer.removeFromSuperlayer()
         hostView?.removeFromSuperview()
         hostView = nil
@@ -163,9 +169,10 @@ final class SBMediaKitPiPBridge: NSObject,
                 return
             }
 
+            let now = CMClockGetTime(CMClockGetHostTimeClock())
             var timing = CMSampleTimingInfo(
-                duration: .invalid,
-                presentationTimeStamp: .invalid,
+                duration: self.frameDuration,
+                presentationTimeStamp: now,
                 decodeTimeStamp: .invalid
             )
             var sampleBuffer: CMSampleBuffer?
@@ -180,13 +187,16 @@ final class SBMediaKitPiPBridge: NSObject,
                 return
             }
 
-            CMSetAttachment(
-                sampleBuffer,
-                key: kCMSampleAttachmentKey_DisplayImmediately,
-                value: kCFBooleanTrue,
-                attachmentMode: kCMAttachmentMode_ShouldPropagate
-            )
+            // A valid host-clock PTS is required for reliable
+            // AVSampleBufferDisplayLayer-backed PiP. Marking every frame
+            // DisplayImmediately with an invalid timestamp can create the
+            // exact failure where iOS shows PiP controls over a black window.
             self.displayLayer.enqueue(sampleBuffer)
+            self.frameIndex += 1
+            if !self.firstFrameReady {
+                self.firstFrameReady = true
+                self.emit("firstFrame", self.frameIndex)
+            }
 
             if let controller = self.controller {
                 self.tryStart(controller)
@@ -208,7 +218,9 @@ final class SBMediaKitPiPBridge: NSObject,
 
         let host = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 9))
         host.isUserInteractionEnabled = false
-        host.alpha = 0.08
+        // Keep the source layer fully renderable. It sits behind Flutter, so
+        // it is not visible in-app, but iOS PiP still receives real frames.
+        host.alpha = 1.0
         displayLayer.frame = host.bounds
         host.layer.addSublayer(displayLayer)
         window.insertSubview(host, at: 0)
@@ -217,6 +229,8 @@ final class SBMediaKitPiPBridge: NSObject,
 
     private func tryStart(_ controller: AVPictureInPictureController) {
         guard wantsStart,
+              firstFrameReady,
+              displayLayer.status != .failed,
               controller.isPictureInPicturePossible,
               !controller.isPictureInPictureActive else {
             return
