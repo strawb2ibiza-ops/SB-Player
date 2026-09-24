@@ -1,4 +1,4 @@
-# SB Player v0.6.10
+# SB Player v0.6.11
 
 SB Player is a cross-platform Flutter IPTV player with mobile, TV and desktop builds from one codebase.
 
@@ -6,22 +6,22 @@ SB Player is a cross-platform Flutter IPTV player with mobile, TV and desktop bu
 
 ## Downloads
 
-The current public build is **v0.6.10**.
+The current public build is **v0.6.11**.
 
-- **Android Mobile APK:** [SB-Player-Android-Mobile-v0.6.10.apk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.10/SB-Player-Android-Mobile-v0.6.10.apk)
-- **Android TV APK:** [SB-Player-Android-TV-v0.6.10.apk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.10/SB-Player-Android-TV-v0.6.10.apk)
-- **Android App Bundle:** [SB-Player-Android-Mobile-v0.6.10.aab](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.10/SB-Player-Android-Mobile-v0.6.10.aab)
-- **iOS unsigned IPA:** [SB-Player-iOS-v0.6.10-unsigned.ipa](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.10/SB-Player-iOS-v0.6.10-unsigned.ipa)
-- **Windows installer:** [SB-Player-Setup-v0.6.10.exe](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.10/SB-Player-Setup-v0.6.10.exe)
-- **LG webOS:** [SB-Player-LG-v0.6.10.ipk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.10/SB-Player-LG-v0.6.10.ipk)
+- **Android Mobile APK:** [SB-Player-Android-Mobile-v0.6.11.apk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.11/SB-Player-Android-Mobile-v0.6.11.apk)
+- **Android TV APK:** [SB-Player-Android-TV-v0.6.11.apk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.11/SB-Player-Android-TV-v0.6.11.apk)
+- **Android App Bundle:** [SB-Player-Android-Mobile-v0.6.11.aab](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.11/SB-Player-Android-Mobile-v0.6.11.aab)
+- **iOS unsigned IPA:** [SB-Player-iOS-v0.6.11-unsigned.ipa](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.11/SB-Player-iOS-v0.6.11-unsigned.ipa)
+- **Windows installer:** [SB-Player-Setup-v0.6.11.exe](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.11/SB-Player-Setup-v0.6.11.exe)
+- **LG webOS:** [SB-Player-LG-v0.6.11.ipk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.11/SB-Player-LG-v0.6.11.ipk)
 
-[View the v0.6.10 release](https://github.com/strawb2ibiza-ops/SB-Player/releases/tag/v0.6.10)
+[View the v0.6.11 release](https://github.com/strawb2ibiza-ops/SB-Player/releases/tag/v0.6.11)
 
 The iOS package is unsigned and must be signed before installation.
 
-## v0.6.10
+## v0.6.11
 
-This build includes the Series catalogue hotfix plus the latest mobile playback, artwork, title-cleanup and TV/desktop fixes.
+This build adds desktop/TV horizontal carousel controls and restores episode names/numbers while keeping the Series catalogue, playback, artwork and PiP fixes.
 
 ### Mobile playback
 
@@ -184,4 +184,4 @@ webos/            LG webOS client
 
 ## CI
 
-Every push to `main` runs analysis, tests and platform builds for Windows, iOS, Android and LG webOS. Successful main builds are used by the v0.6.10 release publishing workflow.
+Every push to `main` runs analysis, tests and platform builds for Windows, iOS, Android and LG webOS. Successful main builds are used by the v0.6.11 release publishing workflow.
