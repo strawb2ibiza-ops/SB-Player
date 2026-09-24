@@ -90,6 +90,8 @@ class AppController extends ChangeNotifier {
   bool epgLoading = false;
   bool _moviesLoaded = false;
   bool _seriesLoaded = false;
+  bool _fullSeriesLoaded = false;
+  final Set<String> _loadedSeriesCategoryIds = <String>{};
   bool _epgLoaded = false;
   int _catalogGeneration = 0;
   int _epgGeneration = 0;
@@ -197,6 +199,10 @@ class AppController extends ChangeNotifier {
     epg = DebugCatalog.epg(DateTime.now());
     _moviesLoaded = true;
     _seriesLoaded = true;
+    _fullSeriesLoaded = true;
+    _loadedSeriesCategoryIds.addAll(
+      series.map((item) => item.categoryId).where((id) => id.isNotEmpty),
+    );
     _epgLoaded = true;
     section = ContentSection.home;
     notifyListeners();
@@ -309,25 +315,34 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  void selectCategory(String categoryId) {
+  Future<void> selectCategory(String categoryId) async {
     switch (section) {
       case ContentSection.live:
       case ContentSection.guide:
         liveCategoryId = categoryId;
-        break;
+        notifyListeners();
+        return;
       case ContentSection.movies:
         movieCategoryId = categoryId;
-        break;
+        notifyListeners();
+        return;
       case ContentSection.series:
         seriesCategoryId = categoryId;
-        break;
+        notifyListeners();
+        if (categoryId == '__all__') {
+          if (!_fullSeriesLoaded) {
+            await _loadAllSeriesCategories();
+          }
+        } else if (!_loadedSeriesCategoryIds.contains(categoryId)) {
+          await _loadSeriesCategory(categoryId);
+        }
+        return;
       case ContentSection.home:
       case ContentSection.continueWatching:
       case ContentSection.favorites:
       case ContentSection.recent:
         return;
     }
-    notifyListeners();
   }
 
   List<IptvChannel> visibleChannels(String search) {
@@ -1221,31 +1236,99 @@ class AppController extends ChangeNotifier {
     final current = account;
     if (current == null || current.type != AccountType.xtream) return;
     final generation = _catalogGeneration;
+
     if (showLoading) {
       contentLoading = true;
       error = null;
       notifyListeners();
     }
+
+    List<IptvCategory> categories = const <IptvCategory>[];
     try {
-      List<IptvCategory> categories = const [];
-      late List<SeriesItem> loadedSeries;
-      await Future.wait<void>([
-        _xtreamClient.fetchSeriesCategories(current).then((value) {
-          categories = value;
-        }).catchError((_) {
-          categories = const [];
-        }),
-        _xtreamClient.fetchSeries(current).then((value) {
-          loadedSeries = value;
-        }),
-      ]);
+      categories = await _xtreamClient.fetchSeriesCategories(current);
+    } catch (_) {
+      // Keep going: some panels omit or break the category endpoint but still
+      // return a usable full Series catalogue.
+    }
+
+    if (generation != _catalogGeneration || account != current) return;
+
+    seriesCategories = _cleanCategories(categories);
+    _seriesLoaded = true;
+    seriesCategoryId = '__all__';
+    notifyListeners();
+
+    try {
+      final loadedSeries = await _xtreamClient.fetchSeries(current);
       if (generation != _catalogGeneration || account != current) return;
-      seriesCategories = _cleanCategories(categories);
-      series = loadedSeries;
-      _rebuildRecentSeries();
-      _seriesByCategory = _groupSeriesByCategory(loadedSeries);
-      _seriesLoaded = true;
-      seriesCategoryId = '__all__';
+
+      if (loadedSeries.isNotEmpty) {
+        _replaceSeries(loadedSeries);
+        _fullSeriesLoaded = true;
+        for (final item in loadedSeries) {
+          if (item.categoryId.isNotEmpty) {
+            _loadedSeriesCategoryIds.add(item.categoryId);
+          }
+        }
+        error = null;
+      } else if (seriesCategories.isNotEmpty) {
+        // The important recovery path: a provider can fail or time out when
+        // asked for the entire catalogue while category-scoped requests still
+        // work. Keep the category screen usable and load rows when selected.
+        error = null;
+      } else {
+        error = 'The provider returned no Series catalogue.';
+      }
+    } catch (exception) {
+      if (generation == _catalogGeneration) {
+        if (seriesCategories.isEmpty) {
+          error = exception.toString().replaceFirst('Exception: ', '');
+        } else {
+          // Categories are usable even if the oversized all-Series call fails.
+          error = null;
+        }
+      }
+    } finally {
+      if (generation == _catalogGeneration) {
+        if (showLoading) contentLoading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> _loadSeriesCategory(
+    String categoryId, {
+    bool showLoading = true,
+  }) async {
+    final current = account;
+    if (current == null ||
+        current.type != AccountType.xtream ||
+        categoryId.isEmpty ||
+        categoryId == '__all__') {
+      return;
+    }
+
+    final generation = _catalogGeneration;
+    if (showLoading) {
+      contentLoading = true;
+      error = null;
+      notifyListeners();
+    }
+
+    try {
+      final items = await _xtreamClient.fetchSeries(
+        current,
+        categoryId: categoryId,
+      );
+      if (generation != _catalogGeneration || account != current) return;
+
+      _loadedSeriesCategoryIds.add(categoryId);
+      _mergeSeries(items, fallbackCategoryId: categoryId);
+      if (items.isEmpty) {
+        error = 'No series were returned for this category.';
+      } else {
+        error = null;
+      }
     } catch (exception) {
       if (generation == _catalogGeneration) {
         error = exception.toString().replaceFirst('Exception: ', '');
@@ -1256,6 +1339,81 @@ class AppController extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  Future<void> _loadAllSeriesCategories() async {
+    final pending = seriesCategories
+        .where((category) => !_loadedSeriesCategoryIds.contains(category.id))
+        .toList(growable: false);
+    if (pending.isEmpty) {
+      _fullSeriesLoaded = true;
+      notifyListeners();
+      return;
+    }
+
+    contentLoading = true;
+    error = null;
+    notifyListeners();
+
+    // Small batches avoid the huge single response that is failing on some
+    // providers without hammering their panel with every category at once.
+    const batchSize = 4;
+    for (var offset = 0; offset < pending.length; offset += batchSize) {
+      if (account == null) break;
+      final end = (offset + batchSize).clamp(0, pending.length);
+      final batch = pending.sublist(offset, end);
+      await Future.wait<void>(
+        batch.map(
+          (category) => _loadSeriesCategory(
+            category.id,
+            showLoading: false,
+          ),
+        ),
+      );
+    }
+
+    _fullSeriesLoaded =
+        _loadedSeriesCategoryIds.containsAll(seriesCategories.map((e) => e.id));
+    contentLoading = false;
+    if (series.isNotEmpty) error = null;
+    notifyListeners();
+  }
+
+  void _replaceSeries(List<SeriesItem> items) {
+    final deduped = <String, SeriesItem>{
+      for (final item in items) item.id: item,
+    }.values.toList(growable: false);
+    series = deduped;
+    _seriesByCategory = _groupSeriesByCategory(deduped);
+    _rebuildRecentSeries();
+  }
+
+  void _mergeSeries(
+    List<SeriesItem> items, {
+    String? fallbackCategoryId,
+  }) {
+    if (items.isEmpty) return;
+
+    final merged = <String, SeriesItem>{
+      for (final item in series) item.id: item,
+    };
+
+    for (final item in items) {
+      final normalized = item.categoryId.isEmpty && fallbackCategoryId != null
+          ? SeriesItem(
+              id: item.id,
+              name: item.name,
+              categoryId: fallbackCategoryId,
+              coverUrl: item.coverUrl,
+              plot: item.plot,
+              rating: item.rating,
+              releaseDate: item.releaseDate,
+            )
+          : item;
+      merged[normalized.id] = normalized;
+    }
+
+    _replaceSeries(merged.values.toList(growable: false));
   }
 
   String get _libraryScope {
@@ -1478,6 +1636,8 @@ class AppController extends ChangeNotifier {
     seriesCategoryId = '__all__';
     _moviesLoaded = false;
     _seriesLoaded = false;
+    _fullSeriesLoaded = false;
+    _loadedSeriesCategoryIds.clear();
     _epgLoaded = false;
     contentLoading = false;
     epgLoading = false;
