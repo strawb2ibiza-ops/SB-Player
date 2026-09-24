@@ -252,7 +252,7 @@ function mediaType(url){
 function resetVideo(video){
  try{video.pause()}catch(_){}
  video.onerror=null;video.onplaying=null;video.onloadedmetadata=null;video.oncanplay=null;video.onended=null;video.ontimeupdate=null;
- video.removeAttribute("src");video.load();
+ video.removeAttribute("src");while(video.firstChild)video.removeChild(video.firstChild);video.load();
 }
 function openVideoCandidates(urls,title,autoNext,meta){
  try{rememberPlayback(true)}catch(_){}
@@ -267,12 +267,18 @@ function openVideoCandidates(urls,title,autoNext,meta){
   if(currentPlayback&&!currentPlayback.url)currentPlayback.url=url;
   function applyResume(){if(!(resumeTarget>5))return;try{var duration=Number(video.duration||0),target=duration>1?Math.min(resumeTarget,duration-1):resumeTarget;if(video.readyState>=1){video.currentTime=target;if(Math.abs(Number(video.currentTime||0)-target)<4){resumeTarget=0;if(currentPlayback)currentPlayback.resumePosition=0}}}catch(_){}}
   video.onerror=function(){if(!settled){settled=true;next()}};
-  video.onplaying=function(){settled=true;clearTimer();$("playingTitle").textContent=title||""};
+  video.onplaying=function(){
+    setTimeout(function(){
+      if(attempt!==playAttempt||settled)return;
+      if(video.videoWidth===0&&index<urls.length){settled=true;next();return}
+      settled=true;clearTimer();$("playingTitle").textContent=title||"";
+    },1200);
+  };
   video.onloadedmetadata=applyResume;
   video.ontimeupdate=function(){rememberPlayback(false)};
   video.onended=function(){clearTimer();rememberPlayback(true);if(currentPlayback&&!currentPlayback.live)removeContinue(currentPlayback.id);if(autoNext)playNextEpisode()};
   video.oncanplay=function(){applyResume();var p=video.play();if(p&&p.catch)p.catch(function(){})};
-  video.src=url;
+  var source=document.createElement("source");source.src=url;source.type=mediaType(url);video.appendChild(source);
   video.load();var p=video.play();if(p&&p.catch)p.catch(function(){});
   timer=setTimeout(function(){if(!settled){settled=true;next()}},10000);
  }
@@ -280,7 +286,7 @@ function openVideoCandidates(urls,title,autoNext,meta){
 }
 function openVideo(url,title,autoNext,meta){openVideoCandidates([url],title,!!autoNext,meta)}
 function minimizeVideo(){
- if(!$("video").src)return;
+ if(!$("video").currentSrc)return;
  $("player").classList.add("mini");
  if(lastFocus&&lastFocus.offsetParent!==null)lastFocus.focus();else focusFirst();
 }
