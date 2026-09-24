@@ -18,6 +18,7 @@ import '../widgets/channel_tile.dart';
 import '../widgets/epg_timeline.dart';
 import '../widgets/library_tile.dart';
 import '../widgets/poster_card.dart';
+import '../widgets/provider_image.dart';
 import '../widgets/resume_card.dart';
 import '../widgets/sb_logo.dart';
 import 'movie_details_screen.dart';
@@ -259,19 +260,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       SizedBox(
                         width: 48,
                         height: 48,
-                        child: channel.logoUrl == null
-                            ? const Icon(
-                                Icons.live_tv_outlined,
-                                color: SbBrand.brightBlue,
-                              )
-                            : Image.network(
-                                channel.logoUrl!,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, _, _) => const Icon(
-                                  Icons.live_tv_outlined,
-                                  color: SbBrand.brightBlue,
-                                ),
-                              ),
+                        child: ProviderImage(
+                          url: channel.logoUrl,
+                          fit: BoxFit.contain,
+                          fallback: const Icon(
+                            Icons.live_tv_outlined,
+                            color: SbBrand.brightBlue,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -585,14 +581,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (hero?.artworkUrl != null)
-                        Image.network(
-                          hero!.artworkUrl!,
-                          fit: BoxFit.cover,
-                          alignment: Alignment.centerRight,
-                          errorBuilder: (_, _, _) =>
-                              const BrandBackdrop(child: SizedBox.expand()),
-                        ),
+                      ProviderImage(
+                        url: hero?.artworkUrl,
+                        fit: BoxFit.cover,
+                        fallback:
+                            const BrandBackdrop(child: SizedBox.expand()),
+                      ),
                       const DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
@@ -795,16 +789,11 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (hero?.artworkUrl != null)
-                  Image.network(
-                    hero!.artworkUrl!,
-                    fit: BoxFit.cover,
-                    alignment: Alignment.centerRight,
-                    errorBuilder: (_, _, _) =>
-                        const BrandBackdrop(child: SizedBox.expand()),
-                  )
-                else
-                  const BrandBackdrop(child: SizedBox.expand()),
+                ProviderImage(
+                  url: hero?.artworkUrl,
+                  fit: BoxFit.cover,
+                  fallback: const BrandBackdrop(child: SizedBox.expand()),
+                ),
                 const DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -1487,15 +1476,22 @@ class _CategoryCard extends StatelessWidget {
               padding: EdgeInsets.zero,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
               itemCount: 4,
-              itemBuilder: (_, i) => i < imageUrls.length
-                  ? Image.network(
-                      imageUrls[i],
-                      fit: BoxFit.cover,
-                      cacheWidth: 360,
-                      cacheHeight: 540,
-                      gaplessPlayback: true,
-                      errorBuilder: (_, _, _) => const ColoredBox(color: SbBrand.panelBlue))
-                  : const ColoredBox(color: SbBrand.panelBlue),
+              itemBuilder: (_, i) {
+                if (i >= imageUrls.length) {
+                  return const ColoredBox(color: SbBrand.panelBlue);
+                }
+                final candidates = <String>[
+                  for (var index = i; index < imageUrls.length; index += 4)
+                    imageUrls[index],
+                ];
+                return ProviderImage(
+                  urls: candidates,
+                  fit: BoxFit.cover,
+                  cacheWidth: 360,
+                  cacheHeight: 540,
+                  fallback: const ColoredBox(color: SbBrand.panelBlue),
+                );
+              },
             ),
           DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, SbBrand.black.withValues(alpha: .94)], stops: const [.28, 1]))),
           Positioned(left: 16, right: 16, bottom: 14, child: Row(children: [Expanded(child: Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900))), const Icon(Icons.chevron_right_rounded, color: SbBrand.brightBlue)])),
