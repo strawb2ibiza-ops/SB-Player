@@ -236,6 +236,21 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           });
         }
       } catch (error) {
+        // Fallback for older Android hosts: use the legacy plugin only when
+        // Activity PiP is unavailable. The normal v0.6.8 path never opens a
+        // second provider stream.
+        try {
+          await _prepareNativePip();
+          final fallback = _nativePip;
+          if (_pipReady && fallback != null) {
+            await fallback.seekTo(_player.state.position);
+            if (_player.state.playing) await fallback.play();
+            await fallback.startPiP();
+            return;
+          }
+        } catch (_) {
+          // Surface the primary native PiP failure below.
+        }
         if (mounted) {
           setState(() => _pipError = error.toString());
           ScaffoldMessenger.of(context).showSnackBar(
