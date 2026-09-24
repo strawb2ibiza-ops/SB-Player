@@ -1,85 +1,121 @@
-# SB Player v0.6.2
+# SB Player v0.6.8
+
+SB Player is a cross-platform Flutter IPTV player with mobile, TV and desktop builds from one codebase.
+
+> Use SB Player only with services and content you are authorized to access or distribute.
 
 ## Downloads
 
-Download the latest verified SB Player v0.6.2 builds directly:
+The current public build is **v0.6.8**.
 
-- **Windows installer (.exe):** [Download SB Player for Windows](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.2/SB-Player-Setup-v0.6.2.exe)
-- **Android / Android TV (.apk):** [Download SB Player APK](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.2/SB-Player-Android-TV-v0.6.2.apk)
-- **Android App Bundle (.aab):** [Download SB Player AAB](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.2/SB-Player-Android-v0.6.2.aab)
-- **iOS unsigned IPA:** [Download SB Player iOS IPA](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.2/SB-Player-iOS-v0.6.2-unsigned.ipa)
+- **Android Mobile APK:** [SB-Player-Android-Mobile-v0.6.8.apk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-Android-Mobile-v0.6.8.apk)
+- **Android TV APK:** [SB-Player-Android-TV-v0.6.8.apk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-Android-TV-v0.6.8.apk)
+- **Android App Bundle:** [SB-Player-Android-Mobile-v0.6.8.aab](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-Android-Mobile-v0.6.8.aab)
+- **iOS unsigned IPA:** [SB-Player-iOS-v0.6.8-unsigned.ipa](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-iOS-v0.6.8-unsigned.ipa)
+- **Windows installer:** [SB-Player-Setup-v0.6.8.exe](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-Setup-v0.6.8.exe)
+- **LG webOS:** [SB-Player-LG-v0.6.8.ipk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-LG-v0.6.8.ipk)
 
-[View the SB Player v0.6.2 release](https://github.com/strawb2ibiza-ops/SB-Player/releases/tag/v0.6.2)
+[View the v0.6.8 release](https://github.com/strawb2ibiza-ops/SB-Player/releases/tag/v0.6.8)
 
-Latest verified app build: **b2aa573c**. The Android APK includes Android TV launcher support. The iOS IPA is unsigned and must be signed before installation.
+The iOS package is unsigned and must be signed before installation.
 
-Windows-first Flutter IPTV player with two distributions from one codebase:
+## v0.6.8 testing build
+
+This is the Android/iOS testing build promoted to the main branch. It includes the current mobile playback and library fixes plus the matching TV/desktop source.
+
+### Mobile playback
+
+- Native Picture-in-Picture integration for Android and iOS
+- Continue Watching / resume-position handling
+- Subtitle track selection and subtitle rendering support
+- Series season and episode loading recovery
+- Next-episode autoplay support
+- Playback retry and recovery handling
+- Mobile-friendly player controls
+
+### Mobile and TV experience
+
+- Android phone and Android TV builds
+- TV pairing / remote-control screens
+- QR-based TV linking support
+- Android TV launcher support
+- Dedicated LG webOS package
+- Settings and account access in the current navigation
+
+### Browsing and library
+
+- Live TV, Movies and Series sections
+- Search and category filtering
+- Favorites
+- Recently watched
+- Continue Watching
+- Artwork/poster support where provider metadata is available
+- EPG / TV Guide support
+
+## Provider modes
+
+SB Player supports two distributions from the same codebase:
 
 - **Open Edition** — users can sign in with an Xtream-compatible account or an M3U playlist URL.
-- **SB Edition** — compiled with a fixed SB provider endpoint; customers see only username/password and cannot edit the server or add M3U sources.
+- **SB Edition** — compiled with a fixed provider endpoint; customers see username/password login without editable server controls.
 
-Use only with IPTV services and content you are authorized to access or distribute.
-
-## Implemented
-
-### Accounts and provider modes
+### Accounts and provider support
 
 - Xtream-compatible authentication through `player_api.php`
-- Multiple securely stored provider profiles in Open Edition
-- Switch, rename, remove and add provider profiles without retyping existing credentials
 - Open Edition server + username + password login
 - Open Edition M3U URL support
+- Multiple stored provider profiles in Open Edition
+- Secure credential persistence with `flutter_secure_storage`
+- Account-expiry display when supplied by the service
 - SB Edition build-time provider lock
-- Secure account credential persistence with `flutter_secure_storage`
-- Account-expiry display when provided by the service
 
-### Live TV
+## Live TV
 
-- Live categories
-- Channel logos
+- Live categories and channel logos
 - Search and category filtering
 - Video playback with `media_kit`
 - XMLTV EPG support
 - Now/Next programme information
-- Timeline-style TV Guide with a four-hour programme window and current-time marker
-- Six-hour persistent EPG cache with manual force refresh and up to seven days of cached guide data
-- Guide navigation for Now, ±2 hours and day selection
-- Programme detail sheets with descriptions and Watch actions
+- Timeline-style TV Guide
+- Persistent guide cache with manual refresh
+- Programme detail views and Watch actions
 
-### Movies and series
+## Movies and series
 
-- Xtream VOD categories and movie catalog
+- VOD categories and movie catalog
 - Movie artwork, rating and release metadata when supplied
 - Series categories and catalog
 - Season and episode retrieval
 - Episode playback
 - Resume positions for movies and episodes
-- Movie details screen with overview, metadata and resume action
+- Movie details and resume actions
+- Next-episode autoplay
 
-### Library
+## Library
 
 - Favorites
 - Recently watched
-- Continue/resume positions
-- Library data stored in platform secure storage because IPTV playback URLs can contain account tokens or credentials
+- Continue Watching / resume positions
+- Local library data stored using platform storage
 
-### Windows playback
+## Windows playback
 
 - Full player controls through `media_kit_video`
 - Audio-track and subtitle selection
-- Buffering indicator, playback-error overlay and retry action
+- Buffering and playback-error handling
 - Hardware-accelerated playback through `media_kit`
-- Always-on-top mini-player mode using `window_manager`
-- Detailed mini-player with title/programme, progress, volume and playback controls
-- Video-only mini-player with hover controls
-- Remembered mini-player layout, size and screen position
-- Auto / 16:9 / 4:3 / Fill video display modes
-- Keyboard shortcuts for playback, seeking, volume, mute, aspect mode and live channel switching
+- Always-on-top mini-player using `window_manager`
+- Detailed and video-only mini-player layouts
+- Remembered mini-player size and position
+- Auto / 16:9 / 4:3 / Fill display modes
+- Keyboard playback shortcuts
 - Automatic live-stream reconnect attempts
 
 ## Requirements
 
-Install the current stable Flutter SDK with Windows desktop support and Visual Studio's **Desktop development with C++** workload. The Windows secure-storage implementation may also require Visual Studio C++ ATL components.
+Install the current stable Flutter SDK and the native toolchains required for the platform you are building.
+
+For Windows development, Visual Studio's **Desktop development with C++** workload is required. The Windows secure-storage implementation may also require Visual Studio C++ ATL components.
 
 From the project directory:
 
@@ -87,15 +123,13 @@ From the project directory:
 .\scripts\bootstrap_windows.ps1
 ```
 
-This creates the native Windows/Android runner folders for the installed Flutter version and resolves packages.
-
-## Run the Open Edition
+## Run Open Edition
 
 ```powershell
 .\scripts\run_open.ps1
 ```
 
-## Run the SB Edition
+## Run SB Edition
 
 ```powershell
 .\scripts\run_sb.ps1 -ProviderUrl "https://YOUR-AUTHORIZED-SB-PROVIDER.example"
@@ -117,11 +151,9 @@ SB Edition:
 
 ## Provider-lock security model
 
-The SB Edition deliberately removes server/M3U controls from the customer interface and obtains the provider endpoint from a compile-time build value.
+The SB Edition removes server/M3U controls from the customer interface and obtains the provider endpoint from a compile-time build value.
 
-That prevents normal customers from switching providers inside the application, but **a provider URL embedded in a desktop or mobile client is not a secret**. A determined person can inspect binaries or network traffic. Never embed reseller-panel credentials, administrator passwords, API master secrets, or a shared IPTV customer login in the application.
-
-Customer-specific credentials and local library data are stored through platform secure storage.
+A provider URL embedded in a desktop or mobile client is not a secret. Do not embed reseller-panel credentials, administrator passwords, API master secrets, or a shared customer login in the application.
 
 ## Build flags
 
@@ -129,6 +161,7 @@ Customer-specific credentials and local library data are stored through platform
 |---|---|
 | `SB_LOCKED=true` | Enables SB provider-locked mode |
 | `SB_PROVIDER_BASE_URL=...` | Fixed authorized SB provider base URL |
+| `SB_ANDROID_TV=true` | Builds the Android TV-oriented package |
 
 ## Project layout
 
@@ -138,18 +171,15 @@ lib/
   src/
     config/       distribution/build configuration
     models/       account, live, VOD, series, playback and EPG models
-    services/     Xtream, M3U, XMLTV and secure persistence
+    services/     provider, playback, pairing and persistence services
     state/        application/session/catalog controller
-    ui/           login, browser, TV guide, series and player UI
-scripts/          Windows bootstrap/run/build commands
-test/             parser and model tests
-.github/           CI checks
+    ui/           login, browser, guide, series, settings, pairing and player UI
+scripts/          build/bootstrap helpers
+test/             parser, model and release-behaviour tests
+webos/            LG webOS client
+.github/           CI and release workflows
 ```
 
-## Planned next milestones
+## CI
 
-1. Additional v0.4 stability and UX polish based on Windows testing.
-2. SB production logo/branding assets.
-3. Windows installer and code-signing workflow.
-4. iOS/Android shells with native Picture-in-Picture and mobile controls.
-5. AirPlay / casting where supported by the target platform and playback source.
+Every push to `main` runs analysis, tests and platform builds for Windows, iOS, Android and LG webOS. Successful main builds are used by the v0.6.8 release publishing workflow.
