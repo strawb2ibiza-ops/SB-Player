@@ -320,18 +320,17 @@ jobs:
         run: |
           python3 - <<'PY'
           import struct,zlib
-          w=h=80
+          w=h=80; bg=(4,5,9,255); blue=(24,160,255,255); purple=(122,77,255,255)
           rows=[]
+          def s(x,y): return ((14<=x<38 and 13<=y<22) or (14<=x<23 and 13<=y<40) or (14<=x<38 and 33<=y<42) or (29<=x<38 and 33<=y<63) or (14<=x<38 and 54<=y<63))
+          def b(x,y): return ((44<=x<53 and 13<=y<63) or (52<=x<68 and 13<=y<22) or (52<=x<68 and 33<=y<42) or (52<=x<68 and 54<=y<63) or (63<=x<72 and 19<=y<36) or (63<=x<72 and 39<=y<58))
           for y in range(h):
               row=bytearray([0])
               for x in range(w):
-                  t=(x+y)/(w+h-2)
-                  r=int(35+(145-35)*t); g=int(140+(71-140)*t); b=255
-                  row += bytes((r,g,b,255))
+                  row += bytes(blue if s(x,y) else purple if b(x,y) else bg)
               rows.append(bytes(row))
           raw=b''.join(rows)
-          def chunk(t,d):
-              return struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff)
+          def chunk(t,d): return struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff)
           png=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',w,h,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
           open('webos/icon.png','wb').write(png)
           PY
