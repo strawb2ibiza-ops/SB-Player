@@ -1,6 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sb_player/src/config/app_config.dart';
+import 'package:sb_player/src/models/content_section.dart';
+import 'package:sb_player/src/models/iptv_account.dart';
 import 'package:sb_player/src/models/library_entry.dart';
 import 'package:sb_player/src/models/playback_item.dart';
 import 'package:sb_player/src/models/series_item.dart';
@@ -9,6 +15,7 @@ import 'package:sb_player/src/services/library_store.dart';
 import 'package:sb_player/src/services/playback_preferences.dart';
 import 'package:sb_player/src/services/secure_account_store.dart';
 import 'package:sb_player/src/services/tv_pairing_service.dart';
+import 'package:sb_player/src/services/xtream_client.dart';
 import 'package:sb_player/src/state/app_controller.dart';
 
 class _MemoryLibraryStore extends LibraryStore {
@@ -103,6 +110,79 @@ void main() {
 
     expect(controller.continueWatching, isEmpty);
     expect(controller.playbackForMovie(movie).startPosition, Duration.zero);
+
+    controller.dispose();
+  });
+
+
+  test('Series categories survive a failed full catalogue and load on demand',
+      () async {
+    final xtream = XtreamClient(
+      client: MockClient((request) async {
+        final action = request.url.queryParameters['action'];
+        final categoryId = request.url.queryParameters['category_id'];
+
+        if (action == 'get_series_categories') {
+          return http.Response(
+            jsonEncode([
+              {'category_id': '9', 'category_name': 'Comedy'},
+            ]),
+            200,
+          );
+        }
+
+        if (action == 'get_series' && categoryId == '9') {
+          return http.Response(
+            jsonEncode([
+              {
+                'series_id': '100',
+                'name': 'South Park',
+                'category_id': '9',
+                'cover': 'https://images.example.test/south-park.jpg',
+              },
+            ]),
+            200,
+          );
+        }
+
+        if (action == 'get_series' || action == 'get_series_streams') {
+          return http.Response('provider full catalogue failure', 500);
+        }
+
+        return http.Response('{}', 200);
+      }),
+    );
+
+    final controller = AppController(
+      config: const AppConfig(
+        mode: DistributionMode.sbLocked,
+        providerBaseUrl: 'https://example.test',
+        appName: 'SB Player',
+      ),
+      accountStore: const SecureAccountStore(),
+      libraryStore: _MemoryLibraryStore(),
+      xtreamClient: xtream,
+    );
+    controller.account = const IptvAccount(
+      type: AccountType.xtream,
+      label: 'Test',
+      serverUrl: 'https://example.test',
+      username: 'user',
+      password: 'pass',
+    );
+
+    await controller.selectSection(ContentSection.series);
+
+    expect(controller.seriesCategories, hasLength(1));
+    expect(controller.seriesCategories.single.id, '9');
+    expect(controller.series, isEmpty);
+    expect(controller.error, isNull);
+
+    await controller.selectCategory('9');
+
+    expect(controller.visibleSeries(''), hasLength(1));
+    expect(controller.visibleSeries('').single.name, 'South Park');
+    expect(controller.error, isNull);
 
     controller.dispose();
   });
