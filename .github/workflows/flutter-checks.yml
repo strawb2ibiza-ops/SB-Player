@@ -18,9 +18,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.5'
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Upload resolved dependency lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: SB-Player-pubspec-lock
+          path: pubspec.lock
+          if-no-files-found: error
+          retention-days: 14
       - run: flutter analyze
       - run: flutter test
 
@@ -31,6 +39,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.5'
           channel: stable
           cache: true
       - run: flutter config --enable-windows-desktop
@@ -103,6 +112,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.5'
           channel: stable
           cache: true
       - name: Create iOS platform
@@ -116,29 +126,73 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsArbitraryLoads bool true" ios/Runner/Info.plist || /usr/libexec/PlistBuddy -c "Set :NSAppTransportSecurity:NSAllowsArbitraryLoads true" ios/Runner/Info.plist
           /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string 'Scan the QR code on your TV to securely link SB Player.'" ios/Runner/Info.plist || /usr/libexec/PlistBuddy -c "Set :NSCameraUsageDescription 'Scan the QR code on your TV to securely link SB Player.'" ios/Runner/Info.plist
           python3 - <<'PY'
-          import struct,zlib,binascii,glob,json,os
-          W=H=1024; bg=(4,5,9); blue=(24,160,255); purple=(122,77,255)
-          rows=[bytearray(bg*W) for _ in range(H)]
-          def rect(x0,y0,x1,y1,col):
-              block=bytes(col)
-              for y in range(y0,y1):
-                  row=rows[y]
-                  for x in range(x0,x1): row[x*3:x*3+3]=block
-          rect(150,180,440,270,blue); rect(150,270,240,470,blue); rect(150,470,440,560,blue); rect(350,560,440,760,blue); rect(150,760,440,850,blue)
-          rect(520,180,610,850,purple); rect(610,180,790,270,purple); rect(610,470,790,560,purple); rect(610,760,790,850,purple); rect(760,250,850,490,purple); rect(760,540,850,780,purple)
-          raw=b''.join(b'\\x00'+bytes(r) for r in rows)
-          def chunk(t,d): return struct.pack('>I',len(d))+t+d+struct.pack('>I',binascii.crc32(t+d)&0xffffffff)
-          png=b'\\x89PNG\\r\\n\\x1a\\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',W,H,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
-          src='/tmp/sb.png'; open(src,'wb').write(png)
+          import struct,zlib,binascii,json,os
           app='ios/Runner/Assets.xcassets/AppIcon.appiconset'
           data=json.load(open(os.path.join(app,'Contents.json')))
           scales={'1x':1,'2x':2,'3x':3}
+          bg=(4,5,9,255); blue=(24,160,255,255); purple=(122,77,255,255)
+
+          def is_s(x,y):
+              return ((150<=x<440 and 180<=y<270) or
+                      (150<=x<240 and 180<=y<470) or
+                      (150<=x<440 and 470<=y<560) or
+                      (350<=x<440 and 560<=y<760) or
+                      (150<=x<440 and 760<=y<850))
+
+          def is_b(x,y):
+              return ((520<=x<610 and 180<=y<850) or
+                      (610<=x<790 and 180<=y<270) or
+                      (610<=x<790 and 470<=y<560) or
+                      (610<=x<790 and 760<=y<850) or
+                      (760<=x<850 and 250<=y<490) or
+                      (760<=x<850 and 540<=y<780))
+
+          def chunk(t,d):
+              return struct.pack('>I',len(d))+t+d+struct.pack('>I',binascii.crc32(t+d)&0xffffffff)
+
+          def write_png(size,path):
+              rows=[]
+              for py in range(size):
+                  y=py*1024//size
+                  row=bytearray([0])
+                  for px in range(size):
+                      x=px*1024//size
+                      row += bytes(blue if is_s(x,y) else purple if is_b(x,y) else bg)
+                  rows.append(bytes(row))
+              raw=b''.join(rows)
+              png=(b'\x89PNG\r\n\x1a\n'
+                   +chunk(b'IHDR',struct.pack('>IIBBBBB',size,size,8,6,0,0,0))
+                   +chunk(b'IDAT',zlib.compress(raw,9))
+                   +chunk(b'IEND',b''))
+              with open(path,'wb') as out:
+                  out.write(png)
+
+          generated=0
           for image in data['images']:
               name=image.get('filename')
-              if not name: continue
-              points=float(image['size'].split('x')[0]); px=round(points*scales[image['scale']])
-              os.system(f"sips -z {px} {px} {src} --out '{os.path.join(app,name)}' >/dev/null")
+              if not name:
+                  continue
+              points=float(image['size'].split('x')[0])
+              px=round(points*scales[image['scale']])
+              path=os.path.join(app,name)
+              write_png(px,path)
+              with open(path,'rb') as src:
+                  header=src.read(24)
+              if header[:8] != b'\x89PNG\r\n\x1a\n':
+                  raise SystemExit(f'Invalid PNG generated: {path}')
+              width,height=struct.unpack('>II',header[16:24])
+              if width != px or height != px:
+                  raise SystemExit(f'Wrong icon size for {path}: {width}x{height}, wanted {px}x{px}')
+              generated += 1
+          if generated == 0:
+              raise SystemExit('No iOS app icons were generated')
+          print(f'Generated and verified {generated} iOS app icons')
           PY
+      - name: Verify iOS privacy and playback configuration
+        run: |
+          grep -F 'NSCameraUsageDescription' ios/Runner/Info.plist
+          grep -F 'UIBackgroundModes' ios/Runner/Info.plist
+          grep -F 'NSAllowsArbitraryLoads' ios/Runner/Info.plist
       - run: flutter pub get
       - name: Patch media_kit iOS same-player PiP
         run: python3 scripts/patch_ios_media_kit_pip.py
@@ -185,6 +239,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.5'
           channel: stable
           cache: true
       - name: Create Android platform
@@ -192,7 +247,8 @@ jobs:
       - name: Configure Android PiP and TV support
         run: |
           manifest=android/app/src/main/AndroidManifest.xml
-          sed -i 's/android:name=".MainActivity"/android:name=".MainActivity" android:supportsPictureInPicture="true"/' "$manifest"
+          sed -i 's/android:name=".MainActivity"/android:name=".MainActivity" android:supportsPictureInPicture="true" android:resizeableActivity="true"/' "$manifest"
+          sed -i '0,/<application/s/<application/<application android:usesCleartextTraffic="true" android:allowBackup="false"/' "$manifest"
           sed -i '/<application/i\    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />\n    <uses-feature android:name="android.software.leanback" android:required="false" />' "$manifest"
           sed -i '/android.intent.category.LAUNCHER/a\                <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>' "$manifest"
           main=$(find android/app/src/main/kotlin -name MainActivity.kt | head -1)
@@ -209,7 +265,7 @@ jobs:
 
           class MainActivity : FlutterFragmentActivity() {
               private val pipChannel = "sb_player/android_pip"
-              private var autoPip = true
+              private var autoPip = false
 
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
@@ -245,7 +301,7 @@ jobs:
               }
           }
           EOF
-          sed -i '/<application/i\    <uses-permission android:name="android.permission.WAKE_LOCK" />' "$manifest"
+          sed -i '/<application/i\    <uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-permission android:name="android.permission.WAKE_LOCK" />' "$manifest"
           python3 - <<'PY'
           import struct,zlib,os
           def png(size,path):
@@ -273,6 +329,17 @@ jobs:
           for folder,size in [('mipmap-mdpi',48),('mipmap-hdpi',72),('mipmap-xhdpi',96),('mipmap-xxhdpi',144),('mipmap-xxxhdpi',192)]:
               png(size,'android/app/src/main/res/'+folder+'/ic_launcher.png')
           PY
+      - name: Verify Android mobile configuration
+        run: |
+          manifest=android/app/src/main/AndroidManifest.xml
+          grep -F 'android:usesCleartextTraffic="true"' "$manifest"
+          grep -F 'android:allowBackup="false"' "$manifest"
+          grep -F 'android.permission.INTERNET' "$manifest"
+          grep -F 'android.permission.CAMERA' "$manifest"
+          grep -F 'android:supportsPictureInPicture="true"' "$manifest"
+          main=$(find android/app/src/main/kotlin -name MainActivity.kt | head -1)
+          grep -F 'FlutterFragmentActivity' "$main"
+          grep -F 'private var autoPip = false' "$main"
       - run: flutter pub get
       - name: Build Android Mobile APK
         run: |
