@@ -21,24 +21,7 @@ jobs:
           flutter-version: '3.47.5'
           channel: stable
           cache: true
-      - run: flutter pub get
-      - name: Commit resolved dependency lock
-        if: github.event_name == 'push' && github.ref == 'refs/heads/v0.6.8-launch-fixes'
-        run: |
-          if [ -n "$(git status --porcelain -- pubspec.lock)" ]; then
-            git config user.name "SB Player CI"
-            git config user.email "sb-player-ci@users.noreply.github.com"
-            git add pubspec.lock
-            git commit -m "Lock mobile dependency versions"
-            git push
-          fi
-      - name: Upload resolved dependency lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: SB-Player-pubspec-lock
-          path: pubspec.lock
-          if-no-files-found: error
-          retention-days: 14
+      - run: flutter pub get --enforce-lockfile
       - run: flutter analyze
       - run: flutter test
 
@@ -57,7 +40,7 @@ jobs:
       - name: Generate SB Player Windows icon
         shell: pwsh
         run: ./scripts/generate_windows_brand_icon.ps1
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - run: flutter build windows --release
       - name: Capture real Windows UI screenshots
         shell: pwsh
@@ -203,7 +186,7 @@ jobs:
           grep -F 'NSCameraUsageDescription' ios/Runner/Info.plist
           grep -F 'UIBackgroundModes' ios/Runner/Info.plist
           grep -F 'NSAllowsArbitraryLoads' ios/Runner/Info.plist
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - name: Patch media_kit iOS same-player PiP
         run: python3 scripts/patch_ios_media_kit_pip.py
       - name: Verify patched iOS plugin source
@@ -372,7 +355,7 @@ jobs:
           grep -F 'private var autoPip = false' "$main"
           grep -F 'onPictureInPictureModeChanged' "$main"
           grep -F '"pipModeChanged"' "$main"
-      - run: flutter pub get
+      - run: flutter pub get --enforce-lockfile
       - name: Build Android Mobile APK
         run: |
           flutter build apk --release
