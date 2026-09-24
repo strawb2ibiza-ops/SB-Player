@@ -1,4 +1,4 @@
-# SB Player v0.6.8
+# SB Player v0.6.9
 
 SB Player is a cross-platform Flutter IPTV player with mobile, TV and desktop builds from one codebase.
 
@@ -6,30 +6,32 @@ SB Player is a cross-platform Flutter IPTV player with mobile, TV and desktop bu
 
 ## Downloads
 
-The current public build is **v0.6.8**.
+The current public build is **v0.6.9**.
 
-- **Android Mobile APK:** [SB-Player-Android-Mobile-v0.6.8.apk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-Android-Mobile-v0.6.8.apk)
-- **Android TV APK:** [SB-Player-Android-TV-v0.6.8.apk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-Android-TV-v0.6.8.apk)
-- **Android App Bundle:** [SB-Player-Android-Mobile-v0.6.8.aab](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-Android-Mobile-v0.6.8.aab)
-- **iOS unsigned IPA:** [SB-Player-iOS-v0.6.8-unsigned.ipa](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-iOS-v0.6.8-unsigned.ipa)
-- **Windows installer:** [SB-Player-Setup-v0.6.8.exe](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-Setup-v0.6.8.exe)
-- **LG webOS:** [SB-Player-LG-v0.6.8.ipk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.8/SB-Player-LG-v0.6.8.ipk)
+- **Android Mobile APK:** [SB-Player-Android-Mobile-v0.6.9.apk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.9/SB-Player-Android-Mobile-v0.6.9.apk)
+- **Android TV APK:** [SB-Player-Android-TV-v0.6.9.apk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.9/SB-Player-Android-TV-v0.6.9.apk)
+- **Android App Bundle:** [SB-Player-Android-Mobile-v0.6.9.aab](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.9/SB-Player-Android-Mobile-v0.6.9.aab)
+- **iOS unsigned IPA:** [SB-Player-iOS-v0.6.9-unsigned.ipa](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.9/SB-Player-iOS-v0.6.9-unsigned.ipa)
+- **Windows installer:** [SB-Player-Setup-v0.6.9.exe](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.9/SB-Player-Setup-v0.6.9.exe)
+- **LG webOS:** [SB-Player-LG-v0.6.9.ipk](https://github.com/strawb2ibiza-ops/SB-Player/releases/download/v0.6.9/SB-Player-LG-v0.6.9.ipk)
 
-[View the v0.6.8 release](https://github.com/strawb2ibiza-ops/SB-Player/releases/tag/v0.6.8)
+[View the v0.6.9 release](https://github.com/strawb2ibiza-ops/SB-Player/releases/tag/v0.6.9)
 
 The iOS package is unsigned and must be signed before installation.
 
-## v0.6.8 testing build
+## v0.6.9
 
-This is the Android/iOS testing build promoted to the main branch. It includes the current mobile playback and library fixes plus the matching TV/desktop source.
+This build incorporates the latest mobile testing fixes and matching TV/desktop source.
 
 ### Mobile playback
 
 - Native Picture-in-Picture integration for Android and iOS
 - Continue Watching / resume-position handling
 - Subtitle track selection and subtitle rendering support
-- Series season and episode loading recovery
-- Next-episode autoplay support
+- More tolerant Series catalogue parsing and compatibility fallbacks
+- Resilient provider artwork loading with alternate URL/scheme retries
+- Central title simplification across catalogues and Continue Watching
+- Next-episode autoplay, including episodes resumed from Continue Watching
 - Playback retry and recovery handling
 - Mobile-friendly player controls
 
@@ -49,7 +51,7 @@ This is the Android/iOS testing build promoted to the main branch. It includes t
 - Favorites
 - Recently watched
 - Continue Watching
-- Artwork/poster support where provider metadata is available
+- Artwork/poster recovery and fallbacks where provider metadata is available
 - EPG / TV Guide support
 
 ## Provider modes
@@ -182,4 +184,4 @@ webos/            LG webOS client
 
 ## CI
 
-Every push to `main` runs analysis, tests and platform builds for Windows, iOS, Android and LG webOS. Successful main builds are used by the v0.6.8 release publishing workflow.
+Every push to `main` runs analysis, tests and platform builds for Windows, iOS, Android and LG webOS. Successful main builds are used by the v0.6.9 release publishing workflow.
