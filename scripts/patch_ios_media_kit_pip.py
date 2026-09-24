@@ -74,6 +74,19 @@ final class SBMediaKitPiPBridge: NSObject,
 
         displayLayer.videoGravity = .resizeAspect
         displayLayer.backgroundColor = UIColor.black.cgColor
+
+        var timebase: CMTimebase?
+        let timebaseStatus = CMTimebaseCreateWithSourceClock(
+            allocator: kCFAllocatorDefault,
+            sourceClock: CMClockGetHostTimeClock(),
+            timebaseOut: &timebase
+        )
+        if timebaseStatus == noErr, let timebase {
+            displayLayer.controlTimebase = timebase
+            CMTimebaseSetTime(timebase, time: .zero)
+            CMTimebaseSetRate(timebase, rate: 1.0)
+        }
+
         attachLayer()
 
         let source = AVPictureInPictureController.ContentSource(
@@ -195,7 +208,7 @@ final class SBMediaKitPiPBridge: NSObject,
 
         let host = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 9))
         host.isUserInteractionEnabled = false
-        host.alpha = 0.01
+        host.alpha = 0.08
         displayLayer.frame = host.bounds
         host.layer.addSublayer(displayLayer)
         window.insertSubview(host, at: 0)
@@ -228,7 +241,7 @@ final class SBMediaKitPiPBridge: NSObject,
     func pictureInPictureControllerTimeRangeForPlayback(
         _ pictureInPictureController: AVPictureInPictureController
     ) -> CMTimeRange {
-        CMTimeRange(start: .negativeInfinity, duration: .positiveInfinity)
+        CMTimeRange(start: .zero, duration: .positiveInfinity)
     }
 
     func pictureInPictureControllerIsPlaybackPaused(
