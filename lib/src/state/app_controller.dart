@@ -163,11 +163,34 @@ class AppController extends ChangeNotifier {
         await _saveOpenProfile(stored);
       }
 
-      await _loadAccount(stored);
+      var accountToLoad = stored;
+      if (config.isLocked && stored.type == AccountType.xtream) {
+        final username = stored.username;
+        final password = stored.password;
+        final storedHost = Uri.tryParse(stored.serverUrl ?? '')?.host.toLowerCase();
+        final configuredHost =
+            Uri.tryParse(config.providerBaseUrl)?.host.toLowerCase();
+
+        if (username != null &&
+            username.isNotEmpty &&
+            password != null &&
+            storedHost != configuredHost) {
+          accountToLoad = await _xtreamClient.authenticate(
+            serverUrl: config.providerBaseUrl,
+            username: username,
+            password: password,
+            label: 'SB',
+          );
+        }
+      }
+
+      await _loadAccount(accountToLoad);
       await accountStore.save(account!);
 
       if (!config.isLocked) {
         await _updateActiveProfileAccount(account!);
+      } else {
+        await _migrateSbProviderLibraryUrls();
       }
       await _migrateLegacyLibraryToCurrentScope();
     } catch (_) {
@@ -1262,8 +1285,10 @@ class AppController extends ChangeNotifier {
     if (config.isLocked) {
       final current = account;
       if (current == null) return 'sb:pending';
-      final identity =
-          '${current.serverUrl ?? config.providerBaseUrl}|${current.username ?? ''}';
+      final serverIdentity = _sbLibraryServerIdentity(
+        current.serverUrl ?? config.providerBaseUrl,
+      );
+      final identity = '$serverIdentity|${current.username ?? ''}';
       if (_cachedSbScopeIdentity == identity && _cachedSbScope != null) {
         return _cachedSbScope!;
       }
@@ -1276,6 +1301,87 @@ class AppController extends ChangeNotifier {
 
     final id = activeProfileId;
     return id == null ? 'profile:pending' : 'profile:$id';
+  }
+
+  String _sbLibraryServerIdentity(String serverUrl) {
+    final uri = Uri.tryParse(serverUrl);
+    final host = uri?.host.toLowerCase();
+    if (host == 'line.watchsbtv.top' || host == 'line.8kultradnscloud.ru') {
+      // Keep the historical library namespace stable so upgrading the
+      // branded endpoint does not hide Continue Watching or Favorites.
+      return 'http://line.8kultradnscloud.ru';
+    }
+    return serverUrl;
+  }
+
+  String _rewriteSbProviderUrl(String value) {
+    final source = Uri.tryParse(value);
+    if (source == null ||
+        source.host.toLowerCase() != 'line.8kultradnscloud.ru') {
+      return value;
+    }
+
+    final target = Uri.tryParse(config.providerBaseUrl);
+    if (target == null || !target.hasAuthority) return value;
+
+    return source
+        .replace(
+          scheme: target.scheme.isEmpty ? source.scheme : target.scheme,
+          host: target.host,
+          port: target.hasPort ? target.port : null,
+        )
+        .toString();
+  }
+
+  LibraryEntry _rewriteSbLibraryEntry(LibraryEntry entry) {
+    final streamUrl = _rewriteSbProviderUrl(entry.streamUrl);
+    final artworkUrl = entry.artworkUrl == null
+        ? null
+        : _rewriteSbProviderUrl(entry.artworkUrl!);
+    if (streamUrl == entry.streamUrl && artworkUrl == entry.artworkUrl) {
+      return entry;
+    }
+
+    return LibraryEntry(
+      id: entry.id,
+      title: entry.title,
+      streamUrl: streamUrl,
+      kind: entry.kind,
+      updatedAt: entry.updatedAt,
+      artworkUrl: artworkUrl,
+      subtitle: entry.subtitle,
+      positionSeconds: entry.positionSeconds,
+      durationSeconds: entry.durationSeconds,
+    );
+  }
+
+  Future<void> _migrateSbProviderLibraryUrls() async {
+    var favoritesChanged = false;
+    var recentChanged = false;
+
+    favorites = [
+      for (final entry in favorites)
+        (() {
+          final migrated = _rewriteSbLibraryEntry(entry);
+          if (!identical(migrated, entry)) favoritesChanged = true;
+          return migrated;
+        })(),
+    ];
+
+    recent = [
+      for (final entry in recent)
+        (() {
+          final migrated = _rewriteSbLibraryEntry(entry);
+          if (!identical(migrated, entry)) recentChanged = true;
+          return migrated;
+        })(),
+    ];
+
+    if (favoritesChanged) {
+      _favoriteIds = favorites.map((entry) => entry.id).toSet();
+      await libraryStore.saveFavorites(favorites);
+    }
+    if (recentChanged) await libraryStore.saveRecent(recent);
   }
 
   String _scopedContentId(String kind, String id) =>
