@@ -13,6 +13,7 @@ import '../../models/playback_item.dart';
 import '../../services/mini_player_preferences.dart';
 import '../../services/playback_preferences.dart';
 import '../../state/app_controller.dart';
+import 'tv_remote_screen.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({
@@ -89,7 +90,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _iosPipChannel.setMethodCallHandler(_handleIosPipMethodCall);
     }
     _checkpointTimer = Timer.periodic(
-      const Duration(seconds: 5),
+      const Duration(seconds: 10),
       (_) => unawaited(_checkpointPlayback()),
     );
     _subscriptions.add(_player.stream.buffering.listen((value) {
@@ -122,7 +123,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         _reconnectAttempts = 0;
         _reconnecting = false;
       }
-      if (mounted) setState(() => _playing = value);
+      _playing = value;
+      if (Platform.isAndroid) {
+        unawaited(_syncAndroidAutoPip());
+      }
+      if (mounted) setState(() {});
     }));
     _subscriptions.add(_player.stream.position.listen((value) {
       _position = value;
@@ -367,7 +372,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
     if (!force &&
         (_position - _lastCheckpointPosition).abs() <
-            const Duration(seconds: 5)) {
+            const Duration(seconds: 10)) {
       return;
     }
     _lastCheckpointPosition = _position;
@@ -403,13 +408,19 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _subtitlePreference = subtitlePreference;
     _subtitlePreferenceApplied = false;
     if (Platform.isAndroid) {
-      try {
-        await _androidPipChannel.invokeMethod<void>('setAutoPip', autoPip);
-      } catch (_) {
-        // Older Android builds can ignore this until the next app update.
-      }
+      await _syncAndroidAutoPip();
     }
     await _applySubtitlePreference();
+  }
+
+  Future<void> _syncAndroidAutoPip({bool forceDisable = false}) async {
+    if (!Platform.isAndroid) return;
+    final enabled = !forceDisable && _autoPipEnabled && _playing;
+    try {
+      await _androidPipChannel.invokeMethod<void>('setAutoPip', enabled);
+    } catch (_) {
+      // Older Android hosts can ignore this until the next app update.
+    }
   }
 
   Future<void> _loadMiniPreference() async {
@@ -839,59 +850,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     );
   }
 
-  Future<void> _showCastOptions() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.cast_connected_rounded),
-                title: const Text('SB Player TV'),
-                subtitle: const Text(
-                  'Use the linked-TV remote for the full SB Player TV experience.',
-                ),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Open TV Remote from Settings to control your linked SB Player TV.',
-                      ),
-                    ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Platform.isIOS
-                      ? Icons.airplay_rounded
-                      : Icons.cast_rounded,
-                ),
-                title: Text(
-                  Platform.isIOS ? 'AirPlay / Screen Mirroring' : 'Cast / Screen share',
-                ),
-                subtitle: const Text(
-                  'Use your phone’s system casting controls for TVs without SB Player installed.',
-                ),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'System casting is available from your phone’s device controls. Native in-app receiver discovery is coming next.',
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
+  Future<void> _openTvRemote() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const TvRemoteScreen(),
       ),
     );
   }
@@ -1023,7 +985,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
     if (Platform.isIOS) {
       _iosPipChannel.setMethodCallHandler(null);
-      unawaited(_iosPipChannel.invokeMethod<void>('SBPlayerPiP.Stop').catchError((_) {}));
+      unawaited(
+        _iosPipChannel
+            .invokeMethod<void>('SBPlayerPiP.Stop')
+            .catchError((_) {}),
+      );
+    }
+    if (Platform.isAndroid) {
+      unawaited(_syncAndroidAutoPip(forceDisable: true));
     }
     unawaited(_restoreWindow());
     for (final subscription in _subscriptions) {
@@ -1088,9 +1057,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                 ),
               if (Platform.isIOS || Platform.isAndroid)
                 IconButton(
-                  tooltip: 'Cast / mirror to TV',
-                  onPressed: _showCastOptions,
-                  icon: const Icon(Icons.cast_rounded),
+                  tooltip: 'Linked TV remote',
+                  onPressed: _openTvRemote,
+                  icon: const Icon(Icons.connected_tv_rounded),
                 ),
               if (_item.isLive)
                 IconButton(
