@@ -389,6 +389,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         await _playbackPreferences.readSubtitlePreference();
     _autoPipEnabled = autoPip;
     _subtitlePreference = subtitlePreference;
+    _subtitlePreferenceApplied = false;
     if (_nativePip != null && Platform.isAndroid) {
       try {
         await _nativePip!.setAutoPipEnabled(autoPip);
