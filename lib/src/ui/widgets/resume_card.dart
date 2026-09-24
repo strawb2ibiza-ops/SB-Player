@@ -9,6 +9,7 @@ import '../../models/library_entry.dart';
 import '../../models/playback_item.dart';
 import '../branding/sb_brand.dart';
 import 'brand_backdrop.dart';
+import 'provider_image.dart';
 
 /// Compact resume card used by Home and Continue Watching.
 ///
@@ -134,15 +135,14 @@ class _ResumeCardState extends State<ResumeCard> {
                               controls: NoVideoControls,
                               fit: BoxFit.cover,
                             )
-                          else if (entry.artworkUrl != null)
-                            Image.network(
-                              entry.artworkUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) =>
-                                  const BrandBackdrop(child: SizedBox.expand()),
-                            )
                           else
-                            const BrandBackdrop(child: SizedBox.expand()),
+                            ProviderImage(
+                              url: entry.artworkUrl,
+                              fit: BoxFit.cover,
+                              fallback: const BrandBackdrop(
+                                child: SizedBox.expand(),
+                              ),
+                            ),
                           if (_hovered && !_previewVisible)
                             const Center(
                               child: DecoratedBox(
