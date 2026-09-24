@@ -153,6 +153,15 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                         .firstOrNull;
                     return InkWell(
                       borderRadius: BorderRadius.circular(14),
+                      onFocusChange: (focused) {
+                        if (!focused) return;
+                        Scrollable.ensureVisible(
+                          context,
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          alignment: 0.5,
+                        );
+                      },
                       onTap: () => setState(() => _selectedSeason = season),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
