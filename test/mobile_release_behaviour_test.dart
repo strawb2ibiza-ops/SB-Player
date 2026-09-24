@@ -207,16 +207,46 @@ void main() {
     );
     const episode = SeriesEpisode(
       id: '501',
-      title: 'EN - South Park (1997) 4K - S11E03',
+      title:
+          'EN - South Park (1997) 4K - S11E03 - Lice Capades',
       season: 11,
       episodeNumber: 3,
       streamUrl: 'https://example.test/series/501.mp4',
     );
 
     expect(controller.displaySeriesTitle(series), 'South Park (1997)');
+    expect(
+      controller.displayEpisodeTitle(episode, series: series),
+      'Lice Capades',
+    );
     final playback = controller.playbackForEpisode(series, episode);
     expect(playback.title, 'South Park (1997)');
-    expect(playback.subtitle, 'Season 11 • Episode 3');
+    expect(playback.subtitle, 'S11E03 • Lice Capades');
+
+    controller.dispose();
+  });
+
+  test('episode display falls back to the episode number when no name exists',
+      () {
+    final library = _MemoryLibraryStore();
+    final controller = _controller(library);
+    const series = SeriesItem(
+      id: '100',
+      name: 'South Park (1997)',
+      categoryId: '9',
+    );
+    const episode = SeriesEpisode(
+      id: '502',
+      title: 'South Park (1997) - S01E02',
+      season: 1,
+      episodeNumber: 2,
+      streamUrl: 'https://example.test/series/502.mp4',
+    );
+
+    expect(
+      controller.displayEpisodeTitle(episode, series: series),
+      'Episode 2',
+    );
 
     controller.dispose();
   });
@@ -261,11 +291,11 @@ void main() {
     );
 
     expect(playback.title, 'Queue Test');
-    expect(playback.subtitle, 'Season 1 • Episode 1');
+    expect(playback.subtitle, 'S01E01 • Episode 1');
     expect(playback.next?.title, 'Queue Test');
-    expect(playback.next?.subtitle, 'Season 1 • Episode 2');
+    expect(playback.next?.subtitle, 'S01E02 • Episode 2');
     expect(playback.next?.next?.title, 'Queue Test');
-    expect(playback.next?.next?.subtitle, 'Season 2 • Episode 1');
+    expect(playback.next?.next?.subtitle, 'S02E01 • Episode 1');
     expect(playback.next?.next?.next, isNull);
 
     controller.dispose();
