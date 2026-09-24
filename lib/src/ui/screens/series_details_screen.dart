@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/series_item.dart';
 import '../../state/app_controller.dart';
+import '../widgets/provider_image.dart';
 import 'player_screen.dart';
 
 class SeriesDetailsScreen extends StatefulWidget {
@@ -164,19 +165,14 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                               child: SizedBox(
                                 width: 64,
                                 height: 82,
-                                child: image == null
-                                    ? const ColoredBox(
-                                        color: Color(0xFF11182A),
-                                        child: Icon(Icons.tv_rounded),
-                                      )
-                                    : Image.network(
-                                        image,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, _, _) => const ColoredBox(
-                                          color: Color(0xFF11182A),
-                                          child: Icon(Icons.tv_rounded),
-                                        ),
-                                      ),
+                                child: ProviderImage(
+                                  url: image,
+                                  fit: BoxFit.cover,
+                                  fallback: const ColoredBox(
+                                    color: Color(0xFF11182A),
+                                    child: Icon(Icons.tv_rounded),
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -228,19 +224,14 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                             child: SizedBox(
                               width: 128,
                               height: 72,
-                              child: episode.imageUrl == null
-                                  ? const ColoredBox(
-                                      color: Color(0xFF11182A),
-                                      child: Icon(Icons.play_circle_outline),
-                                    )
-                                  : Image.network(
-                                      episode.imageUrl!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, _, _) => const ColoredBox(
-                                        color: Color(0xFF11182A),
-                                        child: Icon(Icons.play_circle_outline),
-                                      ),
-                                    ),
+                              child: ProviderImage(
+                                url: episode.imageUrl,
+                                fit: BoxFit.cover,
+                                fallback: const ColoredBox(
+                                  color: Color(0xFF11182A),
+                                  child: Icon(Icons.play_circle_outline),
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 14),
@@ -303,13 +294,11 @@ class _SeriesHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             color: Colors.white.withValues(alpha: 0.06),
           ),
-          child: series.coverUrl == null
-              ? const Icon(Icons.movie_filter_outlined, size: 50)
-              : Image.network(
-                  series.coverUrl!,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const Icon(Icons.movie_filter_outlined, size: 50),
-                ),
+          child: ProviderImage(
+            url: series.coverUrl,
+            fit: BoxFit.cover,
+            fallback: const Icon(Icons.movie_filter_outlined, size: 50),
+          ),
         ),
         const SizedBox(width: 20),
         Expanded(
