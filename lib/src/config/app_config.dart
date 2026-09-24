@@ -1,6 +1,8 @@
 enum DistributionMode { open, sbLocked }
 
 class AppConfig {
+  static const sbProviderBaseUrl = 'http://line.watchsbtv.top';
+
   const AppConfig({
     required this.mode,
     required this.providerBaseUrl,
@@ -17,7 +19,7 @@ class AppConfig {
     const locked = bool.fromEnvironment('SB_LOCKED', defaultValue: false);
     const provider = String.fromEnvironment(
       'SB_PROVIDER_BASE_URL',
-      defaultValue: 'https://replace-me.invalid',
+      defaultValue: sbProviderBaseUrl,
     );
 
     return AppConfig(
