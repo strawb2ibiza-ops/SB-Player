@@ -1084,6 +1084,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     final categories = controller.activeCategories;
     if (categories.isEmpty) {
+      if (section == ContentSection.series &&
+          controller.visibleSeries('').isNotEmpty) {
+        return _buildSeries(controller);
+      }
       return const Center(child: Text('No categories found.'));
     }
     return LayoutBuilder(builder: (context, constraints) {
