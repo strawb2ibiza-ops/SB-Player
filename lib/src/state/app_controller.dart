@@ -423,16 +423,16 @@ class AppController extends ChangeNotifier {
 
   String displayEpisodeTitle(SeriesEpisode episode) {
     var value = episode.title.trim();
-    final token = RegExp(r'\\bS\\d{1,2}E\\d{1,3}\\b', caseSensitive: false)
+    final token = RegExp(r'\bS\d{1,2}E\d{1,3}\b', caseSensitive: false)
         .firstMatch(value);
     if (token != null) {
       value = value.substring(token.start);
     } else {
       value = _stripProviderPrefix(value);
-      value = value.replaceFirst(RegExp(r'^\\d+\\s*[.:-]\\s*'), '');
+      value = value.replaceFirst(RegExp(r'^\d+\s*[.:-]\s*'), '');
       final code =
           'S${episode.season.toString().padLeft(2, '0')}E${episode.episodeNumber.toString().padLeft(2, '0')}';
-      if (value.isEmpty || RegExp(r'^(episode|ep)\\s*\\d+
+      if (value.isEmpty || RegExp(r'^(episode|ep)\s*\d+
 
   List<SeriesItem> get recentlyAddedSeries => _recentSeriesCache;
 
@@ -454,7 +454,7 @@ class AppController extends ChangeNotifier {
     }
     final direct = DateTime.tryParse(value.trim());
     if (direct != null) return direct;
-    final match = RegExp(r'(\\d{4})[-/.](\\d{1,2})[-/.](\\d{1,2})')
+    final match = RegExp(r'(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})')
         .firstMatch(value);
     if (match == null) return DateTime.fromMillisecondsSinceEpoch(0);
     return DateTime(
@@ -1338,9 +1338,9 @@ class AppController extends ChangeNotifier {
       value = '$code - $value';
     }
     return value
-        .replaceFirst(RegExp(r'^S(\\d)E', caseSensitive: false), 'S0\\$1E')
+        .replaceFirst(RegExp(r'^S(\d)E', caseSensitive: false), 'S0\$1E')
         .replaceFirstMapped(
-          RegExp(r'^(S\\d{2}E)(\\d)(?!\\d)', caseSensitive: false),
+          RegExp(r'^(S\d{2}E)(\d)(?!\d)', caseSensitive: false),
           (match) => '${match.group(1)}0${match.group(2)}',
         )
         .trim();
@@ -1349,10 +1349,10 @@ class AppController extends ChangeNotifier {
   String displayCategoryName(ContentSection target, String raw) {
     if (raw == 'All') return raw;
     var value = raw.trim();
-    value = value.replaceAll(RegExp(r'^\\|[A-Z]{2,4}\\|\\s*', caseSensitive: false), '');
-    value = value.replaceAll(RegExp(r'^(UK|US|CA|AU|NZ|NA|HR)\\|\\s*', caseSensitive: false), '');
+    value = value.replaceAll(RegExp(r'^\|[A-Z]{2,4}\|\s*', caseSensitive: false), '');
+    value = value.replaceAll(RegExp(r'^(UK|US|CA|AU|NZ|NA|HR)\|\s*', caseSensitive: false), '');
     if (target == ContentSection.movies || target == ContentSection.series) {
-      value = value.replaceAll(RegExp(r'\\s*\\[(EN|MULTI)\\]\\s*
+      value = value.replaceAll(RegExp(r'\s*\[(EN|MULTI)\]\s*
 
   List<SeriesItem> get recentlyAddedSeries => _recentSeriesCache;
 
@@ -1374,7 +1374,7 @@ class AppController extends ChangeNotifier {
     }
     final direct = DateTime.tryParse(value.trim());
     if (direct != null) return direct;
-    final match = RegExp(r'(\\d{4})[-/.](\\d{1,2})[-/.](\\d{1,2})')
+    final match = RegExp(r'(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})')
         .firstMatch(value);
     if (match == null) return DateTime.fromMillisecondsSinceEpoch(0);
     return DateTime(
@@ -2254,13 +2254,13 @@ class AppController extends ChangeNotifier {
 }
 , caseSensitive: false), '');
     }
-    return value.replaceAll(RegExp(r'\\s{2,}'), ' ').trim();
+    return value.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
   }
 
   String _cleanVodTitle(String raw) {
     var value = _stripProviderPrefix(raw);
-    value = value.replaceAll(RegExp(r'\\s+(4K|UHD|FHD|HD)(?=\\s*(?:\\(\\d{4}\\)|$))', caseSensitive: false), '');
-    value = value.replaceAll(RegExp(r'(?<=\\(\\d{4}\\))\\s+(4K|UHD|FHD|HD)\\s*
+    value = value.replaceAll(RegExp(r'\s+(4K|UHD|FHD|HD)(?=\s*(?:\(\d{4}\)|$))', caseSensitive: false), '');
+    value = value.replaceAll(RegExp(r'(?<=\(\d{4}\))\s+(4K|UHD|FHD|HD)\s*
 
   List<SeriesItem> get recentlyAddedSeries => _recentSeriesCache;
 
@@ -2282,7 +2282,7 @@ class AppController extends ChangeNotifier {
     }
     final direct = DateTime.tryParse(value.trim());
     if (direct != null) return direct;
-    final match = RegExp(r'(\\d{4})[-/.](\\d{1,2})[-/.](\\d{1,2})')
+    final match = RegExp(r'(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})')
         .firstMatch(value);
     if (match == null) return DateTime.fromMillisecondsSinceEpoch(0);
     return DateTime(
@@ -3161,13 +3161,13 @@ class AppController extends ChangeNotifier {
   }
 }
 , caseSensitive: false), '');
-    return value.replaceAll(RegExp(r'\\s{2,}'), ' ').trim();
+    return value.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
   }
 
   String _cleanSeriesTitle(String raw) {
     var value = _stripProviderPrefix(raw);
-    value = value.replaceAll(RegExp(r'\\s+(4K|UHD|FHD|HD)(?=\\s*(?:\\(\\d{4}\\)|$))', caseSensitive: false), '');
-    value = value.replaceAll(RegExp(r'(?<=\\(\\d{4}\\))\\s+(4K|UHD|FHD|HD)\\s*
+    value = value.replaceAll(RegExp(r'\s+(4K|UHD|FHD|HD)(?=\s*(?:\(\d{4}\)|$))', caseSensitive: false), '');
+    value = value.replaceAll(RegExp(r'(?<=\(\d{4}\))\s+(4K|UHD|FHD|HD)\s*
 
   List<SeriesItem> get recentlyAddedSeries => _recentSeriesCache;
 
@@ -3189,7 +3189,7 @@ class AppController extends ChangeNotifier {
     }
     final direct = DateTime.tryParse(value.trim());
     if (direct != null) return direct;
-    final match = RegExp(r'(\\d{4})[-/.](\\d{1,2})[-/.](\\d{1,2})')
+    final match = RegExp(r'(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})')
         .firstMatch(value);
     if (match == null) return DateTime.fromMillisecondsSinceEpoch(0);
     return DateTime(
@@ -4068,13 +4068,13 @@ class AppController extends ChangeNotifier {
   }
 }
 , caseSensitive: false), '');
-    return value.replaceAll(RegExp(r'\\s{2,}'), ' ').trim();
+    return value.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
   }
 
   String _stripProviderPrefix(String raw) {
     var value = raw.trim();
-    value = value.replaceFirst(RegExp(r'^\\d+\\s*[.]\\s*'), '');
-    value = value.replaceFirst(RegExp(r'^\\|?[A-Z]{2,4}\\|?\\s*[-|:]\\s*', caseSensitive: false), '');
+    value = value.replaceFirst(RegExp(r'^\d+\s*[.]\s*'), '');
+    value = value.replaceFirst(RegExp(r'^\|?[A-Z]{2,4}\|?\s*[-|:]\s*', caseSensitive: false), '');
     return value.trim();
   }
 
