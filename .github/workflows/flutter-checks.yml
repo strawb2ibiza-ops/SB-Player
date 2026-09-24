@@ -3,7 +3,7 @@ name: Flutter checks
 on:
   workflow_dispatch:
   push:
-    branches: [main, v0.5-branding-installer, v0.6-ios, v0.6-unified, v0.6.8-launch, v0.6.8-launch-fixes]
+    branches: [main, v0.5-branding-installer, v0.6-ios, v0.6-unified, v0.6.9-launch, v0.6.9-launch-fixes, v0.6.9-test-fixes]
   pull_request:
 
 concurrency:
@@ -79,7 +79,7 @@ jobs:
       - name: Upload portable Windows release
         uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Windows-Open-v0.6.8
+          name: SB-Player-Windows-Open-v0.6.9
           path: build/windows/x64/runner/Release/**
           if-no-files-found: error
           retention-days: 14
@@ -92,8 +92,8 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Setup-v0.6.8
-          path: dist/SB-Player-Setup-v0.6.8.exe
+          name: SB-Player-Setup-v0.6.9
+          path: dist/SB-Player-Setup-v0.6.9.exe
           if-no-files-found: error
           retention-days: 14
 
@@ -216,12 +216,12 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -qry SB-Player-iOS-v0.6.8-unsigned.ipa Payload
+          zip -qry SB-Player-iOS-v0.6.9-unsigned.ipa Payload
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-iOS-v0.6.8-unsigned-IPA
-          path: SB-Player-iOS-v0.6.8-unsigned.ipa
+          name: SB-Player-iOS-v0.6.9-unsigned-IPA
+          path: SB-Player-iOS-v0.6.9-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
 
@@ -359,31 +359,31 @@ jobs:
       - name: Build Android Mobile APK
         run: |
           flutter build apk --release
-          cp build/app/outputs/flutter-apk/app-release.apk SB-Player-Android-Mobile-v0.6.8.apk
+          cp build/app/outputs/flutter-apk/app-release.apk SB-Player-Android-Mobile-v0.6.9.apk
       - name: Build Android Mobile App Bundle
         run: |
           flutter build appbundle --release
-          cp build/app/outputs/bundle/release/app-release.aab SB-Player-Android-Mobile-v0.6.8.aab
+          cp build/app/outputs/bundle/release/app-release.aab SB-Player-Android-Mobile-v0.6.9.aab
       - name: Build Android TV APK
         run: |
           flutter build apk --release --dart-define=SB_ANDROID_TV=true
-          cp build/app/outputs/flutter-apk/app-release.apk SB-Player-Android-TV-v0.6.8.apk
+          cp build/app/outputs/flutter-apk/app-release.apk SB-Player-Android-TV-v0.6.9.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Android-Mobile-v0.6.8
-          path: SB-Player-Android-Mobile-v0.6.8.apk
+          name: SB-Player-Android-Mobile-v0.6.9
+          path: SB-Player-Android-Mobile-v0.6.9.apk
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Android-Mobile-AAB-v0.6.8
-          path: SB-Player-Android-Mobile-v0.6.8.aab
+          name: SB-Player-Android-Mobile-AAB-v0.6.9
+          path: SB-Player-Android-Mobile-v0.6.9.aab
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Android-TV-v0.6.8
-          path: SB-Player-Android-TV-v0.6.8.apk
+          name: SB-Player-Android-TV-v0.6.9
+          path: SB-Player-Android-TV-v0.6.9.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -420,10 +420,10 @@ jobs:
         run: |
           mkdir -p dist
           ares-package -o dist webos
-          mv dist/*.ipk dist/SB-Player-LG-v0.6.8.ipk
+          mv dist/*.ipk dist/SB-Player-LG-v0.6.9.ipk
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-LG-v0.6.8
-          path: dist/SB-Player-LG-v0.6.8.ipk
+          name: SB-Player-LG-v0.6.9
+          path: dist/SB-Player-LG-v0.6.9.ipk
           if-no-files-found: error
           retention-days: 14
