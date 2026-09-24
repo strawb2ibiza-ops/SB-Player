@@ -110,12 +110,15 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                                   item: controller.playbackForEpisode(
                                     series,
                                     episode,
-                                    nextEpisode: (() {
+                                    followingEpisodes: (() {
                                       final index = orderedEpisodes.indexOf(episode);
-                                      return index >= 0 &&
-                                              index + 1 < orderedEpisodes.length
-                                          ? orderedEpisodes[index + 1]
-                                          : null;
+                                      if (index < 0 ||
+                                          index + 1 >= orderedEpisodes.length) {
+                                        return const <SeriesEpisode>[];
+                                      }
+                                      return orderedEpisodes
+                                          .skip(index + 1)
+                                          .toList(growable: false);
                                     })(),
                                   ),
                                 ),
