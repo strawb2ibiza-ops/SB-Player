@@ -539,7 +539,15 @@ class XtreamClient {
     return SeriesEpisode(
       id: id,
       title:
-          '${raw['title'] ?? raw['name'] ?? info['title'] ?? info['name'] ?? 'Episode $episodeNumber'}',
+          '${raw['episode_title'] ??
+              raw['episode_name'] ??
+              info['episode_title'] ??
+              info['episode_name'] ??
+              raw['title'] ??
+              raw['name'] ??
+              info['title'] ??
+              info['name'] ??
+              'Episode $episodeNumber'}',
       season: season,
       episodeNumber: episodeNumber,
       streamUrl: _httpSource(direct) ?? fallback,
@@ -611,7 +619,7 @@ class XtreamClient {
         uri,
         headers: const {
           'Accept': 'application/json,*/*',
-          'User-Agent': 'SBPlayer/0.6.10',
+          'User-Agent': 'SBPlayer/0.6.11',
           'Connection': 'keep-alive',
         },
       ).timeout(const Duration(seconds: 60));
