@@ -1,14 +1,18 @@
+import 'dart:isolate';
+
 import 'package:http/http.dart' as http;
 
 import 'm3u_parser.dart';
 
 class M3uClient {
   M3uClient({http.Client? client, M3uParser? parser})
-      : _client = client ?? http.Client(),
-        _parser = parser ?? const M3uParser();
+      : _client = client ?? http.Client() {
+    // Keep the parser argument for test/backward compatibility. Parsing is
+    // intentionally isolated in release builds to keep large lists off the UI.
+    assert(parser == null || parser is M3uParser);
+  }
 
   final http.Client _client;
-  final M3uParser _parser;
 
   Future<M3uPlaylist> load(String playlistUrl) async {
     final uri = Uri.tryParse(playlistUrl.trim());
@@ -20,15 +24,28 @@ class M3uClient {
 
     late http.Response response;
     try {
-      response = await _client.get(uri).timeout(const Duration(seconds: 25));
+      response = await _client.get(
+        uri,
+        headers: const {
+          'Accept': 'application/x-mpegURL,audio/x-mpegurl,text/plain,*/*',
+          'User-Agent': 'SBPlayer/0.6.8',
+          'Connection': 'keep-alive',
+        },
+      ).timeout(const Duration(seconds: 25));
     } catch (_) {
       throw Exception('Could not load the M3U playlist.');
     }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Playlist returned HTTP ${response.statusCode}.');
     }
-    return _parser.parse(response.body);
+    final body = response.body;
+    return Isolate.run(
+      () => _parseM3uBody(body),
+      debugName: 'sb-player-m3u-parse',
+    );
   }
 
   void dispose() => _client.close();
 }
+
+M3uPlaylist _parseM3uBody(String body) => const M3uParser().parse(body);
