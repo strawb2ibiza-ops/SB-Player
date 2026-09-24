@@ -110,14 +110,9 @@ class _ChannelTileState extends State<ChannelTile> {
                               child: Tooltip(
                                 message: widget.channel.name,
                                 waitDuration: const Duration(milliseconds: 350),
-                                child: Text(
-                                  widget.channel.name,
-                                  maxLines: 1,
-                                  softWrap: false,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                                child: _AutoMarquee(
+                                  text: widget.channel.name,
+                                  style: const TextStyle(fontWeight: FontWeight.w800),
                                 ),
                               ),
                             ),
@@ -224,4 +219,73 @@ class _LiveBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+
+class _AutoMarquee extends StatefulWidget {
+  const _AutoMarquee({required this.text, this.style});
+  final String text;
+  final TextStyle? style;
+
+  @override
+  State<_AutoMarquee> createState() => _AutoMarqueeState();
+}
+
+class _AutoMarqueeState extends State<_AutoMarquee> {
+  final ScrollController _controller = ScrollController();
+  bool _running = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loop());
+  }
+
+  @override
+  void didUpdateWidget(covariant _AutoMarquee oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text) {
+      _running = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loop());
+    }
+  }
+
+  Future<void> _loop() async {
+    if (!mounted || !_controller.hasClients || _running) return;
+    if (_controller.position.maxScrollExtent <= 2) return;
+    _running = true;
+    while (mounted && _controller.hasClients) {
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      if (!mounted || !_controller.hasClients) break;
+      await _controller.animateTo(
+        _controller.position.maxScrollExtent,
+        duration: Duration(milliseconds: 1600 + (_controller.position.maxScrollExtent * 12).round()),
+        curve: Curves.linear,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      if (!mounted || !_controller.hasClients) break;
+      await _controller.animateTo(
+        0,
+        duration: Duration(milliseconds: 1200 + (_controller.position.maxScrollExtent * 10).round()),
+        curve: Curves.linear,
+      );
+    }
+    _running = false;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => ClipRect(
+        child: SingleChildScrollView(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          physics: const NeverScrollableScrollPhysics(),
+          child: Text(widget.text, maxLines: 1, softWrap: false, style: widget.style),
+        ),
+      );
 }
