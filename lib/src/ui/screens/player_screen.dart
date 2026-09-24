@@ -339,6 +339,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         final seconds = (raw['value'] as num?)?.round() ?? 0;
         if (seconds != 0) await _seekRelative(seconds);
         break;
+      case 'firstFrame':
+        // Native PiP now waits for a successfully enqueued video frame before
+        // starting, preventing a controls-only/black PiP window.
+        break;
       case 'didStart':
         if (mounted) {
           setState(() {
