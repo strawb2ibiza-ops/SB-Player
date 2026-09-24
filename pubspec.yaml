@@ -4,24 +4,24 @@ publish_to: 'none'
 version: 0.6.8+13
 
 environment:
-  sdk: '>=3.8.0 <4.0.0'
-  flutter: '>=3.32.0'
+  sdk: '>=3.12.1 <4.0.0'
+  flutter: '>=3.44.0'
 
 dependencies:
   crypto: ^3.0.7
-  cryptography: ^2.7.0
+  cryptography: ^2.9.0
   flutter:
     sdk: flutter
   flutter_secure_storage: ^11.2.0
-  flutter_svg: ^2.2.3
+  flutter_svg: ^2.3.0
   http: ^1.6.0
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
   media_kit_libs_video: ^1.0.7
-  mobile_scanner: ^7.0.1
+  mobile_scanner: ^7.4.2
   native_picture_in_picture: ^1.0.1
-  shared_preferences: ^2.5.3
-  path_provider: ^2.1.5
+  shared_preferences: ^2.5.5
+  path_provider: ^2.1.6
   window_manager: ^0.5.2
   xml: ^6.6.1
 
