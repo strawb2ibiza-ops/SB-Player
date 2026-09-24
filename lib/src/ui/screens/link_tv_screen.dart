@@ -19,8 +19,10 @@ class LinkTvScreen extends StatefulWidget {
   State<LinkTvScreen> createState() => _LinkTvScreenState();
 }
 
-class _LinkTvScreenState extends State<LinkTvScreen> {
+class _LinkTvScreenState extends State<LinkTvScreen>
+    with WidgetsBindingObserver {
   final _scannerController = MobileScannerController(
+    autoStart: false,
     formats: const [BarcodeFormat.qrCode],
   );
   final _pairingService = TvPairingService();
@@ -54,17 +56,43 @@ class _LinkTvScreenState extends State<LinkTvScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final active = widget.controller.activeProfile;
     if (active?.account.type == AccountType.xtream) {
       _selectedProfileId = active!.id;
     } else if (_xtreamProfiles.isNotEmpty) {
       _selectedProfileId = _xtreamProfiles.first.id;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _request == null && !_done) {
+        unawaited(_scannerController.start());
+      }
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_scannerController.value.hasCameraPermission) return;
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        if (_request == null && !_done) {
+          unawaited(_scannerController.start());
+        }
+        return;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        unawaited(_scannerController.stop());
+        return;
+    }
   }
 
   @override
   void dispose() {
-    _scannerController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_scannerController.dispose());
     _pairingService.dispose();
     super.dispose();
   }
