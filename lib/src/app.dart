@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'models/content_section.dart';
@@ -51,6 +52,7 @@ class _SbPlayerAppState extends State<SbPlayerApp> {
       title: widget.controller.config.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
+      scrollBehavior: const SbScrollBehavior(),
       builder: (context, child) {
         if (child == null || (uiScale - 1.0).abs() < 0.001) return child ?? const SizedBox.shrink();
         final size = MediaQuery.sizeOf(context);
@@ -86,4 +88,19 @@ class _SbPlayerAppState extends State<SbPlayerApp> {
       ),
     ));
   }
+}
+
+
+class SbScrollBehavior extends MaterialScrollBehavior {
+  const SbScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => const <PointerDeviceKind>{
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+        PointerDeviceKind.invertedStylus,
+        PointerDeviceKind.unknown,
+      };
 }
