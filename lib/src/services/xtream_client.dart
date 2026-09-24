@@ -211,8 +211,9 @@ class XtreamClient {
 
     return rows.whereType<Map>().map((item) {
       return IptvCategory(
-        id: '${item['category_id'] ?? ''}',
-        name: '${item['category_name'] ?? 'Other'}',
+        id: '${item['category_id'] ?? item['id'] ?? ''}',
+        name:
+            '${item['category_name'] ?? item['name'] ?? item['title'] ?? 'Other'}',
       );
     }).where((category) => category.id.isNotEmpty).toList(growable: false);
   }
@@ -282,32 +283,61 @@ class XtreamClient {
     }).where((item) => item.id.isNotEmpty).toList(growable: false);
   }
 
-  Future<List<SeriesItem>> fetchSeries(IptvAccount account) async {
-    var data = await _getAction(account, 'get_series', cache: true);
-    var rawItems = _asList(
-      data,
-      const ['series', 'shows', 'streams', 'data', 'results', 'items'],
-    );
+  Future<List<SeriesItem>> fetchSeries(
+    IptvAccount account, {
+    String? categoryId,
+  }) async {
+    final extra = <String, String>{
+      if (categoryId != null &&
+          categoryId.isNotEmpty &&
+          categoryId != '__all__')
+        'category_id': categoryId,
+    };
 
-    // A few Xtream-compatible panels expose the same catalogue under this
-    // alias. Only use it when the standard action returned no usable rows.
+    dynamic data;
+    List<dynamic> rawItems = const <dynamic>[];
+
+    try {
+      data = await _getAction(
+        account,
+        'get_series',
+        extra: extra,
+        cache: true,
+      );
+      rawItems = _asList(
+        data,
+        const ['series', 'shows', 'streams', 'data', 'results', 'items'],
+      );
+    } catch (_) {
+      // A failed full-catalogue request must not make the Series tab unusable.
+      // Category-scoped calls are often much smaller and still work on panels
+      // that choke when returning the entire catalogue.
+      rawItems = const <dynamic>[];
+    }
+
     if (rawItems.isEmpty) {
       try {
-        data = await _getAction(account, 'get_series_streams', cache: true);
+        data = await _getAction(
+          account,
+          'get_series_streams',
+          extra: extra,
+          cache: true,
+        );
         rawItems = _asList(
           data,
           const ['series', 'shows', 'streams', 'data', 'results', 'items'],
         );
       } catch (_) {
-        // Keep the standard empty result if the compatibility action is absent.
+        rawItems = const <dynamic>[];
       }
     }
 
-    return rawItems.whereType<Map>().map((item) {
+    final result = rawItems.whereType<Map>().map((item) {
       return SeriesItem(
         id: '${item['series_id'] ?? item['stream_id'] ?? item['id'] ?? ''}',
         name: '${item['name'] ?? item['title'] ?? 'Untitled series'}',
-        categoryId: '${item['category_id'] ?? item['category'] ?? ''}',
+        categoryId:
+            '${item['category_id'] ?? item['category'] ?? categoryId ?? ''}',
         coverUrl: _imageSource(
           account,
           item['cover'] ??
@@ -323,6 +353,16 @@ class XtreamClient {
         ),
       );
     }).where((item) => item.id.isNotEmpty).toList(growable: false);
+
+    if (categoryId == null ||
+        categoryId.isEmpty ||
+        categoryId == '__all__') {
+      return result;
+    }
+    return result
+        .where((item) =>
+            item.categoryId.isEmpty || item.categoryId == categoryId)
+        .toList(growable: false);
   }
 
   Future<SeriesDetails> fetchSeriesDetails(
@@ -571,7 +611,7 @@ class XtreamClient {
         uri,
         headers: const {
           'Accept': 'application/json,*/*',
-          'User-Agent': 'SBPlayer/0.6.9',
+          'User-Agent': 'SBPlayer/0.6.10',
           'Connection': 'keep-alive',
         },
       ).timeout(const Duration(seconds: 60));
