@@ -76,6 +76,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   MiniPlayerLayout _miniLayout = MiniPlayerLayout.detailed;
   _VideoDisplayMode _displayMode = _VideoDisplayMode.auto;
   bool _autoPipEnabled = true;
+  bool _androidPipActive = false;
   SubtitlePreference _subtitlePreference = const SubtitlePreference.auto();
   bool _subtitlePreferenceApplied = false;
 
@@ -88,6 +89,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     WidgetsBinding.instance.addObserver(this);
     if (Platform.isIOS) {
       _iosPipChannel.setMethodCallHandler(_handleIosPipMethodCall);
+    }
+    if (Platform.isAndroid) {
+      _androidPipChannel.setMethodCallHandler(_handleAndroidPipMethodCall);
     }
     _checkpointTimer = Timer.periodic(
       const Duration(seconds: 10),
@@ -362,6 +366,18 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           );
         }
         break;
+    }
+    return null;
+  }
+
+  Future<dynamic> _handleAndroidPipMethodCall(MethodCall call) async {
+    if (call.method != 'pipModeChanged') return null;
+    final active = call.arguments == true;
+    if (mounted && _androidPipActive != active) {
+      setState(() => _androidPipActive = active);
+    }
+    if (!active) {
+      unawaited(_checkpointPlayback(force: true));
     }
     return null;
   }
@@ -992,6 +1008,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       );
     }
     if (Platform.isAndroid) {
+      _androidPipChannel.setMethodCallHandler(null);
       unawaited(_syncAndroidAutoPip(forceDisable: true));
     }
     unawaited(_restoreWindow());
@@ -1006,6 +1023,16 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isAndroid && _androidPipActive) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: _buildVideo(
+          useBuiltInControls: false,
+          forceFill: false,
+        ),
+      );
+    }
+
     final child = _miniMode && Platform.isWindows
         ? (_miniLayout == MiniPlayerLayout.detailed
             ? _buildDetailedMiniPlayer()
