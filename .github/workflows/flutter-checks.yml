@@ -22,6 +22,16 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Commit resolved dependency lock
+        if: github.event_name == 'push' && github.ref == 'refs/heads/v0.6.8-launch-fixes'
+        run: |
+          if [ -n "$(git status --porcelain -- pubspec.lock)" ]; then
+            git config user.name "SB Player CI"
+            git config user.email "sb-player-ci@users.noreply.github.com"
+            git add pubspec.lock
+            git commit -m "Lock mobile dependency versions"
+            git push
+          fi
       - name: Upload resolved dependency lock
         uses: actions/upload-artifact@v4
         with:
