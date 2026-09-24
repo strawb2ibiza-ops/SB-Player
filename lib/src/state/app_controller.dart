@@ -486,12 +486,21 @@ class AppController extends ChangeNotifier {
   PlaybackItem playbackForEpisode(
     SeriesItem seriesItem,
     SeriesEpisode episode, {
-    SeriesEpisode? nextEpisode,
+    List<SeriesEpisode> followingEpisodes = const [],
   }) {
+    PlaybackItem? next;
+    for (final queuedEpisode in followingEpisodes.reversed) {
+      next = _playbackForEpisodeWithNext(seriesItem, queuedEpisode, next);
+    }
+    return _playbackForEpisodeWithNext(seriesItem, episode, next);
+  }
+
+  PlaybackItem _playbackForEpisodeWithNext(
+    SeriesItem seriesItem,
+    SeriesEpisode episode,
+    PlaybackItem? next,
+  ) {
     final id = _scopedContentId('episode', episode.id);
-    final next = nextEpisode == null
-        ? null
-        : playbackForEpisode(seriesItem, nextEpisode);
     return PlaybackItem(
       id: id,
       title: episode.title,
