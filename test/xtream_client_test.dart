@@ -169,6 +169,51 @@ void main() {
     client.dispose();
   });
 
+  test('prefers explicit episode names over generic provider titles',
+      () async {
+    final client = XtreamClient(
+      client: MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'episodes': {
+              '1': [
+                {
+                  'id': 501,
+                  'episode_num': 1,
+                  'title': 'South Park (1997) - S01E01',
+                  'episode_name': 'Cartman Gets an Anal Probe',
+                  'container_extension': 'mp4',
+                },
+              ],
+            },
+          }),
+          200,
+        );
+      }),
+    );
+
+    const account = IptvAccount(
+      type: AccountType.xtream,
+      label: 'Test',
+      serverUrl: 'https://example.test',
+      username: 'user',
+      password: 'pass',
+    );
+    const series = SeriesItem(
+      id: '100',
+      name: 'South Park (1997)',
+      categoryId: '9',
+    );
+
+    final details = await client.fetchSeriesDetails(account, series);
+
+    expect(
+      details.seasons[1]!.single.title,
+      'Cartman Gets an Anal Probe',
+    );
+    client.dispose();
+  });
+
   test('loads episodes from nested series data wrappers', () async {
     final client = XtreamClient(
       client: MockClient((request) async {
