@@ -81,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_tvRemoteSession == null || !mounted) return;
     _tvRemoteTimer?.cancel();
     _tvRemoteTimer = Timer.periodic(
-      const Duration(milliseconds: 300),
+      const Duration(milliseconds: 80),
       (_) => unawaited(_pollTvRemote()),
     );
     unawaited(_pollTvRemote());
@@ -395,6 +395,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               icon: const Icon(Icons.gamepad_rounded),
+            ),
+          if ((Platform.isAndroid || Platform.isIOS) && !widget.tvMode)
+            IconButton(
+              tooltip: 'Favorites',
+              onPressed: () => unawaited(_changeSection(ContentSection.favorites)),
+              icon: const Icon(Icons.favorite_border_rounded),
             ),
           IconButton(
             tooltip: 'Settings',
@@ -763,6 +769,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHome(AppController controller) {
+    final query = _search.text.trim();
+    if (query.isNotEmpty) return _buildGlobalSearch(controller, query);
     final continueItems = controller.continueWatching;
     final recentItems = controller.visibleLibrary(controller.recent, '');
     final hero = continueItems.isNotEmpty
