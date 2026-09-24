@@ -391,11 +391,30 @@ class AppController extends ChangeNotifier {
       case ContentSection.recent:
         return const [];
     }
-    return images
+    final result = images
         .whereType<String>()
         .where((value) => value.isNotEmpty)
         .take(limit)
-        .toList(growable: false);
+        .toList(growable: true);
+
+    // Keep every category visually useful even when a provider omits artwork
+    // for the first few items in that category. The fallback still uses real
+    // provider-supplied artwork rather than a generic placeholder.
+    if (result.length < limit) {
+      final fallback = switch (target) {
+        ContentSection.live || ContentSection.guide =>
+          channels.map((item) => item.logoUrl),
+        ContentSection.movies => movies.map((item) => item.posterUrl),
+        ContentSection.series => series.map((item) => item.coverUrl),
+        _ => const <String?>[],
+      };
+      for (final value in fallback.whereType<String>()) {
+        if (value.isEmpty || result.contains(value)) continue;
+        result.add(value);
+        if (result.length >= limit) break;
+      }
+    }
+    return result.toList(growable: false);
   }
 
   List<VodItem> get recentlyAddedMovies => _recentMoviesCache;
