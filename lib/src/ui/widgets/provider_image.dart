@@ -43,7 +43,7 @@ class ProviderImage extends StatelessWidget {
         'User-Agent': 'SBPlayer/0.6.9',
         'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
       },
-      errorBuilder: (_, __, ___) => _buildCandidate(candidates, index + 1),
+      errorBuilder: (_, _, _) => _buildCandidate(candidates, index + 1),
     );
   }
 
@@ -52,7 +52,7 @@ class ProviderImage extends StatelessWidget {
     final seen = <String>{};
 
     void add(String? raw) {
-      var value = raw?.trim().replaceAll('&amp;', '&') ?? '';
+      final value = raw?.trim().replaceAll('&amp;', '&') ?? '';
       if (value.isEmpty || !seen.add(value)) return;
       result.add(value);
 
