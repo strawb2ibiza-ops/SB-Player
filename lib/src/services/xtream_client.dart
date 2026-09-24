@@ -305,35 +305,120 @@ class XtreamClient {
     }
 
     final episodes = <int, List<SeriesEpisode>>{};
-    final rawEpisodes = data['episodes'] ?? data['episode'] ?? data['data'];
-
-    if (rawEpisodes is Map) {
-      for (final entry in rawEpisodes.entries) {
-        final seasonNumber = int.tryParse('${entry.key}') ?? 0;
-        final values = entry.value;
-        if (values is List) {
-          for (final raw in values.whereType<Map>()) {
-            final episode = _episodeFromMap(account, raw, fallbackSeason: seasonNumber);
-            if (episode != null) {
-              episodes.putIfAbsent(episode.season, () => []).add(episode);
-            }
-          }
-        }
-      }
-    } else if (rawEpisodes is List) {
-      for (final raw in rawEpisodes.whereType<Map>()) {
-        final episode = _episodeFromMap(account, raw, fallbackSeason: 0);
-        if (episode != null) {
-          episodes.putIfAbsent(episode.season, () => []).add(episode);
-        }
-      }
-    }
+    _collectSeriesEpisodes(
+      account,
+      data,
+      episodes,
+      fallbackSeason: 0,
+    );
 
     for (final list in episodes.values) {
+      final seen = <String>{};
+      list.removeWhere((episode) => !seen.add(episode.id));
       list.sort((a, b) => a.episodeNumber.compareTo(b.episodeNumber));
     }
 
     return SeriesDetails(series: series, seasons: episodes);
+  }
+
+  void _collectSeriesEpisodes(
+    IptvAccount account,
+    dynamic node,
+    Map<int, List<SeriesEpisode>> output, {
+    required int fallbackSeason,
+    int depth = 0,
+  }) {
+    if (node == null || depth > 8) return;
+
+    if (node is List) {
+      for (final value in node) {
+        if (value is Map && _looksLikeEpisode(value)) {
+          final episode =
+              _episodeFromMap(account, value, fallbackSeason: fallbackSeason);
+          if (episode != null) {
+            output.putIfAbsent(episode.season, () => []).add(episode);
+          }
+        } else {
+          _collectSeriesEpisodes(
+            account,
+            value,
+            output,
+            fallbackSeason: fallbackSeason,
+            depth: depth + 1,
+          );
+        }
+      }
+      return;
+    }
+
+    if (node is! Map) return;
+
+    if (_looksLikeEpisode(node)) {
+      final episode =
+          _episodeFromMap(account, node, fallbackSeason: fallbackSeason);
+      if (episode != null) {
+        output.putIfAbsent(episode.season, () => []).add(episode);
+      }
+      return;
+    }
+
+    final localSeason = int.tryParse(
+          '${node['season'] ?? node['season_number'] ?? fallbackSeason}',
+        ) ??
+        fallbackSeason;
+
+    for (final key in const ['episodes', 'episode']) {
+      if (!node.containsKey(key) || node[key] == null) continue;
+      _collectSeriesEpisodes(
+        account,
+        node[key],
+        output,
+        fallbackSeason: localSeason,
+        depth: depth + 1,
+      );
+      return;
+    }
+
+    var foundNumericSeason = false;
+    for (final entry in node.entries) {
+      final seasonNumber = int.tryParse('${entry.key}');
+      if (seasonNumber == null) continue;
+      foundNumericSeason = true;
+      _collectSeriesEpisodes(
+        account,
+        entry.value,
+        output,
+        fallbackSeason: seasonNumber,
+        depth: depth + 1,
+      );
+    }
+    if (foundNumericSeason) return;
+
+    for (final key in const ['data', 'results', 'items']) {
+      if (!node.containsKey(key) || node[key] == null) continue;
+      _collectSeriesEpisodes(
+        account,
+        node[key],
+        output,
+        fallbackSeason: localSeason,
+        depth: depth + 1,
+      );
+      return;
+    }
+  }
+
+  bool _looksLikeEpisode(Map raw) {
+    final hasId = raw['id'] != null ||
+        raw['stream_id'] != null ||
+        raw['episode_id'] != null;
+    if (!hasId) return false;
+    return raw.containsKey('episode_num') ||
+        raw.containsKey('episode_number') ||
+        raw.containsKey('episode') ||
+        raw.containsKey('season') ||
+        raw.containsKey('container_extension') ||
+        raw.containsKey('extension') ||
+        raw.containsKey('title');
   }
 
   SeriesEpisode? _episodeFromMap(
@@ -341,17 +426,32 @@ class XtreamClient {
     Map raw, {
     required int fallbackSeason,
   }) {
-    final id = '${raw['id'] ?? raw['stream_id'] ?? raw['episode_id'] ?? ''}';
+    final info =
+        raw['info'] is Map ? raw['info'] as Map : const <dynamic, dynamic>{};
+    final id =
+        '${raw['id'] ?? raw['stream_id'] ?? raw['episode_id'] ?? info['id'] ?? info['stream_id'] ?? ''}';
     if (id.isEmpty) return null;
 
-    final extension = _safeExtension(raw['container_extension'] ?? raw['extension'], 'mp4');
-    final season = int.tryParse('${raw['season'] ?? fallbackSeason}') ?? fallbackSeason;
-    final episodeNumber = int.tryParse('${raw['episode_num'] ?? raw['episode'] ?? raw['episode_number'] ?? 0}') ?? 0;
-    final info = raw['info'] is Map ? raw['info'] as Map : const <dynamic, dynamic>{};
+    final extension = _safeExtension(
+      raw['container_extension'] ??
+          raw['extension'] ??
+          info['container_extension'] ??
+          info['extension'],
+      'mp4',
+    );
+    final season = int.tryParse(
+          '${raw['season'] ?? raw['season_number'] ?? info['season'] ?? fallbackSeason}',
+        ) ??
+        fallbackSeason;
+    final episodeNumber = int.tryParse(
+          '${raw['episode_num'] ?? raw['episode_number'] ?? raw['episode'] ?? info['episode_num'] ?? info['episode_number'] ?? 0}',
+        ) ??
+        0;
     final server = account.serverUrl!;
     final username = account.username!;
     final password = account.password!;
-    final direct = '${raw['direct_source'] ?? ''}'.trim();
+    final direct =
+        '${raw['direct_source'] ?? info['direct_source'] ?? ''}'.trim();
     final fallback = '$server/series/${_segment(username)}/${_segment(password)}/${_segment(id)}.$extension';
 
     final subtitles = _subtitleList(
@@ -364,7 +464,8 @@ class XtreamClient {
 
     return SeriesEpisode(
       id: id,
-      title: '${raw['title'] ?? raw['name'] ?? 'Episode $episodeNumber'}',
+      title:
+          '${raw['title'] ?? raw['name'] ?? info['title'] ?? info['name'] ?? 'Episode $episodeNumber'}',
       season: season,
       episodeNumber: episodeNumber,
       streamUrl: _httpSource(direct) ?? fallback,
@@ -496,20 +597,23 @@ class XtreamClient {
     return result.where((item) => seen.add(item.url)).toList(growable: false);
   }
 
-  List<dynamic> _asList(dynamic value, List<String> keys) {
+  List<dynamic> _asList(
+    dynamic value,
+    List<String> keys, {
+    int depth = 0,
+  }) {
     if (value is List) return value;
-    if (value is Map) {
-      for (final key in keys) {
-        final candidate = value[key];
-        if (candidate is List) return candidate;
-        if (candidate is Map) {
-          final nested = candidate.values.expand<dynamic>((entry) {
-            if (entry is List) return entry;
-            return const <dynamic>[];
-          }).toList(growable: false);
-          if (nested.isNotEmpty) return nested;
-        }
-      }
+    if (value is! Map || depth > 6) return const <dynamic>[];
+
+    for (final key in keys) {
+      if (!value.containsKey(key)) continue;
+      final nested = _asList(value[key], keys, depth: depth + 1);
+      if (nested.isNotEmpty) return nested;
+    }
+
+    final values = value.values.toList(growable: false);
+    if (values.isNotEmpty && values.every((entry) => entry is Map)) {
+      return values;
     }
     return const <dynamic>[];
   }
