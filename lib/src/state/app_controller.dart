@@ -1290,6 +1290,9 @@ class AppController extends ChangeNotifier {
       }
     } finally {
       if (generation == _catalogGeneration) {
+        if (seriesCategories.isEmpty && series.isEmpty) {
+          _seriesLoaded = false;
+        }
         if (showLoading) contentLoading = false;
         notifyListeners();
       }
@@ -1322,11 +1325,11 @@ class AppController extends ChangeNotifier {
       );
       if (generation != _catalogGeneration || account != current) return;
 
-      _loadedSeriesCategoryIds.add(categoryId);
-      _mergeSeries(items, fallbackCategoryId: categoryId);
       if (items.isEmpty) {
         error = 'No series were returned for this category.';
       } else {
+        _loadedSeriesCategoryIds.add(categoryId);
+        _mergeSeries(items, fallbackCategoryId: categoryId);
         error = null;
       }
     } catch (exception) {
@@ -1360,7 +1363,9 @@ class AppController extends ChangeNotifier {
     const batchSize = 4;
     for (var offset = 0; offset < pending.length; offset += batchSize) {
       if (account == null) break;
-      final end = (offset + batchSize).clamp(0, pending.length);
+      final end = offset + batchSize < pending.length
+          ? offset + batchSize
+          : pending.length;
       final batch = pending.sublist(offset, end);
       await Future.wait<void>(
         batch.map(
