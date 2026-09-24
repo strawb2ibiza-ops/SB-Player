@@ -144,8 +144,10 @@ class XtreamClient {
     }
 
     var resolvedServer = server;
+    final inputHost = Uri.tryParse(server)?.host.toLowerCase();
+    final preserveInputEndpoint = inputHost == 'line.8kultradnscloud.ru';
     final serverInfo = decoded['server_info'];
-    if (serverInfo is Map) {
+    if (serverInfo is Map && !preserveInputEndpoint) {
       final serverProtocol =
           _nullableString(serverInfo['server_protocol'])?.toLowerCase();
       final serverUrl = _nullableString(serverInfo['url']);
@@ -203,9 +205,10 @@ class XtreamClient {
     String action,
   ) async {
     final data = await _getAction(account, action, cache: true);
-    if (data is! List) return const [];
+    final rows = _asList(data, const ['categories', 'data']);
+    if (rows.isEmpty) return const [];
 
-    return data.whereType<Map>().map((item) {
+    return rows.whereType<Map>().map((item) {
       return IptvCategory(
         id: '${item['category_id'] ?? ''}',
         name: '${item['category_name'] ?? 'Other'}',
@@ -215,13 +218,14 @@ class XtreamClient {
 
   Future<List<IptvChannel>> fetchLiveChannels(IptvAccount account) async {
     final data = await _getAction(account, 'get_live_streams', cache: true);
-    if (data is! List) return const [];
+    final rows = _asList(data, const ['streams', 'live_streams', 'data']);
+    if (rows.isEmpty) return const [];
 
     final server = account.serverUrl!;
     final username = account.username!;
     final password = account.password!;
 
-    return data.whereType<Map>().map((item) {
+    return rows.whereType<Map>().map((item) {
       final streamId = '${item['stream_id'] ?? ''}';
       final direct = '${item['direct_source'] ?? ''}'.trim();
       final fallback = '$server/live/${_segment(username)}/${_segment(password)}/${_segment(streamId)}.ts';
@@ -239,14 +243,15 @@ class XtreamClient {
 
   Future<List<VodItem>> fetchVodStreams(IptvAccount account) async {
     final data = await _getAction(account, 'get_vod_streams', cache: true);
-    if (data is! List) return const [];
+    final rows = _asList(data, const ['streams', 'vod_streams', 'movies', 'data']);
+    if (rows.isEmpty) return const [];
 
     final server = account.serverUrl!;
     final username = account.username!;
     final password = account.password!;
 
-    return data.whereType<Map>().map((item) {
-      final streamId = '${item['stream_id'] ?? ''}';
+    return rows.whereType<Map>().map((item) {
+      final streamId = '${item['stream_id'] ?? item['id'] ?? ''}';
       final extension = _safeExtension(item['container_extension'], 'mp4');
       final direct = '${item['direct_source'] ?? ''}'.trim();
       final fallback = '$server/movie/${_segment(username)}/${_segment(password)}/${_segment(streamId)}.$extension';
@@ -268,20 +273,17 @@ class XtreamClient {
 
   Future<List<SeriesItem>> fetchSeries(IptvAccount account) async {
     final data = await _getAction(account, 'get_series', cache: true);
-    final rawItems = data is List
-        ? data
-        : data is Map && data['series'] is List
-            ? data['series'] as List
-            : data is Map && data['data'] is List
-                ? data['data'] as List
-                : const <dynamic>[];
+    final rawItems = _asList(
+      data,
+      const ['series', 'shows', 'streams', 'data', 'results'],
+    );
 
     return rawItems.whereType<Map>().map((item) {
       return SeriesItem(
-        id: '${item['series_id'] ?? ''}',
+        id: '${item['series_id'] ?? item['id'] ?? ''}',
         name: '${item['name'] ?? 'Untitled series'}',
         categoryId: '${item['category_id'] ?? ''}',
-        coverUrl: _nullableString(item['cover']),
+        coverUrl: _nullableString(item['cover'] ?? item['cover_big'] ?? item['stream_icon']),
         plot: _nullableString(item['plot']),
         rating: _rating(item['rating_5based'] ?? item['rating']),
         releaseDate: _nullableString(item['releaseDate'] ?? item['release_date']),
@@ -303,7 +305,7 @@ class XtreamClient {
     }
 
     final episodes = <int, List<SeriesEpisode>>{};
-    final rawEpisodes = data['episodes'];
+    final rawEpisodes = data['episodes'] ?? data['episode'] ?? data['data'];
 
     if (rawEpisodes is Map) {
       for (final entry in rawEpisodes.entries) {
@@ -339,12 +341,12 @@ class XtreamClient {
     Map raw, {
     required int fallbackSeason,
   }) {
-    final id = '${raw['id'] ?? raw['stream_id'] ?? ''}';
+    final id = '${raw['id'] ?? raw['stream_id'] ?? raw['episode_id'] ?? ''}';
     if (id.isEmpty) return null;
 
-    final extension = _safeExtension(raw['container_extension'], 'mp4');
+    final extension = _safeExtension(raw['container_extension'] ?? raw['extension'], 'mp4');
     final season = int.tryParse('${raw['season'] ?? fallbackSeason}') ?? fallbackSeason;
-    final episodeNumber = int.tryParse('${raw['episode_num'] ?? raw['episode'] ?? 0}') ?? 0;
+    final episodeNumber = int.tryParse('${raw['episode_num'] ?? raw['episode'] ?? raw['episode_number'] ?? 0}') ?? 0;
     final info = raw['info'] is Map ? raw['info'] as Map : const <dynamic, dynamic>{};
     final server = account.serverUrl!;
     final username = account.username!;
@@ -420,7 +422,14 @@ class XtreamClient {
   Future<dynamic> _requestJson(Uri uri) async {
     late http.Response response;
     try {
-      response = await _client.get(uri).timeout(const Duration(seconds: 25));
+      response = await _client.get(
+        uri,
+        headers: const {
+          'Accept': 'application/json,*/*',
+          'User-Agent': 'SBPlayer/0.6.8',
+          'Connection': 'keep-alive',
+        },
+      ).timeout(const Duration(seconds: 25));
     } catch (_) {
       throw XtreamException('Could not load data from the IPTV provider.');
     }
@@ -485,6 +494,24 @@ class XtreamClient {
 
     final seen = <String>{};
     return result.where((item) => seen.add(item.url)).toList(growable: false);
+  }
+
+  List<dynamic> _asList(dynamic value, List<String> keys) {
+    if (value is List) return value;
+    if (value is Map) {
+      for (final key in keys) {
+        final candidate = value[key];
+        if (candidate is List) return candidate;
+        if (candidate is Map) {
+          final nested = candidate.values.expand<dynamic>((entry) {
+            if (entry is List) return entry;
+            return const <dynamic>[];
+          }).toList(growable: false);
+          if (nested.isNotEmpty) return nested;
+        }
+      }
+    }
+    return const <dynamic>[];
   }
 
   String? _httpSource(String value) {
