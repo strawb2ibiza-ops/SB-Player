@@ -5,12 +5,7 @@ import 'package:http/http.dart' as http;
 import 'm3u_parser.dart';
 
 class M3uClient {
-  M3uClient({http.Client? client, M3uParser? parser})
-      : _client = client ?? http.Client() {
-    // Keep the parser argument for test/backward compatibility. Parsing is
-    // intentionally isolated in release builds to keep large lists off the UI.
-    assert(parser == null || parser is M3uParser);
-  }
+  M3uClient({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
 
