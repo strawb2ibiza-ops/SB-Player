@@ -79,6 +79,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   bool _androidPipActive = false;
   SubtitlePreference _subtitlePreference = const SubtitlePreference.auto();
   bool _subtitlePreferenceApplied = false;
+  bool _advancingToNext = false;
 
   @override
   void initState() {
@@ -111,8 +112,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         _handlePlaybackFailure();
         return;
       }
-      final next = _item.next;
-      if (next != null) unawaited(_playNext(next));
+      unawaited(_advanceToNextEpisode());
     }));
     _subscriptions.add(_player.stream.tracks.listen((value) {
       if (mounted) setState(() => _tracks = value);
@@ -135,6 +135,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }));
     _subscriptions.add(_player.stream.position.listen((value) {
       _position = value;
+      if (_item.kind == PlaybackKind.episode &&
+          _duration > const Duration(seconds: 5) &&
+          value >= _duration - const Duration(milliseconds: 900)) {
+        unawaited(_advanceToNextEpisode());
+      }
       if (!mounted) return;
       final now = DateTime.now();
       if (now.difference(_lastPositionRebuild) >=
@@ -521,6 +526,20 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       if (_player.state.position >= target - const Duration(seconds: 3)) {
         return;
       }
+    }
+  }
+
+  Future<void> _advanceToNextEpisode() async {
+    if (_disposing || _advancingToNext || _item.kind != PlaybackKind.episode) {
+      return;
+    }
+    _advancingToNext = true;
+    try {
+      final next = _item.next ?? await widget.controller.resolveNextEpisode(_item);
+      if (next == null || _disposing) return;
+      await _playNext(next);
+    } finally {
+      _advancingToNext = false;
     }
   }
 
