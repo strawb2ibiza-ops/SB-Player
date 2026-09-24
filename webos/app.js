@@ -163,6 +163,72 @@ async function stopPairing(cancelRemote){
  if(cancelRemote&&p){try{await pairPost({action:"cancel",pairingId:p.pairingId,token:p.token})}catch(_){}}
 }
 async function cancelPairing(){await stopPairing(true);$("pairing").classList.add("hidden");$("login").classList.remove("hidden");$("phoneSignIn").focus()}
+function providerList(value,keys,depth){
+ depth=depth||0;
+ if(Array.isArray(value))return value;
+ if(!value||typeof value!=="object"||depth>6)return [];
+ for(let i=0;i<keys.length;i++){
+  const key=keys[i];
+  if(!Object.prototype.hasOwnProperty.call(value,key))continue;
+  const nested=providerList(value[key],keys,depth+1);
+  if(nested.length)return nested;
+ }
+ const names=Object.keys(value),mapped=[];
+ for(let i=0;i<names.length;i++){
+  const item=value[names[i]];
+  if(!item||typeof item!=="object"||Array.isArray(item))return [];
+  mapped.push(item);
+ }
+ return mapped;
+}
+function episodeField(e,info,names,fallback){
+ for(let i=0;i<names.length;i++){
+  const key=names[i];
+  if(e[key]!==undefined&&e[key]!==null&&String(e[key])!=="")return e[key];
+  if(info&&info[key]!==undefined&&info[key]!==null&&String(info[key])!=="")return info[key];
+ }
+ return fallback;
+}
+function flattenSeriesEpisodes(value){
+ const out=[],seen={};
+ function walk(node,fallbackSeason,depth){
+  if(node==null||depth>8)return;
+  if(Array.isArray(node)){for(let i=0;i<node.length;i++)walk(node[i],fallbackSeason,depth+1);return}
+  if(typeof node!=="object")return;
+  const info=node.info&&typeof node.info==="object"?node.info:{};
+  const id=episodeField(node,info,["id","stream_id","episode_id"],"");
+  const episodeLike=id!==""&&(
+   node.episode_num!=null||node.episode_number!=null||node.episode!=null||
+   node.season!=null||node.container_extension!=null||node.extension!=null||
+   node.title!=null
+  );
+  if(episodeLike){
+   const key=String(id);if(seen[key])return;seen[key]=true;
+   const copy={};Object.keys(node).forEach(function(k){copy[k]=node[k]});
+   copy.id=id;
+   copy.season=episodeField(node,info,["season","season_number"],fallbackSeason||0);
+   copy.episode_num=episodeField(node,info,["episode_num","episode_number","episode"],0);
+   copy.container_extension=episodeField(node,info,["container_extension","extension"],"mp4");
+   copy.title=episodeField(node,info,["title","name"],"Episode "+copy.episode_num);
+   out.push(copy);return;
+  }
+  const localSeason=parseInt(episodeField(node,info,["season","season_number"],fallbackSeason||0),10)||0;
+  if(node.episodes!=null){walk(node.episodes,localSeason,depth+1);return}
+  if(node.episode!=null){walk(node.episode,localSeason,depth+1);return}
+  const keys=Object.keys(node);let numeric=false;
+  for(let i=0;i<keys.length;i++){
+   if(!/^\d+$/.test(keys[i]))continue;
+   numeric=true;walk(node[keys[i]],parseInt(keys[i],10)||0,depth+1);
+  }
+  if(numeric)return;
+  if(node.data!=null){walk(node.data,localSeason,depth+1);return}
+  if(node.results!=null){walk(node.results,localSeason,depth+1);return}
+  if(node.items!=null){walk(node.items,localSeason,depth+1);return}
+ }
+ walk(value,0,0);
+ out.sort(function(a,b){const sa=parseInt(a.season,10)||0,sb=parseInt(b.season,10)||0;if(sa!==sb)return sa-sb;return(parseInt(a.episode_num,10)||0)-(parseInt(b.episode_num,10)||0)});
+ return out;
+}
 async function loadView(v){
  showContent();
  const generation=++viewGeneration;
@@ -172,7 +238,8 @@ async function loadView(v){
   const ca=v==="live"?"get_live_categories":v==="movies"?"get_vod_categories":"get_series_categories";
   const ia=v==="live"?"get_live_streams":v==="movies"?"get_vod_streams":"get_series";
   const loaded=await Promise.all([getCached(api(ca)),getCached(api(ia))]);if(generation!==viewGeneration)return;
-  categories=loaded[0]||[];items=loaded[1]||[];
+  categories=providerList(loaded[0],["categories","data","results","items"]);
+  items=providerList(loaded[1],v==="live"?["streams","live_streams","data","results","items"]:v==="movies"?["streams","vod_streams","movies","data","results","items"]:["series","shows","streams","data","results","items"]);
   for(let i=0;i<items.length;i++){items[i].__sbIndex=i;const n=items[i].name!=null?items[i].name:(items[i].title!=null?items[i].title:"");items[i].__sbSearch=String(n).toLowerCase()}
   renderCategoryGrid();focusFirst();
  }catch(err){if(generation===viewGeneration)$("grid").innerHTML="<p>Unable to load: "+esc(err.message)+"</p>"}
@@ -224,21 +291,27 @@ async function loadSeries(x){
  episodeSeries=x;
  $("grid").innerHTML="<p>Loading episodes…</p>";
  try{
-  const d=await get(api("get_series_info","&series_id="+encodeURIComponent(x.series_id))),eps=[],groups=d.episodes||{},keys=Object.keys(groups);
-  for(let i=0;i<keys.length;i++){const group=groups[keys[i]]||[];for(let j=0;j<group.length;j++)eps.push(group[j])}
-  $("grid").innerHTML=eps.map(function(e,i){return '<button class="card focusable" data-episode="'+i+'"><strong>'+esc(e.title||("Episode "+e.episode_num))+"</strong><small>S"+esc(e.season||"")+" E"+esc(e.episode_num||"")+"</small></button>"}).join("");
+  const seriesId=x.series_id!=null?x.series_id:x.id;
+  if(seriesId==null||String(seriesId)==="")throw Error("Series ID missing");
+  const d=await get(api("get_series_info","&series_id="+encodeURIComponent(seriesId))),eps=flattenSeriesEpisodes(d);
   episodeQueue=eps;episodeIndex=-1;
+  if(!eps.length){$("grid").innerHTML="<p>No episodes were returned by the provider.</p>";invalidateFocus();return}
+  $("grid").innerHTML=eps.map(function(e,i){
+   const season=parseInt(e.season,10)||0,episode=parseInt(e.episode_num,10)||0;
+   return '<button class="card focusable" data-episode="'+i+'"><strong>'+esc(e.title||("Episode "+episode))+"</strong><small>S"+esc(String(season).padStart(2,"0"))+" E"+esc(String(episode).padStart(2,"0"))+"</small></button>"
+  }).join("");
   $("grid").onclick=function(ev){const b=ev.target.closest("[data-episode]");if(!b)return;playEpisode(parseInt(b.dataset.episode,10))};
   focusFirst();
- }catch(e){$("grid").innerHTML="<p>Unable to load series.</p>"}
+ }catch(e){episodeQueue=[];episodeIndex=-1;$("grid").innerHTML="<p>Unable to load series: "+esc(e.message||"Provider error")+"</p>"}
 }
 function playEpisode(index){
  if(index<0||index>=episodeQueue.length)return;
  episodeIndex=index;
- const e=episodeQueue[index],ext=e.container_extension||"mp4";
- const url=base()+"/series/"+encodeURIComponent(auth.username)+"/"+encodeURIComponent(auth.password)+"/"+e.id+"."+ext;
+ const e=episodeQueue[index],ext=e.container_extension||e.extension||"mp4",id=e.id||e.stream_id||e.episode_id;
+ if(!id)return;
+ const url=base()+"/series/"+encodeURIComponent(auth.username)+"/"+encodeURIComponent(auth.password)+"/"+id+"."+ext;
  const title=e.title||("Episode "+e.episode_num);
- openVideo(url,title,true,{id:"episode:"+e.id,title:title,subtitle:episodeSeries&&episodeSeries.name?episodeSeries.name:"Series",artwork:episodeSeries&&(episodeSeries.cover||episodeSeries.stream_icon)||"",url:url,live:false});
+ openVideo(url,title,true,{id:"episode:"+id,title:title,subtitle:episodeSeries&&episodeSeries.name?episodeSeries.name:"Series",artwork:episodeSeries&&(episodeSeries.cover||episodeSeries.stream_icon)||"",url:url,live:false});
 }
 function playNextEpisode(){
  if(episodeIndex>=0&&episodeIndex+1<episodeQueue.length)playEpisode(episodeIndex+1);
