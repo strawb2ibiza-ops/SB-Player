@@ -901,7 +901,7 @@ class _HomeScreenState extends State<HomeScreen> {
               final movie = newMovies[index];
               final item = controller.playbackForMovie(movie);
               return PosterCard(
-                title: movie.name,
+                title: controller.displayMovieTitle(movie),
                 imageUrl: movie.posterUrl,
                 rating: movie.rating,
                 favorite: controller.isFavorite(item),
@@ -928,7 +928,7 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (index) {
               final series = newSeries[index];
               return PosterCard(
-                title: series.name,
+                title: controller.displaySeriesTitle(series),
                 imageUrl: series.coverUrl,
                 rating: series.rating,
                 onTap: () {
@@ -1016,7 +1016,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return SizedBox(
                   width: 160,
                   child: PosterCard(
-                    title: movie.name,
+                    title: controller.displayMovieTitle(movie),
                     imageUrl: movie.posterUrl,
                     rating: movie.rating,
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
@@ -1043,7 +1043,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 return SizedBox(
                   width: 160,
                   child: PosterCard(
-                    title: show.name,
+                    title: controller.displaySeriesTitle(show),
                     imageUrl: show.coverUrl,
                     rating: show.rating,
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
@@ -1117,8 +1117,9 @@ class _HomeScreenState extends State<HomeScreen> {
           final id = category?.id ?? '__all__';
           final name = category?.name ?? 'All';
           final images = controller.categoryPreviewImages(section, id);
+          final displayName = controller.displayCategoryName(section, name);
           return _CategoryCard(
-            name: name,
+            name: displayName,
             imageUrls: images,
             fallbackIcon: section == ContentSection.live ? Icons.live_tv_outlined : section == ContentSection.movies ? Icons.movie_outlined : Icons.tv_outlined,
             onTap: () {
@@ -1287,7 +1288,7 @@ class _HomeScreenState extends State<HomeScreen> {
             final movie = movies[index];
             final item = controller.playbackForMovie(movie);
             return PosterCard(
-              title: movie.name,
+              title: controller.displayMovieTitle(movie),
               imageUrl: movie.posterUrl,
               rating: movie.rating,
               favorite: controller.isFavorite(item),
@@ -1325,7 +1326,7 @@ class _HomeScreenState extends State<HomeScreen> {
           itemBuilder: (context, index) {
             final series = items[index];
             return PosterCard(
-              title: series.name,
+              title: controller.displaySeriesTitle(series),
               imageUrl: series.coverUrl,
               rating: series.rating,
               onTap: () {
