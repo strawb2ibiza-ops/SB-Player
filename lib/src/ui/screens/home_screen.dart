@@ -992,6 +992,87 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildGlobalSearch(AppController controller, String query) {
+    final channels = controller.visibleChannels(query).take(8).toList(growable: false);
+    final movies = controller.visibleMovies(query).take(12).toList(growable: false);
+    final shows = controller.visibleSeries(query).take(12).toList(growable: false);
+    if (channels.isEmpty && movies.isEmpty && shows.isEmpty) {
+      return const Center(child: Text('No results found.'));
+    }
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 32),
+      children: [
+        if (movies.isNotEmpty) ...[
+          Text('Movies', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 250,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: movies.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final movie = movies[index];
+                return SizedBox(
+                  width: 160,
+                  child: PosterCard(
+                    title: movie.name,
+                    imageUrl: movie.posterUrl,
+                    rating: movie.rating,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => MovieDetailsScreen(controller: controller, movie: movie),
+                    )),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+        if (shows.isNotEmpty) ...[
+          Text('Series', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 250,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: shows.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final show = shows[index];
+                return SizedBox(
+                  width: 160,
+                  child: PosterCard(
+                    title: show.name,
+                    imageUrl: show.coverUrl,
+                    rating: show.rating,
+                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => SeriesDetailsScreen(controller: controller, series: show),
+                    )),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+        if (channels.isNotEmpty) ...[
+          Text('Live TV', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          for (final channel in channels)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ChannelTile(
+                channel: channel,
+                nowText: controller.nowProgram(channel)?.title,
+                nextText: controller.nextProgram(channel)?.title,
+                onTap: () => _play(controller.playbackForChannel(channel)),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
   Widget _buildCategoryLanding(AppController controller, ContentSection section) {
     final query = _search.text.trim();
     if (query.isNotEmpty) {
