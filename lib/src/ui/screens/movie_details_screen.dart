@@ -37,7 +37,7 @@ class MovieDetailsScreen extends StatelessWidget {
           extendBodyBehindAppBar: true,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
-            title: Text(movie.name),
+            title: Text(controller.displayMovieTitle(movie)),
           ),
           body: Stack(
             fit: StackFit.expand,
@@ -71,6 +71,7 @@ class MovieDetailsScreen extends StatelessWidget {
                   final poster = _Poster(url: movie.posterUrl);
                   final details = _Details(
                     movie: movie,
+                    displayTitle: controller.displayMovieTitle(movie),
                     resumePosition: item.startPosition,
                     favorite: favorite,
                     onFavorite: () => controller.toggleFavorite(item),
@@ -154,6 +155,7 @@ class _Poster extends StatelessWidget {
 class _Details extends StatelessWidget {
   const _Details({
     required this.movie,
+    required this.displayTitle,
     required this.resumePosition,
     required this.favorite,
     required this.onFavorite,
@@ -161,6 +163,7 @@ class _Details extends StatelessWidget {
   });
 
   final VodItem movie;
+  final String displayTitle;
   final Duration resumePosition;
   final bool favorite;
   final VoidCallback onFavorite;
@@ -179,7 +182,7 @@ class _Details extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          movie.name,
+          displayTitle,
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w900,
               ),
