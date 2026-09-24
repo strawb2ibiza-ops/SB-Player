@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../models/epg_program.dart';
 import '../../models/iptv_channel.dart';
 import '../../state/app_controller.dart';
+import 'horizontal_scroller.dart';
 
 typedef EpgProgrammeSelected = void Function(
   IptvChannel channel,
@@ -19,6 +20,7 @@ class EpgTimeline extends StatefulWidget {
     required this.anchor,
     required this.onPlayChannel,
     required this.onProgrammeSelected,
+    this.tvMode = false,
   });
 
   final AppController controller;
@@ -26,6 +28,7 @@ class EpgTimeline extends StatefulWidget {
   final DateTime anchor;
   final ValueChanged<IptvChannel> onPlayChannel;
   final EpgProgrammeSelected onProgrammeSelected;
+  final bool tvMode;
 
   @override
   State<EpgTimeline> createState() => _EpgTimelineState();
@@ -36,14 +39,6 @@ class _EpgTimelineState extends State<EpgTimeline> {
   static const double _pixelsPerMinute = 3.6;
   static const double _rowHeight = 72;
   static const Duration _windowLength = Duration(hours: 2);
-
-  final ScrollController _horizontalController = ScrollController();
-
-  @override
-  void dispose() {
-    _horizontalController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,11 +57,14 @@ class _EpgTimelineState extends State<EpgTimeline> {
     final nowOffset =
         now.difference(start).inSeconds / 60 * _pixelsPerMinute;
 
-    return Scrollbar(
-      controller: _horizontalController,
+    return HorizontalScroller(
+      showControls: widget.tvMode,
+      scrollStep: 540,
+      builder: (scrollController) => Scrollbar(
+      controller: scrollController,
       thumbVisibility: true,
       child: SingleChildScrollView(
-        controller: _horizontalController,
+        controller: scrollController,
         scrollDirection: Axis.horizontal,
         child: SizedBox(
           width: totalWidth,
@@ -109,6 +107,7 @@ class _EpgTimelineState extends State<EpgTimeline> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
