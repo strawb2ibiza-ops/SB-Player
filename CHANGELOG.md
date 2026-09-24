@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.11
+
+- Fixed horizontal shelves on Windows/desktop by enabling mouse drag and translating mouse-wheel input for horizontal lists.
+- Added visible left/right carousel controls on desktop and TV for Home shelves and Series season selectors.
+- Passed TV mode into Series details so season navigation is usable with TV controls.
+- Fixed episode title simplification so provider episode names after SxxExx are preserved instead of collapsing every episode to the series name.
+- Episode rows now show explicit season/episode numbers alongside duration.
+- Continue Watching/playback episode metadata now includes both the episode code and episode name.
+
 ## 0.6.10
 
 - Hotfixed Series loading so category lists remain usable even when a provider's full Series catalogue request fails.
