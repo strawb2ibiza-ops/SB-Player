@@ -18,6 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _prefs = PlaybackPreferences();
   bool _autoPip = true;
   bool _loaded = false;
+  double _uiScale = 1.0;
 
   @override
   void initState() {
@@ -27,7 +28,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _load() async {
     final value = await _prefs.readAutoPip();
-    if (mounted) setState(() { _autoPip = value; _loaded = true; });
+    final uiScale = await _prefs.readUiScale();
+    if (mounted) setState(() { _autoPip = value; _uiScale = uiScale; _loaded = true; });
   }
 
   @override
@@ -44,6 +46,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
             setState(() => _autoPip = value);
             await _prefs.saveAutoPip(value);
           },
+        ),
+        const Divider(),
+        const ListTile(title: Text('Appearance'), leading: Icon(Icons.display_settings_outlined)),
+        ListTile(
+          title: const Text('UI scale'),
+          subtitle: Text('${(_uiScale * 100).round()}%'),
+        ),
+        Slider(
+          min: 0.80,
+          max: 1.25,
+          divisions: 9,
+          label: '${(_uiScale * 100).round()}%',
+          value: _uiScale,
+          onChanged: !_loaded ? null : (value) => setState(() => _uiScale = value),
+          onChangeEnd: !_loaded ? null : (value) => _prefs.saveUiScale(value),
         ),
         const Divider(),
         const ListTile(title: Text('Account'), leading: Icon(Icons.person_outline)),
