@@ -508,7 +508,18 @@ class AppController extends ChangeNotifier {
       ' ',
     );
     value = value.replaceAll(RegExp(r'\s{2,}'), ' ').trim();
-    value = value.replaceAll(RegExp(r'^[-|•:]\s*|\s*[-|•:]
+    value = value.replaceAll(
+      RegExp(r'^[-|•:]\s*|\s*[-|•:]$'),
+      '',
+    ).trim();
+    return value;
+  }
+
+  String _normalizedDisplayTitle(String raw) => raw
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '');
+
+  String _cleanVodTitle(String raw) => _cleanOnDemandTitle(raw);
 
   String _cleanSeriesTitle(String raw) => _cleanOnDemandTitle(raw);
 
