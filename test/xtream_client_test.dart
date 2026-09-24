@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:sb_player/src/models/iptv_account.dart';
+import 'package:sb_player/src/models/series_item.dart';
 import 'package:sb_player/src/services/xtream_client.dart';
 
 void main() {
@@ -133,4 +134,91 @@ void main() {
     );
     client.dispose();
   });
+
+  test('loads series from map keyed provider responses', () async {
+    final client = XtreamClient(
+      client: MockClient((request) async {
+        expect(request.url.queryParameters['action'], 'get_series');
+        return http.Response(
+          jsonEncode({
+            '100': {
+              'series_id': 100,
+              'name': 'Test Series',
+              'category_id': '9',
+              'cover': 'https://images.example.test/series.jpg',
+            },
+          }),
+          200,
+        );
+      }),
+    );
+
+    const account = IptvAccount(
+      type: AccountType.xtream,
+      label: 'Test',
+      serverUrl: 'https://example.test',
+      username: 'user',
+      password: 'pass',
+    );
+
+    final series = await client.fetchSeries(account);
+
+    expect(series, hasLength(1));
+    expect(series.single.id, '100');
+    expect(series.single.name, 'Test Series');
+    client.dispose();
+  });
+
+  test('loads episodes from nested series data wrappers', () async {
+    final client = XtreamClient(
+      client: MockClient((request) async {
+        expect(request.url.queryParameters['action'], 'get_series_info');
+        expect(request.url.queryParameters['series_id'], '100');
+        return http.Response(
+          jsonEncode({
+            'info': {'name': 'Test Series'},
+            'data': {
+              'episodes': {
+                '1': [
+                  {
+                    'id': 501,
+                    'episode_num': 1,
+                    'title': 'Pilot',
+                    'container_extension': 'mkv',
+                    'info': {'duration': '45:00'},
+                  },
+                ],
+              },
+            },
+          }),
+          200,
+        );
+      }),
+    );
+
+    const account = IptvAccount(
+      type: AccountType.xtream,
+      label: 'Test',
+      serverUrl: 'https://example.test',
+      username: 'user',
+      password: 'pass',
+    );
+    const series = SeriesItem(
+      id: '100',
+      name: 'Test Series',
+      categoryId: '9',
+    );
+
+    final details = await client.fetchSeriesDetails(account, series);
+
+    expect(details.seasons.keys, contains(1));
+    expect(details.seasons[1], hasLength(1));
+    expect(details.seasons[1]!.single.episodeNumber, 1);
+    expect(
+      details.seasons[1]!.single.streamUrl,
+      'https://example.test/series/user/pass/501.mkv',
+    );
+    client.dispose();
+  });
+
 }
