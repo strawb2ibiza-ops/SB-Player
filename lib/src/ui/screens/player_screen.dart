@@ -55,6 +55,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Timer? _checkpointTimer;
   Duration _lastCheckpointPosition = Duration.zero;
 
+  bool _disposing = false;
   bool _miniMode = false;
   bool _buffering = true;
   bool _playing = false;
@@ -92,14 +93,15 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       (_) => unawaited(_checkpointPlayback()),
     );
     _subscriptions.add(_player.stream.buffering.listen((value) {
+      if (_disposing) return;
       if (mounted) setState(() => _buffering = value);
     }));
     _subscriptions.add(_player.stream.error.listen((value) {
-      if (value.trim().isEmpty) return;
+      if (_disposing || value.trim().isEmpty) return;
       _handlePlaybackFailure();
     }));
     _subscriptions.add(_player.stream.completed.listen((value) {
-      if (!value) return;
+      if (_disposing || !value) return;
       if (_item.isLive) {
         _handlePlaybackFailure();
         return;
@@ -477,6 +479,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   }
 
   Future<void> _playNext(PlaybackItem next) async {
+    if (_disposing) return;
     await widget.controller.recordPlayback(
       _item,
       position: _duration,
@@ -512,7 +515,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   }
 
   void _handlePlaybackFailure() {
-    if (!mounted) return;
+    if (_disposing || !mounted) return;
     setState(() {
       _playbackError = _item.isLive
           ? 'The live stream was interrupted.'
@@ -986,6 +989,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
 
   @override
   void dispose() {
+    _disposing = true;
     WidgetsBinding.instance.removeObserver(this);
     _checkpointTimer?.cancel();
     _reconnectTimer?.cancel();
@@ -1003,8 +1007,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
 
     if (Platform.isIOS) {
-      unawaited(_iosPipChannel.invokeMethod<void>('SBPlayerPiP.Stop'));
       _iosPipChannel.setMethodCallHandler(null);
+      unawaited(_iosPipChannel.invokeMethod<void>('SBPlayerPiP.Stop').catchError((_) {}));
     }
     unawaited(_restoreWindow());
     for (final subscription in _subscriptions) {
