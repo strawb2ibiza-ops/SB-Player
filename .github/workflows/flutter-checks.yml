@@ -257,6 +257,7 @@ jobs:
           $pkg
 
           import android.app.PictureInPictureParams
+          import android.content.res.Configuration
           import android.os.Build
           import android.util.Rational
           import io.flutter.embedding.android.FlutterFragmentActivity
@@ -266,11 +267,16 @@ jobs:
           class MainActivity : FlutterFragmentActivity() {
               private val pipChannel = "sb_player/android_pip"
               private var autoPip = false
+              private var pipMethodChannel: MethodChannel? = null
 
               override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
                   super.configureFlutterEngine(flutterEngine)
-                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, pipChannel)
-                      .setMethodCallHandler { call, result ->
+                  val channel = MethodChannel(
+                      flutterEngine.dartExecutor.binaryMessenger,
+                      pipChannel
+                  )
+                  pipMethodChannel = channel
+                  channel.setMethodCallHandler { call, result ->
                           when (call.method) {
                               "isSupported" -> result.success(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                               "setAutoPip" -> {
@@ -286,6 +292,20 @@ jobs:
               override fun onUserLeaveHint() {
                   super.onUserLeaveHint()
                   if (autoPip) enterSbPictureInPicture()
+              }
+
+              override fun onPictureInPictureModeChanged(
+                  isInPictureInPictureMode: Boolean,
+                  newConfig: Configuration
+              ) {
+                  super.onPictureInPictureModeChanged(
+                      isInPictureInPictureMode,
+                      newConfig
+                  )
+                  pipMethodChannel?.invokeMethod(
+                      "pipModeChanged",
+                      isInPictureInPictureMode
+                  )
               }
 
               private fun enterSbPictureInPicture(): Boolean {
@@ -340,6 +360,8 @@ jobs:
           main=$(find android/app/src/main/kotlin -name MainActivity.kt | head -1)
           grep -F 'FlutterFragmentActivity' "$main"
           grep -F 'private var autoPip = false' "$main"
+          grep -F 'onPictureInPictureModeChanged' "$main"
+          grep -F '"pipModeChanged"' "$main"
       - run: flutter pub get
       - name: Build Android Mobile APK
         run: |
