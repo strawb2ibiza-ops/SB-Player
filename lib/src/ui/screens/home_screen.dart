@@ -966,7 +966,14 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 12),
           SizedBox(
             height: 140,
-            child: ListView.separated(
+            child: HorizontalScroller(
+              showControls: widget.tvMode ||
+                  Platform.isWindows ||
+                  Platform.isLinux ||
+                  Platform.isMacOS,
+              scrollStep: 620,
+              builder: (scrollController) => ListView.separated(
+              controller: scrollController,
               scrollDirection: Axis.horizontal,
               itemCount: liveChannels.length,
               separatorBuilder: (_, _) => const SizedBox(width: 12),
@@ -988,6 +995,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               },
+            ),
             ),
           ),
         ],
@@ -1023,7 +1031,14 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 10),
           SizedBox(
             height: 250,
-            child: ListView.separated(
+            child: HorizontalScroller(
+              showControls: widget.tvMode ||
+                  Platform.isWindows ||
+                  Platform.isLinux ||
+                  Platform.isMacOS,
+              scrollStep: 520,
+              builder: (scrollController) => ListView.separated(
+              controller: scrollController,
               scrollDirection: Axis.horizontal,
               itemCount: movies.length,
               separatorBuilder: (_, _) => const SizedBox(width: 12),
@@ -1042,6 +1057,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
+            ),
           ),
           const SizedBox(height: 24),
         ],
@@ -1050,7 +1066,14 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 10),
           SizedBox(
             height: 250,
-            child: ListView.separated(
+            child: HorizontalScroller(
+              showControls: widget.tvMode ||
+                  Platform.isWindows ||
+                  Platform.isLinux ||
+                  Platform.isMacOS,
+              scrollStep: 520,
+              builder: (scrollController) => ListView.separated(
+              controller: scrollController,
               scrollDirection: Axis.horizontal,
               itemCount: shows.length,
               separatorBuilder: (_, _) => const SizedBox(width: 12),
@@ -1068,6 +1091,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               },
+            ),
             ),
           ),
           const SizedBox(height: 24),
@@ -1293,6 +1317,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(
           child: EpgTimeline(
             controller: controller,
+            tvMode: widget.tvMode,
             channels: channels,
             anchor: _guideAnchor,
             onPlayChannel: (channel) =>
