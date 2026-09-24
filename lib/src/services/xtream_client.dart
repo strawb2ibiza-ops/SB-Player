@@ -146,7 +146,11 @@ class XtreamClient {
 
     var resolvedServer = server;
     final inputHost = Uri.tryParse(server)?.host.toLowerCase();
-    final preserveInputEndpoint = inputHost == 'line.8kultradnscloud.ru';
+    const brandedProviderHosts = <String>{
+      'line.watchsbtv.top',
+      'line.8kultradnscloud.ru', // Legacy SB endpoint for seamless upgrades.
+    };
+    final preserveInputEndpoint = brandedProviderHosts.contains(inputHost);
     final serverInfo = decoded['server_info'];
     if (serverInfo is Map && !preserveInputEndpoint) {
       final serverProtocol =
