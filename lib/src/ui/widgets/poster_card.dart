@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../branding/sb_brand.dart';
+import 'provider_image.dart';
 
 class PosterCard extends StatefulWidget {
   const PosterCard({
@@ -73,14 +74,11 @@ class _PosterCardState extends State<PosterCard> {
                               ],
                             ),
                           ),
-                          child: widget.imageUrl == null
-                              ? const _MissingPoster()
-                              : Image.network(
-                                  widget.imageUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) =>
-                                      const _MissingPoster(),
-                                ),
+                          child: ProviderImage(
+                            url: widget.imageUrl,
+                            fit: BoxFit.cover,
+                            fallback: const _MissingPoster(),
+                          ),
                         ),
                         Positioned.fill(
                           child: IgnorePointer(
