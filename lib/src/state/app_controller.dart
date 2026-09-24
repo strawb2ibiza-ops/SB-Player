@@ -417,6 +417,7 @@ class AppController extends ChangeNotifier {
     return result.toList(growable: false);
   }
 
+  // Provider-facing names stay raw internally; these helpers only clean UI labels.
   String displayMovieTitle(VodItem item) => _cleanVodTitle(item.name);
 
   String displaySeriesTitle(SeriesItem item) => _cleanSeriesTitle(item.name);
