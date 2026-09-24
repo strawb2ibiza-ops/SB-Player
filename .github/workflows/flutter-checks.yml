@@ -3,7 +3,7 @@ name: Flutter checks
 on:
   workflow_dispatch:
   push:
-    branches: [main, v0.5-branding-installer, v0.6-ios, v0.6-unified, v0.6.10-launch, v0.6.10-launch-fixes, v0.6.10-test-fixes]
+    branches: [main, v0.5-branding-installer, v0.6-ios, v0.6-unified, v0.6.10-launch, v0.6.10-launch-fixes, v0.6.10-test-fixes, v0.6.10-series-hotfix]
   pull_request:
 
 concurrency:
