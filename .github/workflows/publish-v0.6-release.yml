@@ -1,4 +1,4 @@
-name: Publish SB Player v0.6.8 Release
+name: Publish SB Player v0.6.9 Release
 
 on:
   workflow_run:
@@ -38,34 +38,34 @@ jobs:
           test -n "$RUN_ID"
           echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
 
-      - name: Download verified v0.6.8 artifacts
+      - name: Download verified v0.6.9 artifacts
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ steps.build.outputs.run_id }}
         run: |
           mkdir -p release/windows release/android-mobile release/android-tv release/android-aab release/ios release/lg
-          gh run download "$RUN_ID" -n SB-Player-Setup-v0.6.8 -D release/windows
-          gh run download "$RUN_ID" -n SB-Player-Android-Mobile-v0.6.8 -D release/android-mobile
-          gh run download "$RUN_ID" -n SB-Player-Android-TV-v0.6.8 -D release/android-tv
-          gh run download "$RUN_ID" -n SB-Player-Android-Mobile-AAB-v0.6.8 -D release/android-aab
-          gh run download "$RUN_ID" -n SB-Player-iOS-v0.6.8-unsigned-IPA -D release/ios
-          gh run download "$RUN_ID" -n SB-Player-LG-v0.6.8 -D release/lg
+          gh run download "$RUN_ID" -n SB-Player-Setup-v0.6.9 -D release/windows
+          gh run download "$RUN_ID" -n SB-Player-Android-Mobile-v0.6.9 -D release/android-mobile
+          gh run download "$RUN_ID" -n SB-Player-Android-TV-v0.6.9 -D release/android-tv
+          gh run download "$RUN_ID" -n SB-Player-Android-Mobile-AAB-v0.6.9 -D release/android-aab
+          gh run download "$RUN_ID" -n SB-Player-iOS-v0.6.9-unsigned-IPA -D release/ios
+          gh run download "$RUN_ID" -n SB-Player-LG-v0.6.9 -D release/lg
 
       - name: Collect release files
         run: |
-          cp release/windows/SB-Player-Setup-v0.6.8.exe release/SB-Player-Setup-v0.6.8.exe
-          cp release/android-mobile/SB-Player-Android-Mobile-v0.6.8.apk release/SB-Player-Android-Mobile-v0.6.8.apk
-          cp release/android-tv/SB-Player-Android-TV-v0.6.8.apk release/SB-Player-Android-TV-v0.6.8.apk
-          cp release/android-aab/SB-Player-Android-Mobile-v0.6.8.aab release/SB-Player-Android-Mobile-v0.6.8.aab
-          cp release/ios/SB-Player-iOS-v0.6.8-unsigned.ipa release/SB-Player-iOS-v0.6.8-unsigned.ipa
-          cp release/lg/SB-Player-LG-v0.6.8.ipk release/SB-Player-LG-v0.6.8.ipk
+          cp release/windows/SB-Player-Setup-v0.6.9.exe release/SB-Player-Setup-v0.6.9.exe
+          cp release/android-mobile/SB-Player-Android-Mobile-v0.6.9.apk release/SB-Player-Android-Mobile-v0.6.9.apk
+          cp release/android-tv/SB-Player-Android-TV-v0.6.9.apk release/SB-Player-Android-TV-v0.6.9.apk
+          cp release/android-aab/SB-Player-Android-Mobile-v0.6.9.aab release/SB-Player-Android-Mobile-v0.6.9.aab
+          cp release/ios/SB-Player-iOS-v0.6.9-unsigned.ipa release/SB-Player-iOS-v0.6.9-unsigned.ipa
+          cp release/lg/SB-Player-LG-v0.6.9.ipk release/SB-Player-LG-v0.6.9.ipk
 
-      - name: Publish or update v0.6.8
+      - name: Publish or update v0.6.9
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         run: |
-          if gh release view v0.6.8 >/dev/null 2>&1; then
-            gh release upload v0.6.8               release/SB-Player-Setup-v0.6.8.exe               release/SB-Player-Android-Mobile-v0.6.8.apk               release/SB-Player-Android-TV-v0.6.8.apk               release/SB-Player-Android-Mobile-v0.6.8.aab               release/SB-Player-iOS-v0.6.8-unsigned.ipa               release/SB-Player-LG-v0.6.8.ipk               --clobber
+          if gh release view v0.6.9 >/dev/null 2>&1; then
+            gh release upload v0.6.9               release/SB-Player-Setup-v0.6.9.exe               release/SB-Player-Android-Mobile-v0.6.9.apk               release/SB-Player-Android-TV-v0.6.9.apk               release/SB-Player-Android-Mobile-v0.6.9.aab               release/SB-Player-iOS-v0.6.9-unsigned.ipa               release/SB-Player-LG-v0.6.9.ipk               --clobber
           else
-            gh release create v0.6.8               release/SB-Player-Setup-v0.6.8.exe               release/SB-Player-Android-Mobile-v0.6.8.apk               release/SB-Player-Android-TV-v0.6.8.apk               release/SB-Player-Android-Mobile-v0.6.8.aab               release/SB-Player-iOS-v0.6.8-unsigned.ipa               release/SB-Player-LG-v0.6.8.ipk               --target main               --title "SB Player v0.6.8"               --notes "Promoted Android/iOS testing build with the matching Windows, Android TV and LG webOS packages. Includes the current mobile PiP, resume/Continue Watching, subtitle, series recovery, autoplay and TV pairing/remote work. The iOS IPA is unsigned and must be signed before installation."
+            gh release create v0.6.9               release/SB-Player-Setup-v0.6.9.exe               release/SB-Player-Android-Mobile-v0.6.9.apk               release/SB-Player-Android-TV-v0.6.9.apk               release/SB-Player-Android-Mobile-v0.6.9.aab               release/SB-Player-iOS-v0.6.9-unsigned.ipa               release/SB-Player-LG-v0.6.9.ipk               --target main               --title "SB Player v0.6.9"               --notes "SB Player v0.6.9 with the latest iOS/Android testing fixes and matching Windows, Android TV and LG webOS packages. Includes working mobile PiP, improved Series catalogue compatibility, central title simplification, resilient artwork loading, Continue Watching/resume fixes and next-episode autoplay recovery. The iOS IPA is unsigned and must be signed before installation."
           fi
