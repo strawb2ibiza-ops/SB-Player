@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../models/series_item.dart';
 import '../../state/app_controller.dart';
+import '../widgets/horizontal_scroller.dart';
 import '../widgets/provider_image.dart';
 import 'player_screen.dart';
 
@@ -10,10 +13,12 @@ class SeriesDetailsScreen extends StatefulWidget {
     super.key,
     required this.controller,
     required this.series,
+    this.tvMode = false,
   });
 
   final AppController controller;
   final SeriesItem series;
+  final bool tvMode;
 
   @override
   State<SeriesDetailsScreen> createState() => _SeriesDetailsScreenState();
@@ -127,7 +132,14 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
               const SizedBox(height: 12),
               SizedBox(
                 height: 102,
-                child: ListView.separated(
+                child: HorizontalScroller(
+                  showControls: widget.tvMode ||
+                      Platform.isWindows ||
+                      Platform.isLinux ||
+                      Platform.isMacOS,
+                  scrollStep: 360,
+                  builder: (scrollController) => ListView.separated(
+                  controller: scrollController,
                   scrollDirection: Axis.horizontal,
                   itemCount: seasons.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 10),
@@ -200,6 +212,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                     );
                   },
                 ),
+                ),
               ),
               const SizedBox(height: 20),
               Text(
@@ -240,15 +253,22 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  controller.displayEpisodeTitle(episode),
+                                  controller.displayEpisodeTitle(episode, series: series),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontWeight: FontWeight.w800),
                                 ),
-                                if (episode.duration?.isNotEmpty == true) ...[
-                                  const SizedBox(height: 4),
-                                  Text(episode.duration!, style: Theme.of(context).textTheme.bodySmall),
-                                ],
+                                const SizedBox(height: 4),
+                                Text(
+                                  [
+                                    'S${episode.season} E${episode.episodeNumber}',
+                                    if (episode.duration?.isNotEmpty == true)
+                                      episode.duration!,
+                                  ].join(' • '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
                                 if (episode.plot?.isNotEmpty == true) ...[
                                   const SizedBox(height: 4),
                                   Text(
