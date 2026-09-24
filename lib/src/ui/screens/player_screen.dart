@@ -42,6 +42,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   DateTime _lastPositionRebuild = DateTime.fromMillisecondsSinceEpoch(0);
   static const MethodChannel _iosPipChannel =
       MethodChannel('sb_player/media_kit_pip');
+  static const MethodChannel _androidPipChannel =
+      MethodChannel('sb_player/android_pip');
 
   final MiniPlayerPreferences _miniPreferences = const MiniPlayerPreferences();
   final PlaybackPreferences _playbackPreferences = const PlaybackPreferences();
@@ -141,10 +143,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     unawaited(_loadMiniPreference());
     unawaited(_loadPlaybackPreferences());
     unawaited(_open());
-    // Android PiP can share the app's playback lifecycle. On iOS the
-    // native PiP package creates a second AVPlayer, so preloading it here
-    // can open a second IPTV connection and fail even while media_kit plays.
-    if (Platform.isAndroid) unawaited(_prepareNativePip());
+    // Android PiP now uses the existing Flutter/media_kit surface through
+    // Activity Picture-in-Picture. Do not initialize a second player/stream.
   }
 
   Future<void> _prepareNativePip() async {
@@ -215,36 +215,31 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       return;
     }
 
-    var pip = _nativePip;
-    if (!_pipReady || pip == null) {
-      await _prepareNativePip();
-      pip = _nativePip;
-    }
-    if (!_pipReady || pip == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _pipError == null
-                  ? 'Picture-in-Picture is not ready yet.'
-                  : 'Picture-in-Picture unavailable: $_pipError',
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
-    try {
-      await pip.seekTo(_player.state.position);
-      if (_player.state.playing) await pip.play();
-      await pip.startPiP();
-    } catch (error) {
-      if (mounted) {
-        setState(() => _pipError = error.toString());
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not start Picture-in-Picture: $error')),
-        );
+    if (Platform.isAndroid) {
+      try {
+        final supported =
+            await _androidPipChannel.invokeMethod<bool>('isSupported') ?? false;
+        if (!supported) {
+          throw StateError('Picture-in-Picture is not supported on this device.');
+        }
+        final started =
+            await _androidPipChannel.invokeMethod<bool>('startPiP') ?? false;
+        if (!started) {
+          throw StateError('Android rejected the Picture-in-Picture request.');
+        }
+        if (mounted) {
+          setState(() {
+            _pipReady = true;
+            _pipError = null;
+          });
+        }
+      } catch (error) {
+        if (mounted) {
+          setState(() => _pipError = error.toString());
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not start Picture-in-Picture: $error')),
+          );
+        }
       }
     }
   }
@@ -390,11 +385,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _autoPipEnabled = autoPip;
     _subtitlePreference = subtitlePreference;
     _subtitlePreferenceApplied = false;
-    if (_nativePip != null && Platform.isAndroid) {
+    if (Platform.isAndroid) {
       try {
-        await _nativePip!.setAutoPipEnabled(autoPip);
+        await _androidPipChannel.invokeMethod<void>('setAutoPip', autoPip);
       } catch (_) {
-        // PiP preference updates are best-effort while a stream is active.
+        // Older Android builds can ignore this until the next app update.
       }
     }
     await _applySubtitlePreference();
@@ -500,9 +495,6 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _nativePip = null;
     _pipReady = false;
     await _open();
-    if (Platform.isAndroid) {
-      unawaited(_prepareNativePip());
-    }
   }
 
   Future<void> _retry({bool manual = true}) async {
@@ -1138,7 +1130,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
               const SizedBox(width: 8),
             ],
           ),
-          body: Center(child: _buildVideo(useBuiltInControls: true)),
+          body: SafeArea(
+            minimum: const EdgeInsets.only(bottom: 8),
+            child: Center(child: _buildVideo(useBuiltInControls: true)),
+          ),
         );
       },
     );
