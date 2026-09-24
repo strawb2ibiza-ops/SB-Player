@@ -235,7 +235,10 @@ class XtreamClient {
         id: streamId,
         name: '${item['name'] ?? 'Unnamed channel'}',
         categoryId: '${item['category_id'] ?? ''}',
-        logoUrl: _nullableString(item['stream_icon']),
+        logoUrl: _imageSource(
+          account,
+          item['stream_icon'] ?? item['logo'] ?? item['icon'],
+        ),
         epgId: _nullableString(item['epg_channel_id']),
         streamUrl: _httpSource(direct) ?? fallback,
       );
@@ -261,7 +264,14 @@ class XtreamClient {
         id: streamId,
         name: '${item['name'] ?? 'Untitled'}',
         categoryId: '${item['category_id'] ?? ''}',
-        posterUrl: _nullableString(item['stream_icon']),
+        posterUrl: _imageSource(
+          account,
+          item['stream_icon'] ??
+              item['movie_image'] ??
+              item['cover_big'] ??
+              item['cover'] ??
+              item['backdrop_path'],
+        ),
         extension: extension,
         plot: _nullableString(item['plot']),
         rating: _rating(item['rating_5based'] ?? item['rating']),
@@ -273,21 +283,44 @@ class XtreamClient {
   }
 
   Future<List<SeriesItem>> fetchSeries(IptvAccount account) async {
-    final data = await _getAction(account, 'get_series', cache: true);
-    final rawItems = _asList(
+    var data = await _getAction(account, 'get_series', cache: true);
+    var rawItems = _asList(
       data,
-      const ['series', 'shows', 'streams', 'data', 'results'],
+      const ['series', 'shows', 'streams', 'data', 'results', 'items'],
     );
+
+    // A few Xtream-compatible panels expose the same catalogue under this
+    // alias. Only use it when the standard action returned no usable rows.
+    if (rawItems.isEmpty) {
+      try {
+        data = await _getAction(account, 'get_series_streams', cache: true);
+        rawItems = _asList(
+          data,
+          const ['series', 'shows', 'streams', 'data', 'results', 'items'],
+        );
+      } catch (_) {
+        // Keep the standard empty result if the compatibility action is absent.
+      }
+    }
 
     return rawItems.whereType<Map>().map((item) {
       return SeriesItem(
-        id: '${item['series_id'] ?? item['id'] ?? ''}',
-        name: '${item['name'] ?? 'Untitled series'}',
-        categoryId: '${item['category_id'] ?? ''}',
-        coverUrl: _nullableString(item['cover'] ?? item['cover_big'] ?? item['stream_icon']),
-        plot: _nullableString(item['plot']),
+        id: '${item['series_id'] ?? item['stream_id'] ?? item['id'] ?? ''}',
+        name: '${item['name'] ?? item['title'] ?? 'Untitled series'}',
+        categoryId: '${item['category_id'] ?? item['category'] ?? ''}',
+        coverUrl: _imageSource(
+          account,
+          item['cover'] ??
+              item['cover_big'] ??
+              item['movie_image'] ??
+              item['stream_icon'] ??
+              item['backdrop_path'],
+        ),
+        plot: _nullableString(item['plot'] ?? item['description']),
         rating: _rating(item['rating_5based'] ?? item['rating']),
-        releaseDate: _nullableString(item['releaseDate'] ?? item['release_date']),
+        releaseDate: _nullableString(
+          item['releaseDate'] ?? item['release_date'] ?? item['releasedate'],
+        ),
       );
     }).where((item) => item.id.isNotEmpty).toList(growable: false);
   }
@@ -473,7 +506,17 @@ class XtreamClient {
       extension: extension,
       plot: _nullableString(info['plot'] ?? raw['plot']),
       duration: _nullableString(info['duration'] ?? raw['duration']),
-      imageUrl: _nullableString(info['movie_image'] ?? info['cover_big'] ?? raw['cover']),
+      imageUrl: _imageSource(
+        account,
+        info['movie_image'] ??
+            info['cover_big'] ??
+            info['cover'] ??
+            info['stream_icon'] ??
+            raw['movie_image'] ??
+            raw['cover_big'] ??
+            raw['cover'] ??
+            raw['stream_icon'],
+      ),
       subtitles: subtitles,
     );
   }
@@ -528,10 +571,10 @@ class XtreamClient {
         uri,
         headers: const {
           'Accept': 'application/json,*/*',
-          'User-Agent': 'SBPlayer/0.6.8',
+          'User-Agent': 'SBPlayer/0.6.9',
           'Connection': 'keep-alive',
         },
-      ).timeout(const Duration(seconds: 25));
+      ).timeout(const Duration(seconds: 60));
     } catch (_) {
       throw XtreamException('Could not load data from the IPTV provider.');
     }
@@ -539,7 +582,7 @@ class XtreamClient {
       throw XtreamException('Provider returned HTTP ${response.statusCode}.');
     }
     try {
-      final body = response.body;
+      final body = utf8.decode(response.bodyBytes, allowMalformed: true);
       return await Isolate.run(
         () => jsonDecode(body),
         debugName: 'sb-player-xtream-json',
@@ -608,7 +651,7 @@ class XtreamClient {
     int depth = 0,
   }) {
     if (value is List) return value;
-    if (value is! Map || depth > 6) return const <dynamic>[];
+    if (value is! Map || depth > 8) return const <dynamic>[];
 
     for (final key in keys) {
       if (!value.containsKey(key)) continue;
@@ -620,7 +663,57 @@ class XtreamClient {
     if (values.isNotEmpty && values.every((entry) => entry is Map)) {
       return values;
     }
-    return const <dynamic>[];
+
+    // Some compatible panels group rows by category or numeric ID and mix
+    // metadata alongside those groups. Flatten those nested containers.
+    final flattened = <dynamic>[];
+    for (final entry in values) {
+      if (entry is List) {
+        flattened.addAll(entry);
+      } else if (entry is Map) {
+        final nested = _asList(entry, keys, depth: depth + 1);
+        if (nested.isNotEmpty) flattened.addAll(nested);
+      }
+    }
+    return flattened;
+  }
+
+  String? _imageSource(IptvAccount account, dynamic value) {
+    dynamic candidate = value;
+    if (candidate is List) {
+      candidate = candidate.cast<dynamic>().firstWhere(
+            (entry) => _nullableString(entry) != null,
+            orElse: () => null,
+          );
+    }
+    var text = _nullableString(candidate);
+    if (text == null) return null;
+    text = text.replaceAll('&amp;', '&').trim();
+
+    final base = Uri.tryParse(account.serverUrl ?? '');
+    if (text.startsWith('//')) {
+      final scheme = base?.scheme.isNotEmpty == true ? base!.scheme : 'https';
+      text = '$scheme:$text';
+    }
+
+    final absolute = Uri.tryParse(text);
+    if (absolute != null &&
+        absolute.hasAuthority &&
+        {'http', 'https'}.contains(absolute.scheme.toLowerCase())) {
+      return absolute.toString();
+    }
+
+    if (base == null || !base.hasAuthority) return null;
+    try {
+      final origin = Uri(
+        scheme: base.scheme,
+        host: base.host,
+        port: base.hasPort ? base.port : null,
+      );
+      return origin.resolve(text).toString();
+    } catch (_) {
+      return null;
+    }
   }
 
   String? _httpSource(String value) {
