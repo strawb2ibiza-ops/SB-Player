@@ -101,6 +101,41 @@ void main() {
     client.dispose();
   });
 
+  test('preserves the SB branded custom domain from server_info', () async {
+    final client = XtreamClient(
+      client: MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'user_info': {
+              'auth': 1,
+              'status': 'Active',
+              'exp_date': '0',
+            },
+            'server_info': {
+              'server_protocol': 'http',
+              'url': 'origin.provider.test',
+              'port': '8080',
+            },
+          }),
+          200,
+        );
+      }),
+    );
+
+    final account = await client.authenticate(
+      serverUrl: 'http://line.watchsbtv.top',
+      username: 'viewer',
+      password: 'secret',
+    );
+
+    expect(account.serverUrl, 'http://line.watchsbtv.top');
+    expect(
+      account.epgUrl,
+      startsWith('http://line.watchsbtv.top/xmltv.php?'),
+    );
+    client.dispose();
+  });
+
   test('ignores malformed direct stream sources', () async {
     final client = XtreamClient(
       client: MockClient((request) async {
