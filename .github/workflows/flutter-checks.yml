@@ -3,7 +3,7 @@ name: Flutter checks
 on:
   workflow_dispatch:
   push:
-    branches: [main, v0.5-branding-installer, v0.6-ios, v0.6-unified, v0.6.7-launch]
+    branches: [main, v0.5-branding-installer, v0.6-ios, v0.6-unified, v0.6.8-launch, v0.6.8-launch-fixes]
   pull_request:
 
 concurrency:
@@ -77,7 +77,7 @@ jobs:
       - name: Upload portable Windows release
         uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Windows-Open-v0.6.7
+          name: SB-Player-Windows-Open-v0.6.8
           path: build/windows/x64/runner/Release/**
           if-no-files-found: error
           retention-days: 14
@@ -90,8 +90,8 @@ jobs:
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Setup-v0.6.7
-          path: dist/SB-Player-Setup-v0.6.7.exe
+          name: SB-Player-Setup-v0.6.8
+          path: dist/SB-Player-Setup-v0.6.8.exe
           if-no-files-found: error
           retention-days: 14
 
@@ -169,12 +169,12 @@ jobs:
         run: |
           mkdir -p Payload
           cp -R build/ios/iphoneos/Runner.app Payload/
-          zip -qry SB-Player-iOS-v0.6.7-unsigned.ipa Payload
+          zip -qry SB-Player-iOS-v0.6.8-unsigned.ipa Payload
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-iOS-v0.6.7-unsigned-IPA
-          path: SB-Player-iOS-v0.6.7-unsigned.ipa
+          name: SB-Player-iOS-v0.6.8-unsigned-IPA
+          path: SB-Player-iOS-v0.6.8-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
 
@@ -196,37 +196,112 @@ jobs:
           sed -i '/<application/i\    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />\n    <uses-feature android:name="android.software.leanback" android:required="false" />' "$manifest"
           sed -i '/android.intent.category.LAUNCHER/a\                <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>' "$manifest"
           main=$(find android/app/src/main/kotlin -name MainActivity.kt | head -1)
-          sed -i 's/import io.flutter.embedding.android.FlutterActivity/import io.flutter.embedding.android.FlutterFragmentActivity/' "$main"
-          sed -i 's/: FlutterActivity()/: FlutterFragmentActivity()/' "$main"
+          pkg=$(grep '^package ' "$main")
+          cat > "$main" <<EOF
+          $pkg
+
+          import android.app.PictureInPictureParams
+          import android.os.Build
+          import android.util.Rational
+          import io.flutter.embedding.android.FlutterFragmentActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+
+          class MainActivity : FlutterFragmentActivity() {
+              private val pipChannel = "sb_player/android_pip"
+              private var autoPip = true
+
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, pipChannel)
+                      .setMethodCallHandler { call, result ->
+                          when (call.method) {
+                              "isSupported" -> result.success(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                              "setAutoPip" -> {
+                                  autoPip = call.arguments as? Boolean ?: true
+                                  result.success(null)
+                              }
+                              "startPiP" -> result.success(enterSbPictureInPicture())
+                              else -> result.notImplemented()
+                          }
+                      }
+              }
+
+              override fun onUserLeaveHint() {
+                  super.onUserLeaveHint()
+                  if (autoPip) enterSbPictureInPicture()
+              }
+
+              private fun enterSbPictureInPicture(): Boolean {
+                  if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || isInPictureInPictureMode) return false
+                  return try {
+                      val params = PictureInPictureParams.Builder()
+                          .setAspectRatio(Rational(16, 9))
+                          .build()
+                      enterPictureInPictureMode(params)
+                  } catch (_: Throwable) {
+                      false
+                  }
+              }
+          }
+          EOF
+          sed -i '/<application/i\    <uses-permission android:name="android.permission.WAKE_LOCK" />' "$manifest"
+          python3 - <<'PY'
+          import struct,zlib,os
+          def png(size,path):
+              bg=(4,5,9,255); blue=(24,160,255,255); purple=(122,77,255,255)
+              rows=[]
+              def is_s(x,y):
+                  return ((18<=x<46 and 16<=y<27) or (18<=x<29 and 16<=y<50) or
+                          (18<=x<46 and 39<=y<50) or (35<=x<46 and 39<=y<72) or
+                          (18<=x<46 and 61<=y<72))
+              def is_b(x,y):
+                  return ((54<=x<65 and 16<=y<72) or (64<=x<82 and 16<=y<27) or
+                          (64<=x<82 and 39<=y<50) or (64<=x<82 and 61<=y<72) or
+                          (76<=x<87 and 23<=y<43) or (76<=x<87 and 47<=y<66))
+              for py in range(size):
+                  y=py*100//size; row=bytearray([0])
+                  for px in range(size):
+                      x=px*100//size
+                      col=blue if is_s(x,y) else purple if is_b(x,y) else bg
+                      row+=bytes(col)
+                  rows.append(bytes(row))
+              raw=b''.join(rows)
+              def chunk(t,d): return struct.pack('>I',len(d))+t+d+struct.pack('>I',zlib.crc32(t+d)&0xffffffff)
+              data=b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',size,size,8,6,0,0,0))+chunk(b'IDAT',zlib.compress(raw,9))+chunk(b'IEND',b'')
+              os.makedirs(os.path.dirname(path),exist_ok=True);open(path,'wb').write(data)
+          for folder,size in [('mipmap-mdpi',48),('mipmap-hdpi',72),('mipmap-xhdpi',96),('mipmap-xxhdpi',144),('mipmap-xxxhdpi',192)]:
+              png(size,'android/app/src/main/res/'+folder+'/ic_launcher.png')
+          PY
       - run: flutter pub get
       - name: Build Android Mobile APK
         run: |
           flutter build apk --release
-          cp build/app/outputs/flutter-apk/app-release.apk SB-Player-Android-Mobile-v0.6.7.apk
+          cp build/app/outputs/flutter-apk/app-release.apk SB-Player-Android-Mobile-v0.6.8.apk
       - name: Build Android Mobile App Bundle
         run: |
           flutter build appbundle --release
-          cp build/app/outputs/bundle/release/app-release.aab SB-Player-Android-Mobile-v0.6.7.aab
+          cp build/app/outputs/bundle/release/app-release.aab SB-Player-Android-Mobile-v0.6.8.aab
       - name: Build Android TV APK
         run: |
           flutter build apk --release --dart-define=SB_ANDROID_TV=true
-          cp build/app/outputs/flutter-apk/app-release.apk SB-Player-Android-TV-v0.6.7.apk
+          cp build/app/outputs/flutter-apk/app-release.apk SB-Player-Android-TV-v0.6.8.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Android-Mobile-v0.6.7
-          path: SB-Player-Android-Mobile-v0.6.7.apk
+          name: SB-Player-Android-Mobile-v0.6.8
+          path: SB-Player-Android-Mobile-v0.6.8.apk
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Android-Mobile-AAB-v0.6.7
-          path: SB-Player-Android-Mobile-v0.6.7.aab
+          name: SB-Player-Android-Mobile-AAB-v0.6.8
+          path: SB-Player-Android-Mobile-v0.6.8.aab
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-Android-TV-v0.6.7
-          path: SB-Player-Android-TV-v0.6.7.apk
+          name: SB-Player-Android-TV-v0.6.8
+          path: SB-Player-Android-TV-v0.6.8.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -264,10 +339,10 @@ jobs:
         run: |
           mkdir -p dist
           ares-package -o dist webos
-          mv dist/*.ipk dist/SB-Player-LG-v0.6.7.ipk
+          mv dist/*.ipk dist/SB-Player-LG-v0.6.8.ipk
       - uses: actions/upload-artifact@v4
         with:
-          name: SB-Player-LG-v0.6.7
-          path: dist/SB-Player-LG-v0.6.7.ipk
+          name: SB-Player-LG-v0.6.8
+          path: dist/SB-Player-LG-v0.6.8.ipk
           if-no-files-found: error
           retention-days: 14
