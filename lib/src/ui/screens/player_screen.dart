@@ -11,6 +11,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../../models/playback_item.dart';
 import '../../services/mini_player_preferences.dart';
+import '../../services/playback_preferences.dart';
 import '../../state/app_controller.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -43,6 +44,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       MethodChannel('sb_player/media_kit_pip');
 
   final MiniPlayerPreferences _miniPreferences = const MiniPlayerPreferences();
+  final PlaybackPreferences _playbackPreferences = const PlaybackPreferences();
   NativePictureInPicture? _nativePip;
   StreamSubscription<PipEvent>? _pipSubscription;
   bool _pipReady = false;
@@ -69,6 +71,9 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   Track _selectedTracks = const Track();
   MiniPlayerLayout _miniLayout = MiniPlayerLayout.detailed;
   _VideoDisplayMode _displayMode = _VideoDisplayMode.auto;
+  bool _autoPipEnabled = true;
+  SubtitlePreference _subtitlePreference = const SubtitlePreference.auto();
+  bool _subtitlePreferenceApplied = false;
 
   @override
   void initState() {
@@ -102,6 +107,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }));
     _subscriptions.add(_player.stream.tracks.listen((value) {
       if (mounted) setState(() => _tracks = value);
+      unawaited(_applySubtitlePreference());
     }));
     _subscriptions.add(_player.stream.track.listen((value) {
       if (mounted) setState(() => _selectedTracks = value);
@@ -133,6 +139,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }));
 
     unawaited(_loadMiniPreference());
+    unawaited(_loadPlaybackPreferences());
     unawaited(_open());
     // Android PiP can share the app's playback lifecycle. On iOS the
     // native PiP package creates a second AVPlayer, so preloading it here
@@ -165,7 +172,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       }
 
       await pip.initialize(_item.streamUrl);
-      await pip.setAutoPipEnabled(false);
+      await pip.setAutoPipEnabled(_autoPipEnabled);
 
       await _pipSubscription?.cancel();
       _pipSubscription = pip.onPipEvent.listen((event) async {
@@ -367,6 +374,29 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
         state == AppLifecycleState.hidden) {
       unawaited(_checkpointPlayback(force: true));
     }
+
+    if (Platform.isIOS &&
+        _autoPipEnabled &&
+        _playing &&
+        state == AppLifecycleState.inactive) {
+      unawaited(_startIosNativePip());
+    }
+  }
+
+  Future<void> _loadPlaybackPreferences() async {
+    final autoPip = await _playbackPreferences.readAutoPip();
+    final subtitlePreference =
+        await _playbackPreferences.readSubtitlePreference();
+    _autoPipEnabled = autoPip;
+    _subtitlePreference = subtitlePreference;
+    if (_nativePip != null && Platform.isAndroid) {
+      try {
+        await _nativePip!.setAutoPipEnabled(autoPip);
+      } catch (_) {
+        // PiP preference updates are best-effort while a stream is active.
+      }
+    }
+    await _applySubtitlePreference();
   }
 
   Future<void> _loadMiniPreference() async {
@@ -391,12 +421,19 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       // open(play: true). Open paused, wait until metadata is available, seek,
       // verify the position, and only then start playback.
       await _player.open(
-        Media(_item.streamUrl),
+        Media(
+          _item.streamUrl,
+          start: shouldResume ? target : null,
+        ),
         play: !shouldResume,
       );
 
       if (shouldResume) {
-        await _seekToResumePoint(target);
+        // media_kit can pass the resume point to mpv before demux starts. Keep
+        // the explicit seek loop as a fallback for IPTV origins that ignore it.
+        if (_player.state.position < target - const Duration(seconds: 3)) {
+          await _seekToResumePoint(target);
+        }
         await _player.play();
 
         // A few providers only become fully seekable after playback begins.
@@ -406,6 +443,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
           await _player.seek(target);
         }
       }
+      _subtitlePreferenceApplied = false;
+      await _applySubtitlePreference();
     } catch (_) {
       _handlePlaybackFailure();
     }
@@ -453,6 +492,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _position = Duration.zero;
       _duration = Duration.zero;
       _lastCheckpointPosition = Duration.zero;
+      _subtitlePreferenceApplied = false;
       _playbackError = null;
     });
     await _nativePip?.dispose();
@@ -596,6 +636,77 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     }
   }
 
+  Future<void> _applySubtitlePreference() async {
+    if (_subtitlePreferenceApplied) return;
+    final preference = _subtitlePreference;
+
+    try {
+      if (preference.isOff) {
+        await _player.setSubtitleTrack(SubtitleTrack.no());
+        _subtitlePreferenceApplied = true;
+        return;
+      }
+
+      if (preference.isAuto) {
+        await _player.setSubtitleTrack(SubtitleTrack.auto());
+        _subtitlePreferenceApplied = true;
+        return;
+      }
+
+      for (final track in _item.externalSubtitles) {
+        if (!preference.matches(
+          language: track.language,
+          title: track.title,
+        )) {
+          continue;
+        }
+        await _player.setSubtitleTrack(
+          SubtitleTrack.uri(
+            track.url,
+            title: track.title,
+            language: track.language,
+          ),
+        );
+        _subtitlePreferenceApplied = true;
+        return;
+      }
+
+      for (final track in _tracks.subtitle) {
+        if (track.id == 'auto' || track.id == 'no') continue;
+        if (!preference.matches(
+          language: track.language,
+          title: track.title,
+        )) {
+          continue;
+        }
+        await _player.setSubtitleTrack(track);
+        _subtitlePreferenceApplied = true;
+        return;
+      }
+    } catch (_) {
+      // Track discovery can race stream startup. The tracks listener retries.
+    }
+  }
+
+  Future<void> _rememberSubtitleOff() async {
+    _subtitlePreference = const SubtitlePreference.off();
+    _subtitlePreferenceApplied = true;
+    await _playbackPreferences.saveSubtitleOff();
+  }
+
+  Future<void> _rememberSubtitleTrack({
+    String? language,
+    String? title,
+  }) async {
+    _subtitlePreference =
+        SubtitlePreference.match(language: language, title: title);
+    _subtitlePreferenceApplied = true;
+    await _playbackPreferences.saveSubtitleMatch(
+      language: language,
+      title: title,
+    );
+  }
+
   Future<void> _showSubtitlePicker() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -615,6 +726,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                   selected: _selectedTracks.subtitle.id == 'no',
                   onTap: () async {
                     await _player.setSubtitleTrack(SubtitleTrack.no());
+                    await _rememberSubtitleOff();
                     if (context.mounted) Navigator.of(context).pop();
                   },
                 ),
@@ -641,6 +753,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                           language: track.language,
                         ),
                       );
+                      await _rememberSubtitleTrack(
+                        language: track.language,
+                        title: track.title,
+                      );
                       if (context.mounted) Navigator.of(context).pop();
                     },
                   ),
@@ -652,7 +768,21 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                       selected:
                           _tracks.subtitle[i].id == _selectedTracks.subtitle.id,
                       onTap: () async {
-                        await _player.setSubtitleTrack(_tracks.subtitle[i]);
+                        final track = _tracks.subtitle[i];
+                        await _player.setSubtitleTrack(track);
+                        if (track.id == 'no') {
+                          await _rememberSubtitleOff();
+                        } else if (track.id == 'auto') {
+                          _subtitlePreference =
+                              const SubtitlePreference.auto();
+                          _subtitlePreferenceApplied = true;
+                          await _playbackPreferences.saveSubtitleAuto();
+                        } else {
+                          await _rememberSubtitleTrack(
+                            language: track.language,
+                            title: track.title,
+                          );
+                        }
                         if (context.mounted) Navigator.of(context).pop();
                       },
                     ),
@@ -1237,7 +1367,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                 const SizedBox(height: 8),
                 Text(
                   _reconnecting
-                      ? 'Reconnecting automatically… attempt $_reconnectAttempts of 3'
+                      ? 'Reconnecting automatically… attempt $_reconnectAttempts of 5'
                       : _playbackError!,
                   maxLines: 5,
                   overflow: TextOverflow.ellipsis,
