@@ -17,6 +17,7 @@ import '../widgets/brand_backdrop.dart';
 import '../widgets/channel_tile.dart';
 import '../widgets/epg_timeline.dart';
 import '../widgets/library_tile.dart';
+import '../widgets/horizontal_scroller.dart';
 import '../widgets/poster_card.dart';
 import '../widgets/provider_image.dart';
 import '../widgets/resume_card.dart';
@@ -697,24 +698,30 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
                   Expanded(
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: continueItems.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 14),
-                      itemBuilder: (context, index) {
-                        final entry = continueItems[index];
-                        return SizedBox(
-                          width: 390,
-                          child: ResumeCard(
-                            entry: entry,
-                            favorite: controller.isFavorite(entry.toPlaybackItem()),
-                            onFavorite: () => controller.toggleFavorite(
-                              entry.toPlaybackItem(),
+                    child: HorizontalScroller(
+                      showControls: true,
+                      scrollStep: 620,
+                      builder: (scrollController) => ListView.separated(
+                        controller: scrollController,
+                        scrollDirection: Axis.horizontal,
+                        itemCount: continueItems.length,
+                        separatorBuilder: (_, _) => const SizedBox(width: 14),
+                        itemBuilder: (context, index) {
+                          final entry = continueItems[index];
+                          return SizedBox(
+                            width: 390,
+                            child: ResumeCard(
+                              entry: entry,
+                              favorite:
+                                  controller.isFavorite(entry.toPlaybackItem()),
+                              onFavorite: () => controller.toggleFavorite(
+                                entry.toPlaybackItem(),
+                              ),
+                              onTap: () => _play(entry.toPlaybackItem()),
                             ),
-                            onTap: () => _play(entry.toPlaybackItem()),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ] else
@@ -881,6 +888,10 @@ class _HomeScreenState extends State<HomeScreen> {
             title: 'Pick Up Where You Left Off',
             entries: continueItems.take(10).toList(growable: false),
             controller: controller,
+            showScrollControls: widget.tvMode ||
+                Platform.isWindows ||
+                Platform.isLinux ||
+                Platform.isMacOS,
             onTap: (entry) => _play(entry.toPlaybackItem()),
           ),
         ],
@@ -889,6 +900,10 @@ class _HomeScreenState extends State<HomeScreen> {
           _PosterShelf(
             title: 'Recently Added Movies',
             count: newMovies.length,
+            showScrollControls: widget.tvMode ||
+                Platform.isWindows ||
+                Platform.isLinux ||
+                Platform.isMacOS,
             builder: (index) {
               final movie = newMovies[index];
               final item = controller.playbackForMovie(movie);
@@ -917,6 +932,10 @@ class _HomeScreenState extends State<HomeScreen> {
           _PosterShelf(
             title: 'Recently Added Series',
             count: newSeries.length,
+            showScrollControls: widget.tvMode ||
+                Platform.isWindows ||
+                Platform.isLinux ||
+                Platform.isMacOS,
             builder: (index) {
               final series = newSeries[index];
               return PosterCard(
@@ -929,6 +948,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       builder: (_) => SeriesDetailsScreen(
                         controller: controller,
                         series: series,
+                        tvMode: widget.tvMode,
                       ),
                     ),
                   );
@@ -1039,7 +1059,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     imageUrl: show.coverUrl,
                     rating: show.rating,
                     onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => SeriesDetailsScreen(controller: controller, series: show),
+                      builder: (_) => SeriesDetailsScreen(controller: controller, series: show, tvMode: widget.tvMode),
                     )),
                   ),
                 );
@@ -1344,7 +1364,7 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => SeriesDetailsScreen(controller: controller, series: series),
+                    builder: (_) => SeriesDetailsScreen(controller: controller, series: series, tvMode: widget.tvMode),
                   ),
                 );
               },
@@ -1852,11 +1872,13 @@ class _PosterShelf extends StatelessWidget {
     required this.title,
     required this.count,
     required this.builder,
+    this.showScrollControls = false,
   });
 
   final String title;
   final int count;
   final Widget Function(int index) builder;
+  final bool showScrollControls;
 
   @override
   Widget build(BuildContext context) {
@@ -1867,13 +1889,18 @@ class _PosterShelf extends StatelessWidget {
         const SizedBox(height: 12),
         SizedBox(
           height: 330,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: count,
-            separatorBuilder: (_, _) => const SizedBox(width: 14),
-            itemBuilder: (context, index) => SizedBox(
-              width: 205,
-              child: builder(index),
+          child: HorizontalScroller(
+            showControls: showScrollControls,
+            scrollStep: 520,
+            builder: (scrollController) => ListView.separated(
+              controller: scrollController,
+              scrollDirection: Axis.horizontal,
+              itemCount: count,
+              separatorBuilder: (_, _) => const SizedBox(width: 14),
+              itemBuilder: (context, index) => SizedBox(
+                width: 205,
+                child: builder(index),
+              ),
             ),
           ),
         ),
@@ -1888,12 +1915,14 @@ class _HomeShelf extends StatelessWidget {
     required this.entries,
     required this.controller,
     required this.onTap,
+    this.showScrollControls = false,
   });
 
   final String title;
   final List<LibraryEntry> entries;
   final AppController controller;
   final ValueChanged<LibraryEntry> onTap;
+  final bool showScrollControls;
 
   @override
   Widget build(BuildContext context) {
@@ -1904,23 +1933,28 @@ class _HomeShelf extends StatelessWidget {
         const SizedBox(height: 12),
         SizedBox(
           height: 170,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: entries.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final entry = entries[index];
-              return SizedBox(
-                width: 290,
-                child: ResumeCard(
-                  entry: entry,
-                  favorite: controller.isFavorite(entry.toPlaybackItem()),
-                  onFavorite: () =>
-                      controller.toggleFavorite(entry.toPlaybackItem()),
-                  onTap: () => onTap(entry),
-                ),
-              );
-            },
+          child: HorizontalScroller(
+            showControls: showScrollControls,
+            scrollStep: 520,
+            builder: (scrollController) => ListView.separated(
+              controller: scrollController,
+              scrollDirection: Axis.horizontal,
+              itemCount: entries.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final entry = entries[index];
+                return SizedBox(
+                  width: 290,
+                  child: ResumeCard(
+                    entry: entry,
+                    favorite: controller.isFavorite(entry.toPlaybackItem()),
+                    onFavorite: () =>
+                        controller.toggleFavorite(entry.toPlaybackItem()),
+                    onTap: () => onTap(entry),
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ],
