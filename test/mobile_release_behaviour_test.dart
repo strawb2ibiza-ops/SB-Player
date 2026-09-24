@@ -180,9 +180,12 @@ void main() {
       followingEpisodes: episodes.skip(1).toList(),
     );
 
-    expect(playback.title, 'Episode 1');
-    expect(playback.next?.title, 'Episode 2');
-    expect(playback.next?.next?.title, 'Episode 1');
+    expect(playback.title, 'Queue Test');
+    expect(playback.subtitle, 'Season 1 • Episode 1');
+    expect(playback.next?.title, 'Queue Test');
+    expect(playback.next?.subtitle, 'Season 1 • Episode 2');
+    expect(playback.next?.next?.title, 'Queue Test');
+    expect(playback.next?.next?.subtitle, 'Season 2 • Episode 1');
     expect(playback.next?.next?.next, isNull);
 
     controller.dispose();
