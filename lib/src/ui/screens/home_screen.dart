@@ -997,6 +997,10 @@ class _HomeScreenState extends State<HomeScreen> {
             title: 'Recently Watched',
             entries: recentItems.take(8).toList(growable: false),
             controller: controller,
+            showScrollControls: widget.tvMode ||
+                Platform.isWindows ||
+                Platform.isLinux ||
+                Platform.isMacOS,
             onTap: (entry) => _play(entry.toPlaybackItem()),
           ),
         ],
