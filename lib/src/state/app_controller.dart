@@ -433,9 +433,9 @@ class AppController extends ChangeNotifier {
       value = value.replaceFirst(RegExp(r'^\d+\s*[.:-]\s*'), '');
       final season = episode.season.toString().padLeft(2, '0');
       final number = episode.episodeNumber.toString().padLeft(2, '0');
-      final code = 'S' + season + 'E' + number;
+      final code = 'S${season}E$number';
       if (value.isEmpty) return code;
-      value = code + ' - ' + value;
+      value = '$code - $value';
     }
     return value.trim();
   }
