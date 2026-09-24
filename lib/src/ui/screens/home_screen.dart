@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../models/content_section.dart';
@@ -45,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _tvRemotePollBusy = false;
   bool _sidebarCollapsed = false;
   final Set<ContentSection> _categoryLanding = <ContentSection>{};
+  final Set<String> _precacheQueued = <String>{};
 
   bool _showsCategoryLanding(ContentSection section) =>
       (section == ContentSection.live || section == ContentSection.movies || section == ContentSection.series) &&
@@ -1117,6 +1120,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final id = category?.id ?? '__all__';
           final name = category?.name ?? 'All';
           final images = controller.categoryPreviewImages(section, id);
+          _queueCategoryPrecache(images);
           final displayName = controller.displayCategoryName(section, name);
           return _CategoryCard(
             name: displayName,
@@ -1130,6 +1134,21 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       );
     });
+  }
+
+  void _queueCategoryPrecache(List<String> urls) {
+    if (kIsWeb) return;
+    for (final url in urls) {
+      if (url.isEmpty || !_precacheQueued.add(url)) continue;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        precacheImage(
+          ResizeImage(NetworkImage(url), width: 360, height: 540),
+          context,
+          onError: (_, _) => _precacheQueued.remove(url),
+        );
+      });
+    }
   }
 
   Widget _buildLive(AppController controller) {
@@ -1469,7 +1488,13 @@ class _CategoryCard extends StatelessWidget {
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 2),
               itemCount: 4,
               itemBuilder: (_, i) => i < imageUrls.length
-                  ? Image.network(imageUrls[i], fit: BoxFit.cover, errorBuilder: (_, _, _) => const ColoredBox(color: SbBrand.panelBlue))
+                  ? Image.network(
+                      imageUrls[i],
+                      fit: BoxFit.cover,
+                      cacheWidth: 360,
+                      cacheHeight: 540,
+                      gaplessPlayback: true,
+                      errorBuilder: (_, _, _) => const ColoredBox(color: SbBrand.panelBlue))
                   : const ColoredBox(color: SbBrand.panelBlue),
             ),
           DecoratedBox(decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.transparent, SbBrand.black.withValues(alpha: .94)], stops: const [.28, 1]))),
