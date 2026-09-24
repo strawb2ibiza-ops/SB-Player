@@ -34,7 +34,11 @@ class AppController extends ChangeNotifier {
     M3uClient? m3uClient,
     XmlTvService? xmlTvService,
     EpgCacheService epgCacheService = const EpgCacheService(),
-  })  : _epgCacheService = epgCacheService,
+  })  :
+        // Keep the public injection name readable for tests/callers while the
+        // backing field stays private.
+        // ignore: prefer_initializing_formals
+        _epgCacheService = epgCacheService,
         _xtreamClient = xtreamClient ?? XtreamClient(),
         _m3uClient = m3uClient ?? M3uClient(),
         _xmlTvService = xmlTvService ?? XmlTvService();
