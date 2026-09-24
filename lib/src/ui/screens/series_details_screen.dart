@@ -40,7 +40,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
     final series = widget.series;
     final controller = widget.controller;
     return Scaffold(
-      appBar: AppBar(title: Text(series.name)),
+      appBar: AppBar(title: Text(controller.displaySeriesTitle(series))),
       body: FutureBuilder<SeriesDetails>(
         future: _details,
         builder: (context, snapshot) {
@@ -111,6 +111,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
             children: [
               _SeriesHeader(
                 series: series,
+                controller: controller,
                 onPlay: selectedEpisodes.isEmpty
                     ? null
                     : () => playEpisode(selectedEpisodes.first),
@@ -248,7 +249,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '${episode.episodeNumber}. ${episode.title}',
+                                  controller.displayEpisodeTitle(episode),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontWeight: FontWeight.w800),
@@ -284,8 +285,9 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 }
 
 class _SeriesHeader extends StatelessWidget {
-  const _SeriesHeader({required this.series, required this.onPlay});
+  const _SeriesHeader({required this.series, required this.controller, required this.onPlay});
   final SeriesItem series;
+  final AppController controller;
   final VoidCallback? onPlay;
 
   @override
@@ -314,7 +316,7 @@ class _SeriesHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(series.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+              Text(controller.displaySeriesTitle(series), style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
               if (series.releaseDate != null) ...[
                 const SizedBox(height: 6),
                 Text(series.releaseDate!),
