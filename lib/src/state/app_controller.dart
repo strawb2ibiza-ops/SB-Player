@@ -691,7 +691,7 @@ class AppController extends ChangeNotifier {
     final entry = playbackHistory(item);
     if (entry == null || entry.durationSeconds <= 0) return 0;
     if (isWatched(item)) return 1;
-    return entry.progress.clamp(0.0, 1.0);
+    return entry.progress.clamp(0.0, 1.0).toDouble();
   }
 
   String _seriesFavoriteId(SeriesItem item) =>
@@ -1832,7 +1832,12 @@ class AppController extends ChangeNotifier {
     for (final item in series) {
       if (item.id == providerId) return item;
     }
-    return null;
+    return SeriesItem(
+      id: providerId,
+      name: entry.title,
+      categoryId: '',
+      coverUrl: entry.artworkUrl,
+    );
   }
 
   List<LibraryEntry> visibleLibrary(List<LibraryEntry> entries, String search) {
