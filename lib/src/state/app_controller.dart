@@ -712,7 +712,7 @@ class AppController extends ChangeNotifier {
         LibraryEntry(
           id: id,
           title: displaySeriesTitle(item),
-          streamUrl: 'series:\${item.id}',
+          streamUrl: 'series:${item.id}',
           kind: PlaybackKind.episode,
           updatedAt: DateTime.now(),
           artworkUrl: item.coverUrl,
