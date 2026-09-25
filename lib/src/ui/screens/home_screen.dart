@@ -1161,6 +1161,14 @@ class _HomeScreenState extends State<HomeScreen> {
           final id = category?.id ?? '__all__';
           final name = category?.name ?? 'All';
           final images = controller.categoryPreviewImages(section, id);
+          if (section == ContentSection.series &&
+              id != '__all__' &&
+              images.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              unawaited(controller.ensureCategoryPreviewLoaded(section, id));
+            });
+          }
           _queueCategoryPrecache(images);
           final displayName = controller.displayCategoryName(section, name);
           return _CategoryCard(
@@ -1178,7 +1186,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _queueCategoryPrecache(List<String> urls) {
-    if (kIsWeb) return;
+    if (kIsWeb || Platform.isAndroid || Platform.isIOS) return;
     for (final url in urls) {
       if (url.isEmpty || !_precacheQueued.add(url)) continue;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1451,6 +1459,23 @@ class _HomeScreenState extends State<HomeScreen> {
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final entry = entries[index];
+        final series = controller.seriesForFavoriteEntry(entry);
+        if (series != null) {
+          return LibraryTile(
+            entry: entry,
+            favorite: controller.isSeriesFavorite(series),
+            onFavorite: () => controller.toggleSeriesFavorite(series),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => SeriesDetailsScreen(
+                  controller: controller,
+                  series: series,
+                  tvMode: widget.tvMode,
+                ),
+              ),
+            ),
+          );
+        }
         final item = entry.toPlaybackItem();
         return LibraryTile(
           entry: entry,
@@ -1540,8 +1565,8 @@ class _CategoryCard extends StatelessWidget {
                 return ProviderImage(
                   urls: candidates,
                   fit: BoxFit.cover,
-                  cacheWidth: 360,
-                  cacheHeight: 540,
+                  cacheWidth: 240,
+                  cacheHeight: 360,
                   fallback: const ColoredBox(color: SbBrand.panelBlue),
                 );
               },
