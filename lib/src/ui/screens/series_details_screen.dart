@@ -314,7 +314,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                                     const SizedBox(height: 4),
                                     Text(
                                       [
-                                        'S\${episode.season} E\${episode.episodeNumber}',
+                                        'S${episode.season} E${episode.episodeNumber}',
                                         if (episode.duration?.isNotEmpty == true)
                                           episode.duration!,
                                         if (watched) 'Watched',
@@ -419,7 +419,7 @@ class _SeriesHeader extends StatelessWidget {
               ],
               if (series.rating != null) ...[
                 const SizedBox(height: 6),
-                Text('★ \${series.rating!.toStringAsFixed(1)}'),
+                Text('★ ${series.rating!.toStringAsFixed(1)}'),
               ],
               if (series.plot != null) ...[
                 const SizedBox(height: 14),
