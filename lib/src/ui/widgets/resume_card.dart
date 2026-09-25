@@ -148,6 +148,8 @@ class _ResumeCardState extends State<ResumeCard> {
                             ProviderImage(
                               url: entry.artworkUrl,
                               fit: BoxFit.cover,
+                              cacheWidth: 320,
+                              cacheHeight: 240,
                               fallback: const BrandBackdrop(
                                 child: SizedBox.expand(),
                               ),
