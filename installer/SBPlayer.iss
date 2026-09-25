@@ -1,5 +1,5 @@
 #define MyAppName "SB Player"
-#define MyAppVersion "0.6.11"
+#define MyAppVersion "0.6.12"
 #define MyAppPublisher "SB Player"
 #define MyAppExeName "sb_player.exe"
 
@@ -13,7 +13,7 @@ DefaultDirName={autopf}\SB Player
 DefaultGroupName=SB Player
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=SB-Player-Setup-v0.6.11
+OutputBaseFilename=SB-Player-Setup-v0.6.12
 SetupIconFile=..\windows\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2/max
