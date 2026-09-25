@@ -91,8 +91,8 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
           final selectedEpisodes =
               details.seasons[selectedSeason] ?? const <SeriesEpisode>[];
 
-          void playEpisode(SeriesEpisode episode) {
-            Navigator.of(context).push(
+          Future<void> playEpisode(SeriesEpisode episode) async {
+            await Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => PlayerScreen(
                   controller: controller,
@@ -110,6 +110,7 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
                 ),
               ),
             );
+            if (mounted) setState(() {});
           }
 
           return ListView(
@@ -118,6 +119,11 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
               _SeriesHeader(
                 series: series,
                 controller: controller,
+                favorite: controller.isSeriesFavorite(series),
+                onFavorite: () async {
+                  await controller.toggleSeriesFavorite(series);
+                  if (mounted) setState(() {});
+                },
                 onPlay: selectedEpisodes.isEmpty
                     ? null
                     : () => playEpisode(selectedEpisodes.first),
@@ -232,69 +238,125 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
               ),
               const SizedBox(height: 10),
               for (final episode in selectedEpisodes)
-                Card(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: () => playEpisode(episode),
-                    child: Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: SizedBox(
-                              width: 128,
-                              height: 72,
-                              child: ProviderImage(
-                                url: episode.imageUrl,
-                                fit: BoxFit.cover,
-                                fallback: const ColoredBox(
-                                  color: Color(0xFF11182A),
-                                  child: Icon(Icons.play_circle_outline),
+                Builder(
+                  builder: (context) {
+                    final item = controller.playbackForEpisode(series, episode);
+                    final watched = controller.isWatched(item);
+                    final progress = controller.playbackProgress(item);
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      clipBehavior: Clip.antiAlias,
+                      child: InkWell(
+                        onTap: () => playEpisode(episode),
+                        child: Padding(
+                          padding: const EdgeInsets.all(10),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: SizedBox(
+                                  width: 128,
+                                  height: 72,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      ProviderImage(
+                                        url: episode.imageUrl,
+                                        fit: BoxFit.cover,
+                                        cacheWidth: 384,
+                                        cacheHeight: 216,
+                                        fallback: const ColoredBox(
+                                          color: Color(0xFF11182A),
+                                          child: Icon(Icons.play_circle_outline),
+                                        ),
+                                      ),
+                                      if (watched)
+                                        const Align(
+                                          alignment: Alignment.topRight,
+                                          child: Padding(
+                                            padding: EdgeInsets.all(6),
+                                            child: DecoratedBox(
+                                              decoration: BoxDecoration(
+                                                color: Color(0xD9000000),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Padding(
+                                                padding: EdgeInsets.all(4),
+                                                child: Icon(
+                                                  Icons.check_rounded,
+                                                  size: 17,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  controller.displayEpisodeTitle(episode, series: series),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontWeight: FontWeight.w800),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      controller.displayEpisodeTitle(
+                                        episode,
+                                        series: series,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      [
+                                        'S\${episode.season} E\${episode.episodeNumber}',
+                                        if (episode.duration?.isNotEmpty == true)
+                                          episode.duration!,
+                                        if (watched) 'Watched',
+                                      ].join(' • '),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                    if (!watched && progress > 0) ...[
+                                      const SizedBox(height: 7),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(99),
+                                        child: LinearProgressIndicator(
+                                          value: progress,
+                                          minHeight: 4,
+                                        ),
+                                      ),
+                                    ],
+                                    if (episode.plot?.isNotEmpty == true) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        episode.plot!,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ],
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  [
-                                    'S${episode.season} E${episode.episodeNumber}',
-                                    if (episode.duration?.isNotEmpty == true)
-                                      episode.duration!,
-                                  ].join(' • '),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                                if (episode.plot?.isNotEmpty == true) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    episode.plot!,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                ],
-                              ],
-                            ),
+                              ),
+                              Icon(
+                                watched
+                                    ? Icons.check_circle_rounded
+                                    : Icons.play_circle_fill_rounded,
+                                size: 32,
+                              ),
+                            ],
                           ),
-                          const Icon(Icons.play_circle_fill_rounded, size: 32),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
             ],
           );
@@ -305,10 +367,19 @@ class _SeriesDetailsScreenState extends State<SeriesDetailsScreen> {
 }
 
 class _SeriesHeader extends StatelessWidget {
-  const _SeriesHeader({required this.series, required this.controller, required this.onPlay});
+  const _SeriesHeader({
+    required this.series,
+    required this.controller,
+    required this.onPlay,
+    required this.favorite,
+    required this.onFavorite,
+  });
+
   final SeriesItem series;
   final AppController controller;
   final VoidCallback? onPlay;
+  final bool favorite;
+  final VoidCallback onFavorite;
 
   @override
   Widget build(BuildContext context) {
@@ -326,6 +397,8 @@ class _SeriesHeader extends StatelessWidget {
           child: ProviderImage(
             url: series.coverUrl,
             fit: BoxFit.cover,
+            cacheWidth: 480,
+            cacheHeight: 704,
             fallback: const Icon(Icons.movie_filter_outlined, size: 50),
           ),
         ),
@@ -334,24 +407,48 @@ class _SeriesHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(controller.displaySeriesTitle(series), style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+              Text(
+                controller.displaySeriesTitle(series),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+              ),
               if (series.releaseDate != null) ...[
                 const SizedBox(height: 6),
                 Text(series.releaseDate!),
               ],
               if (series.rating != null) ...[
                 const SizedBox(height: 6),
-                Text('★ ${series.rating!.toStringAsFixed(1)}'),
+                Text('★ \${series.rating!.toStringAsFixed(1)}'),
               ],
               if (series.plot != null) ...[
                 const SizedBox(height: 14),
-                Text(series.plot!, maxLines: 5, overflow: TextOverflow.ellipsis),
+                Text(
+                  series.plot!,
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
               const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: onPlay,
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Play'),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  FilledButton.icon(
+                    onPressed: onPlay,
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('Play'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: onFavorite,
+                    icon: Icon(
+                      favorite ? Icons.favorite : Icons.favorite_border,
+                    ),
+                    label: Text(
+                      favorite ? 'In Favourites' : 'Add to Favourites',
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
