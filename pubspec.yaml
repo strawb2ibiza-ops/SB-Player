@@ -1,7 +1,7 @@
 name: sb_player
 description: Cross-platform IPTV player with open and SB-locked provider modes.
 publish_to: 'none'
-version: 0.6.11+16
+version: 0.6.12+17
 
 environment:
   sdk: '>=3.12.1 <4.0.0'
