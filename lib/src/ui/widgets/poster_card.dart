@@ -86,6 +86,8 @@ class _PosterCardState extends State<PosterCard> {
                           child: ProviderImage(
                             url: widget.imageUrl,
                             fit: BoxFit.cover,
+                            cacheWidth: 480,
+                            cacheHeight: 720,
                             fallback: const _MissingPoster(),
                           ),
                         ),
